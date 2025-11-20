@@ -14,12 +14,20 @@
 - NOTE: The list below is the global, project-level TODO where the development team (humans) should add and edit items. An LLM (or automated assistant) MUST NOT modify this section  it can only read it. This file contains the authoritative human TODOs for planning and coordination.
 
 - [ ] Conectar a Thingsboard mediante MQTT para sincronización de datos.
-- [ ] Leer lo que entrega el dispositivo BLE y descodificar los datos según el protocolo definido.
+- [ ] Leer lo que entrega el dispositivo BLE
+- [ ] Descodificar los datos según el protocolo definido.
 - [ ] Confirmar conexion y persistencia del dispositivo BLE preferido.
 - [ ] Agrandar placeholder.png 
 - [ ] Mejorar el menu de opciones.
-- [ ] Agregar la notificacion de sincronización en foreground service.
+- [X] Agregar la notificacion de sincronización en foreground service.
 - [ ] Verificar modularidad y limpieza del código.
+
+Additional objectives to align with the connectivity-stage vision:
+- [ ] Implementar reconexión automática y descubrimiento continuo para identificar y conectar el dispositivo incluso si la app no ha sido abierta (mientras Bluetooth esté activado).
+- [ ] Asegurar la recolección y envío de telemetría en segundo plano con cola y reintentos hasta confirmación en ThingsBoard (persistir mensajes intermedios en caso de red inestable).
+- [ ] Manejar y documentar permisos/entitlements por plataforma (Android: foreground service + permisos; iOS: background modes, entitlements) necesarios para mantener el envío en background.
+- [ ] Almacenar de forma segura el token/credenciales de ThingsBoard y proporcionar un mecanismo de configuración (no hardcodear credenciales en el código fuente).
+- [ ] Añadir pruebas end-to-end que verifiquen descubrimiento, reconexión en background y llegada de telemetría a ThingsBoard.
 
 (LLM/editor rule: Do not write to or change this TODO section unless explicitly authorized by a human operator.)
 
@@ -45,6 +53,24 @@
 
 **How agents should use this file**
 - Coding agents should write actionable proposals and short implementation notes to the **Suggestions** section so humans can review and accept them.
+
+---
+
+## Suggestions
+
+### Low-Latency Game Input Hook
+
+**Context**: For future game integration, the current `incomingRaw$` stream is sufficient for UI display but introduces overhead (string conversion, widget rebuilds). For millisecond-level game input, consider adding a lightweight in-memory callback interface.
+
+**Proposal**:
+- Add a `registerRawCallback(void Function(List<int> bytes) callback)` method to `BluetoothService`.
+- Call the callback directly from the characteristic listener before any stream processing.
+- Decode the 12-byte IMU payload (6 × int16 little-endian) into floats using the scaling factors from the device code:
+  - Accelerometer (ax, ay, az): divide by 100.0
+  - Gyroscope (gx, gy, gz): divide by 10.0
+- This avoids UI rebuild overhead and provides raw sensor data at device sampling rate (~20Hz based on 50ms delay in device code).
+
+**Implementation Note**: Add callback registration/unregistration methods and invoke callback in the characteristic `lastValueStream.listen` handler before publishing to streams.
 - Agents must not edit the **Main TODO** section unless a human asks them to.
 
 ---

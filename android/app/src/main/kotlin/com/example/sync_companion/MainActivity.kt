@@ -8,9 +8,17 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
 
 class MainActivity : FlutterActivity() {
 	private val CHANNEL = "sync_companion/bluetooth"
@@ -39,6 +47,10 @@ class MainActivity : FlutterActivity() {
 					} else {
 						perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
 					}
+					// Android 13+ requires runtime POST_NOTIFICATIONS permission
+					if (sdk >= Build.VERSION_CODES.TIRAMISU) {
+						perms.add(Manifest.permission.POST_NOTIFICATIONS)
+					}
 					requestedPerms = perms.toTypedArray()
 					val toRequest = requestedPerms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
 					if (toRequest.isEmpty()) {
@@ -56,9 +68,106 @@ class MainActivity : FlutterActivity() {
 					val adapter = BluetoothAdapter.getDefaultAdapter()
 					result.success(adapter != null && adapter.isEnabled)
 				}
+				"updateNotification" -> {
+					val text = call.argument<String>("text") ?: ""
+					try {
+						val channelId = "sync_companion_channel"
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+							val nm = getSystemService(NotificationManager::class.java)
+							val ch = NotificationChannel(channelId, "Sync Companion", NotificationManager.IMPORTANCE_LOW)
+							nm.createNotificationChannel(ch)
+						}
+						val builder = NotificationCompat.Builder(this, channelId)
+							.setContentTitle("Sync Companion")
+							.setContentText(text.take(128))
+							.setSmallIcon(android.R.drawable.ic_dialog_info)
+							.setPriority(NotificationCompat.PRIORITY_LOW)
+						NotificationManagerCompat.from(this).notify(1001, builder.build())
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("notif_failed", e.toString(), null)
+					}
+				}
+				"startNativeService" -> {
+					try {
+						val intent = Intent(this, BleForegroundService::class.java)
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("start_failed", e.toString(), null)
+					}
+				}
+				"stopNativeService" -> {
+					try {
+						val intent = Intent(this, BleForegroundService::class.java)
+						stopService(intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("stop_failed", e.toString(), null)
+					}
+				}
+				"isNativeServiceRunning" -> {
+					try {
+						val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+						val list = am.getRunningServices(Integer.MAX_VALUE)
+						val running = list.any { it.service.className == BleForegroundService::class.java.name }
+						result.success(running)
+					} catch (e: Exception) {
+						result.success(false)
+					}
+				}
+				"connect" -> {
+					val id = call.argument<String>("id") ?: ""
+					try {
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_CONNECT"
+						intent.putExtra("id", id)
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("connect_failed", e.toString(), null)
+					}
+				}
+				"disconnect" -> {
+					try {
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_DISCONNECT"
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("disconnect_failed", e.toString(), null)
+					}
+				}
 				else -> result.notImplemented()
 			}
 		}
+
+		// EventChannel: forward broadcasts from native service as byte[] -> List<int>
+		EventChannel(flutterEngine.dartExecutor.binaryMessenger, "sync_companion/ble_events").setStreamHandler(object: EventChannel.StreamHandler {
+			var receiver: BroadcastReceiver? = null
+			override fun onListen(args: Any?, events: EventChannel.EventSink?) {
+				receiver = object: BroadcastReceiver() {
+					override fun onReceive(context: Context?, intent: Intent?) {
+						try {
+							val data = intent?.getByteArrayExtra("data")
+							if (data != null) {
+								val list = data.map { (it.toInt() and 0xFF) }
+								events?.success(list)
+							}
+						} catch (e: Exception) { }
+					}
+				}
+				val filter = IntentFilter("com.example.sync_companion.BLE_EVENT")
+				applicationContext.registerReceiver(receiver, filter)
+			}
+
+			override fun onCancel(args: Any?) {
+				if (receiver != null) {
+					try { applicationContext.unregisterReceiver(receiver) } catch (e: Exception) { }
+					receiver = null
+				}
+			}
+		})
 	}
 
 	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

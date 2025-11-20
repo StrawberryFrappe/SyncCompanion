@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../foreground_handler.dart';
 import '../services/bluetooth_service.dart' as bt_service;
+import '../services/foreground_notification.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,13 +27,15 @@ class _HomePageState extends State<HomePage> {
   bool _scanning = false;
   DateTime? _lastScanStart;
   final Duration _scanDebounce = const Duration(seconds: 5);
-  final Duration _scanTimeout = const Duration(seconds: 30);
+  final Duration _scanTimeout = const Duration(seconds: 7);
+  
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   String _adapterState = 'unknown';
   Map<String, bool> _permissionStatuses = {};
   Map<String, String> _debugInfo = {};
   bool _bgServiceRunning = false;
   bool _showSyncNotification = true;
+  ForegroundNotificationUpdater? _notifUpdater;
 
   StreamSubscription<BluetoothDevice?>? _connSub;
   StreamSubscription<String>? _incomingSub;
@@ -49,6 +52,12 @@ class _HomePageState extends State<HomePage> {
         _connectedDevice = d;
         _status = d != null ? 'LINKED' : 'SEARCHING';
       });
+      // If a device became connected, ensure background service is running
+      // so the notification updater can reflect incoming packets.
+      if (d != null) {
+        // Fire-and-forget; this will request permissions if needed.
+        _startBackgroundTask();
+      }
     });
     _incomingSub = _bt.incomingData$.listen((s) {
       setState(() => _incoming = s);
@@ -57,6 +66,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _notifUpdater?.stop();
     _connSub?.cancel();
     _incomingSub?.cancel();
     _userActionSub?.cancel();
@@ -130,7 +140,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _startBackgroundTask() async {
-    if (await FlutterForegroundTask.isRunningService) return;
+    final running = await FlutterForegroundTask.isRunningService;
+    if (running) {
+      // ensure the notification updater is running when service already active
+      _notifUpdater ??= ForegroundNotificationUpdater(_bt);
+      _notifUpdater?.start();
+      setState(() => _bgServiceRunning = true);
+      return;
+    }
     await _bt.performRequestPermissions();
     setState(() => _permissionStatuses = _bt.permissionStatuses);
     final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
@@ -164,6 +181,10 @@ class _HomePageState extends State<HomePage> {
         callback: startCallback,
       );
       setState(() => _bgServiceRunning = true);
+      // start the notification updater to reflect raw BLE packets in the
+      // foreground notification (connected-only by default)
+      _notifUpdater = ForegroundNotificationUpdater(_bt);
+      _notifUpdater?.start();
     } catch (e) {
       print('startBackgroundTask failed: $e');
       await showDialog<void>(context: context, builder: (c) => AlertDialog(
@@ -183,6 +204,12 @@ class _HomePageState extends State<HomePage> {
     // updates its view of statuses.
     await _bt.performRequestPermissions();
     setState(() => _permissionStatuses = _bt.permissionStatuses);
+    try {
+      await FlutterForegroundTask.stopService();
+    } catch (_) {}
+    _notifUpdater?.stop();
+    _notifUpdater = null;
+    setState(() => _bgServiceRunning = false);
   }
 
   // Permission and adapter flows are handled by `BluetoothService` now.
@@ -255,7 +282,7 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
                         child: SingleChildScrollView(
                           child: Text(
-                            '${(_connectedDevice!.platformName.isNotEmpty ? _connectedDevice!.platformName : _connectedDevice!.remoteId.str)}\n${_incoming.isEmpty ? '—' : _incoming}',
+                            '${(_connectedDevice!.platformName.isNotEmpty ? _connectedDevice!.platformName : _connectedDevice!.remoteId.str)}',
                             style: const TextStyle(fontSize: 10),
                           ),
                         ),
@@ -266,30 +293,39 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: StreamBuilder<List<ScanResult>>(
-                  stream: _bt.foundDevices$,
-                  builder: (ctx, snap) {
-                    final found = snap.data ?? const [];
-                    return ListView.separated(
-                      itemCount: found.length,
-                      separatorBuilder: (_, __) => const Divider(color: Colors.black, thickness: 2),
-                      itemBuilder: (ctx2, i) {
-                        final r = found[i];
-                        final idStr = r.device.remoteId.str;
-                        final name = (r.device.platformName.isNotEmpty ? r.device.platformName : idStr);
-                        return ListTile(
-                          title: Text(name, style: const TextStyle(fontSize: 10)),
-                          subtitle: Text('$idStr\n${_bt.debugInfo[idStr] ?? ''}', style: const TextStyle(fontSize: 8)),
-                          onTap: () async {
-                            await _stopScan();
-                            Navigator.of(context).pop();
-                            await _connectTo(r.device, save: true);
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
+                child: _connectedDevice != null
+                    ? ConnectedTerminal(bt: _bt, maxLines: 200)
+                    : StreamBuilder<List<ScanResult>>(
+                        stream: _bt.foundDevices$,
+                        builder: (ctx, snap) {
+                          final found = snap.data ?? const [];
+                          return ListView.separated(
+                            itemCount: found.length,
+                            separatorBuilder: (_, __) => const Divider(color: Colors.black, thickness: 2),
+                            itemBuilder: (ctx2, i) {
+                              final r = found[i];
+                              final idStr = r.device.remoteId.str;
+                              final name = (r.device.platformName.isNotEmpty ? r.device.platformName : idStr);
+                              // Simplified row: show name and two small numbers (RSSI and short id)
+                              final shortId = idStr.length > 6 ? idStr.substring(idStr.length - 6) : idStr;
+                              return ListTile(
+                                title: Text(name, style: const TextStyle(fontSize: 12)),
+                                subtitle: Text('RSSI: ${r.rssi} dBm', style: const TextStyle(fontSize: 10)),
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(border: Border.all(width: 1, color: Colors.black), borderRadius: BorderRadius.circular(4)),
+                                  child: Text(shortId, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                                ),
+                                onTap: () async {
+                                  await _stopScan();
+                                  Navigator.of(context).pop();
+                                  await _connectTo(r.device, save: true);
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
               ),
               if (_connectedDevice != null)
                 ElevatedButton(
@@ -359,6 +395,81 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// A small terminal-like widget that subscribes to the BluetoothService
+// raw stream and shows a rolling buffer of recent packets in hex.
+class ConnectedTerminal extends StatefulWidget {
+  const ConnectedTerminal({super.key, required this.bt, this.maxLines = 100});
+
+  final bt_service.BluetoothService bt;
+  final int maxLines;
+
+  @override
+  State<ConnectedTerminal> createState() => _ConnectedTerminalState();
+}
+
+class _ConnectedTerminalState extends State<ConnectedTerminal> {
+  final List<String> _lines = [];
+  StreamSubscription<List<int>>? _sub;
+  final ScrollController _scroll = ScrollController();
+  DateTime? _lastPacketAt;
+  Timer? _recentTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = widget.bt.incomingRaw$.listen((bytes) {
+      final s = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+      setState(() {
+        _lastPacketAt = DateTime.now();
+        _lines.add(s);
+        if (_lines.length > widget.maxLines) _lines.removeAt(0);
+      });
+      // auto-scroll to bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
+    }, onError: (_) {});
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _recentTimer?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasRecent = _lastPacketAt != null && DateTime.now().difference(_lastPacketAt!).inMilliseconds < 2000;
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+      child: Scrollbar(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!hasRecent)
+              const Text('— no recent packets —', style: TextStyle(fontSize: 10, fontFamily: 'monospace')),
+            Expanded(
+              child: ListView.builder(
+                controller: _scroll,
+                itemCount: _lines.isEmpty ? 1 : _lines.length,
+                itemBuilder: (ctx, i) {
+                  if (_lines.isEmpty) return const Text('— no incoming packets yet —', style: TextStyle(fontSize: 10, fontFamily: 'monospace'));
+                  return Text(_lines[i], style: const TextStyle(fontSize: 10, fontFamily: 'monospace'));
+                },
+              ),
             ),
           ],
         ),
