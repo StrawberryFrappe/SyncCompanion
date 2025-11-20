@@ -19,6 +19,7 @@
 - [ ] Agrandar placeholder.png 
 - [ ] Mejorar el menu de opciones.
 - [ ] Agregar la notificacion de sincronización en foreground service.
+- [ ] Verificar modularidad y limpieza del código.
 
 (LLM/editor rule: Do not write to or change this TODO section unless explicitly authorized by a human operator.)
 
