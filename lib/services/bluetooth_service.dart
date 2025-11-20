@@ -5,9 +5,29 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Events that instruct the UI to show a dialog or request user input.
+enum BluetoothUserActionType { enableBluetooth, requestPermissions }
+
+class BluetoothUserAction {
+  final BluetoothUserActionType type;
+  const BluetoothUserAction(this.type);
+}
+
 // TODO: add more robust error reporting and expose status events if needed.
 class BluetoothService {
   BluetoothService();
+
+  // Events that require a UI interaction (dialogs). The UI should listen
+  // to `userAction$` and show the appropriate prompt. After the user acts,
+  // the UI should call `performEnableBluetooth()` or `performRequestPermissions()`
+  // which will complete the service's pending operations.
+  // TODO: consider richer event payloads in future (messages, action ids).
+  final StreamController<BluetoothUserAction> _userActionController = StreamController.broadcast();
+  Stream<BluetoothUserAction> get userAction$ => _userActionController.stream;
+
+  Completer<bool>? _pendingEnableCompleter;
+  Completer<bool>? _pendingPermissionCompleter;
+
 
   // Broadcast controllers to allow multiple UI listeners.
   final StreamController<List<ScanResult>> _foundController = StreamController.broadcast();
@@ -26,12 +46,19 @@ class BluetoothService {
   final List<ScanResult> _found = [];
   StreamSubscription? _scanSub;
   Timer? _scanStopTimer;
+  DateTime? _lastScanStart;
+  final Duration _scanDebounce = const Duration(seconds: 5);
   BluetoothDevice? _connected;
   // `_activeChar` was removed because characteristic handling uses subscriptions directly.
   StreamSubscription<List<int>>? _charSub;
   String? _savedId;
 
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
+
+  // Expose current permission snapshot for UI convenience.
+  Map<String, bool> _permissionStatuses = {};
+  Map<String, bool> get permissionStatuses => Map.unmodifiable(_permissionStatuses);
+
 
   Future<void> init() async {
     try {
@@ -45,6 +72,16 @@ class BluetoothService {
   }
 
   Future<void> startScan({Duration? timeout}) async {
+    // Debounce and ensure adapter + permissions are OK. The service owns
+    // the debounce logic so UI callers can simply call `startScan()`.
+    final now = DateTime.now();
+    if (_scanSub != null) return; // already scanning
+    if (_lastScanStart != null && now.difference(_lastScanStart!) < _scanDebounce) return;
+    _lastScanStart = now;
+
+    final ok = await _ensureBluetoothOnBeforeScan();
+    if (!ok) return;
+
     // Reset and start listening to scan results.
     _found.clear();
     _foundController.add(List<ScanResult>.from(_found));
@@ -82,6 +119,78 @@ class BluetoothService {
       _scanStopTimer = Timer(timeout, () async {
         await stopScan();
       });
+    }
+  }
+
+  // Called by UI when the user agreed to enable Bluetooth. This performs the
+  // platform request and unblocks any pending `startScan()` call.
+  Future<bool> performEnableBluetooth() async {
+    bool enabled = false;
+    try {
+      enabled = await _platform.invokeMethod('enableBluetooth') == true;
+    } catch (_) {}
+    _pendingEnableCompleter?.complete(enabled);
+    _pendingEnableCompleter = null;
+    return enabled;
+  }
+
+  // Called by UI when the user agreed to grant permissions. This triggers the
+  // platform request and unblocks pending `startScan()` calls.
+  Future<bool> performRequestPermissions() async {
+    bool ok = false;
+    try {
+      final res = await _platform.invokeMethod('requestPermissions');
+      if (res is Map) {
+        final map = Map<String, dynamic>.from(res);
+        _permissionStatuses = map.map((k, v) => MapEntry(k.toString(), v == true));
+        ok = (_permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true) &&
+            (_permissionStatuses['android.permission.BLUETOOTH_CONNECT'] == true || _permissionStatuses['BLUETOOTH_CONNECT'] == true);
+      }
+    } catch (_) {}
+    _pendingPermissionCompleter?.complete(ok);
+    _pendingPermissionCompleter = null;
+    return ok;
+  }
+
+  Future<bool> _checkPermissions() async {
+    try {
+      final res = await _platform.invokeMethod('requestPermissions');
+      if (res is Map) {
+        final map = Map<String, dynamic>.from(res);
+        _permissionStatuses = map.map((k, v) => MapEntry(k.toString(), v == true));
+        return (_permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true) &&
+            (_permissionStatuses['android.permission.BLUETOOTH_CONNECT'] == true || _permissionStatuses['BLUETOOTH_CONNECT'] == true);
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> _ensureBluetoothOnBeforeScan() async {
+    try {
+      final enabledNow = await isBluetoothEnabled();
+      if (enabledNow) {
+        final permsOk = await _checkPermissions();
+        if (permsOk) return true;
+        // request permissions via UI
+        _userActionController.add(const BluetoothUserAction(BluetoothUserActionType.requestPermissions));
+        _pendingPermissionCompleter = Completer<bool>();
+        final granted = await _pendingPermissionCompleter!.future.timeout(const Duration(seconds: 10), onTimeout: () => false);
+        return granted;
+      }
+      // If not enabled, ask UI to prompt user to enable then perform platform enable.
+      _userActionController.add(const BluetoothUserAction(BluetoothUserActionType.enableBluetooth));
+      _pendingEnableCompleter = Completer<bool>();
+      final enabled = await _pendingEnableCompleter!.future.timeout(const Duration(seconds: 10), onTimeout: () => false);
+      if (!enabled) return false;
+      // after enabling, check permissions
+      final permsOk = await _checkPermissions();
+      if (permsOk) return true;
+      _userActionController.add(const BluetoothUserAction(BluetoothUserActionType.requestPermissions));
+      _pendingPermissionCompleter = Completer<bool>();
+      final granted = await _pendingPermissionCompleter!.future.timeout(const Duration(seconds: 10), onTimeout: () => false);
+      return granted;
+    } catch (e) {
+      return false;
     }
   }
 

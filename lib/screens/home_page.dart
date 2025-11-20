@@ -36,12 +36,14 @@ class _HomePageState extends State<HomePage> {
 
   StreamSubscription<BluetoothDevice?>? _connSub;
   StreamSubscription<String>? _incomingSub;
+  StreamSubscription<bt_service.BluetoothUserAction>? _userActionSub;
 
   @override
   void initState() {
     super.initState();
     _init();
     _bt.init();
+    _userActionSub = _bt.userAction$.listen((a) => _handleUserAction(a));
     _connSub = _bt.connectedDevice$.listen((d) {
       setState(() {
         _connectedDevice = d;
@@ -57,6 +59,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _connSub?.cancel();
     _incomingSub?.cancel();
+    _userActionSub?.cancel();
     _bt.dispose();
     super.dispose();
   }
@@ -79,9 +82,57 @@ class _HomePageState extends State<HomePage> {
     setState(() => _debugInfo = Map<String, String>.from(_bt.debugInfo));
   }
 
+  Future<void> _handleUserAction(bt_service.BluetoothUserAction action) async {
+    try {
+      if (action.type == bt_service.BluetoothUserActionType.enableBluetooth) {
+        final pressed = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('Bluetooth Disabled', style: TextStyle(fontSize: 12)),
+            content: const Text('Bluetooth needs to be enabled to scan for devices.', style: TextStyle(fontSize: 10)),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('CANCEL', style: TextStyle(fontSize: 10))),
+              TextButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('ENABLE BLUETOOTH', style: TextStyle(fontSize: 10))),
+            ],
+          ),
+        );
+        if (pressed == true) {
+          final enabled = await _bt.performEnableBluetooth();
+          setState(() => _adapterState = enabled ? 'ON' : 'OFF');
+        }
+      } else if (action.type == bt_service.BluetoothUserActionType.requestPermissions) {
+        final pressed = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
+            content: const Text('Bluetooth permissions are required. Please grant them in Settings or allow when prompted.', style: TextStyle(fontSize: 10)),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('CANCEL', style: TextStyle(fontSize: 10))),
+              TextButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('REQUEST', style: TextStyle(fontSize: 10))),
+            ],
+          ),
+        );
+        if (pressed == true) {
+          final ok = await _bt.performRequestPermissions();
+          setState(() => _permissionStatuses = _bt.permissionStatuses);
+          if (!ok) {
+            await showDialog<void>(context: context, builder: (c) => AlertDialog(
+              title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
+              content: const Text('Could not acquire required permissions. Please grant them in Android Settings.', style: TextStyle(fontSize: 10)),
+              actions: [TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10)))],
+            ));
+          }
+        }
+      }
+    } catch (e) {
+      // ignore UI errors
+    }
+  }
+
   Future<void> _startBackgroundTask() async {
     if (await FlutterForegroundTask.isRunningService) return;
-    await _requestPermissions();
+    await _bt.performRequestPermissions();
+    setState(() => _permissionStatuses = _bt.permissionStatuses);
     final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
     final connectOk = _permissionStatuses['android.permission.BLUETOOTH_CONNECT'] == true || _permissionStatuses['BLUETOOTH_CONNECT'] == true;
     if (!scanOk || !connectOk) {
@@ -127,68 +178,17 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _stopBackgroundTask() async {
     if (!await FlutterForegroundTask.isRunningService) return;
-    await FlutterForegroundTask.stopService();
-    setState(() => _bgServiceRunning = false);
+    // Ensure required runtime permissions are granted first. The service
+    // manages the actual permission request; UI simply invokes it and
+    // updates its view of statuses.
+    await _bt.performRequestPermissions();
+    setState(() => _permissionStatuses = _bt.permissionStatuses);
   }
 
-  Future<void> _requestPermissions() async {
-    try {
-      final res = await _platform.invokeMethod('requestPermissions');
-      if (res is Map) {
-        final map = Map<String, dynamic>.from(res);
-        setState(() {
-          _permissionStatuses = map.map((k, v) => MapEntry(k.toString(), v == true));
-        });
-      }
-    } on PlatformException catch (e) {
-      print('permission request failed: $e');
-    }
-  }
-
-  Future<bool> _ensureBluetoothOnBeforeScan() async {
-    try {
-      final enabledNow = await _platform.invokeMethod('isBluetoothEnabled');
-      if (enabledNow == true) return true;
-      final pressed = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('Bluetooth Disabled', style: TextStyle(fontSize: 12)),
-          content: const Text('Bluetooth needs to be enabled to scan for devices.', style: TextStyle(fontSize: 10)),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('CANCEL', style: TextStyle(fontSize: 10))),
-            TextButton(onPressed: () async { Navigator.of(c).pop(true); }, child: const Text('ENABLE BLUETOOTH', style: TextStyle(fontSize: 10))),
-          ],
-        ),
-      );
-      if (pressed != true) return false;
-      bool enabled = false;
-      try {
-        enabled = await _platform.invokeMethod('enableBluetooth') == true;
-      } on PlatformException catch (e) {
-        print('enable intent failed: $e');
-      }
-      for (int i = 0; i < 10; i++) {
-        final now = await _platform.invokeMethod('isBluetoothEnabled');
-        if (now == true) return true;
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-      return enabled;
-    } catch (e) {
-      print('ensureBluetoothOnBeforeScan error: $e');
-      return false;
-    }
-  }
+  // Permission and adapter flows are handled by `BluetoothService` now.
 
   Future<void> _startScan() async {
-    final now = DateTime.now();
     if (_scanning) return;
-    if (_lastScanStart != null && now.difference(_lastScanStart!) < _scanDebounce) return;
-    final ok = await _ensureBluetoothOnBeforeScan();
-    if (!ok) {
-      setState(() => _status = 'BLUETOOTH_OFF');
-      return;
-    }
-    _lastScanStart = now;
     setState(() => _scanning = true);
     try {
       await _bt.startScan(timeout: _scanTimeout);
