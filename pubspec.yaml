@@ -1,0 +1,24 @@
+name: sync_companion
+description: A minimal Flutter starter app.
+publish_to: 'none'
+version: 0.0.1
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  flutter_blue_plus: ^1.4.0
+  shared_preferences: ^2.1.0
+  # permission_handler removed due to Android embedding compatibility; runtime
+  # permissions are requested via platform prompts where possible.
+  google_fonts: ^5.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
