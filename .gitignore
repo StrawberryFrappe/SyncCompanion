@@ -11,3 +11,43 @@ build/
 .flutter-plugins
 .DS_Store
 pubspec.lock
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+android/.gradle/
+
+# Flutter / Dart
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+
+# OS files
+.vscode/
+Thumbs.db
+
+# Generated binaries and packages
+*.apk
+*.aab
+*.so
+*.jar
+
+# Logs
+*.log
+
+# Local config
+local.properties
+
+# Keystore
+*.jks
+*.keystore
+
+# Xcode
+ios/Pods/
+ios/Runner/GeneratedPluginRegistrant.*

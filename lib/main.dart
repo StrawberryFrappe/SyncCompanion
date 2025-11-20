@@ -2,12 +2,63 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_fonts/google_fonts.dart';
+// Note: using bundled `Monocraft` font; removed runtime google_fonts usage.
 
-void main() => runApp(const SyncCompanionApp());
+@pragma('vm:entry-point')
+void startCallback() {
+  FlutterForegroundTask.setTaskHandler(_KeepAliveTaskHandler());
+}
+
+class _KeepAliveTaskHandler extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    // no-op: the main isolate handles BLE; this task just keeps the process alive
+  }
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {
+    // Send a lightweight heartbeat to main isolate; main can ignore if not needed
+    FlutterForegroundTask.sendDataToMain({'heartbeat': timestamp.millisecondsSinceEpoch});
+  }
+
+  @override
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+    // cleanup if needed
+  }
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize communication port between task isolate and main isolate.
+  FlutterForegroundTask.initCommunicationPort();
+
+  // Initialize the foreground task plugin with conservative options.
+  FlutterForegroundTask.init(
+    androidNotificationOptions: AndroidNotificationOptions(
+      channelId: 'sync_companion_fg',
+      channelName: 'Sync Companion Service',
+      channelDescription: 'Foreground service for keeping BLE active',
+      onlyAlertOnce: true,
+    ),
+    iosNotificationOptions: IOSNotificationOptions(
+      showNotification: false,
+      playSound: false,
+    ),
+    foregroundTaskOptions: ForegroundTaskOptions(
+      eventAction: ForegroundTaskEventAction.repeat(5000),
+      autoRunOnBoot: false,
+      autoRunOnMyPackageReplaced: false,
+      allowWakeLock: true,
+      allowWifiLock: true,
+    ),
+  );
+
+  runApp(const SyncCompanionApp());
+}
 
 class SyncCompanionApp extends StatelessWidget {
   const SyncCompanionApp({super.key});
@@ -15,18 +66,22 @@ class SyncCompanionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = ThemeData.light();
+    final appTextTheme = base.textTheme.apply(fontFamily: 'Monocraft', bodyColor: Colors.black);
     return MaterialApp(
       title: 'Sync Companion',
-      theme: base.copyWith(
+      theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
-        textTheme: GoogleFonts.pressStart2pTextTheme(
-          base.textTheme.apply(bodyColor: Colors.black),
-        ),
-        appBarTheme: const AppBarTheme(
+        textTheme: appTextTheme,
+        primaryTextTheme: appTextTheme,
+        appBarTheme: AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
+          titleTextStyle: appTextTheme.titleLarge?.copyWith(fontSize: 14) ?? const TextStyle(fontFamily: 'Monocraft', fontSize: 14),
+          toolbarTextStyle: appTextTheme.bodyLarge,
         ),
+        textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
+        elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
       ),
       home: const HomePage(),
     );
@@ -51,7 +106,14 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   // use FlutterBluePlus static APIs directly
   final List<ScanResult> _found = [];
+  // Notifier for live updates inside dialogs/routes that don't rebuild from
+  // the parent `setState`. Use this to show devices as they arrive.
+  final ValueNotifier<List<ScanResult>> _foundNotifier = ValueNotifier(const []);
   StreamSubscription? _scanSub;
+  Timer? _scanStopTimer;
+  DateTime? _lastScanStart;
+  final Duration _scanDebounce = const Duration(seconds: 5);
+  final Duration _scanTimeout = const Duration(seconds: 30);
   BluetoothDevice? _connectedDevice;
   // characteristic placeholder removed; we handle subscriptions directly
   Timer? _readTimer;
@@ -64,6 +126,7 @@ class _HomePageState extends State<HomePage> {
   String _adapterState = 'unknown';
   Map<String, bool> _permissionStatuses = {};
   final Map<String, String> _debugInfo = {};
+  bool _bgServiceRunning = false;
 
   @override
   void initState() {
@@ -75,7 +138,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _scanSub?.cancel();
     _readTimer?.cancel();
-    _connectedDevice?.disconnect();
+    _foundNotifier.dispose();
     super.dispose();
   }
 
@@ -89,6 +152,11 @@ class _HomePageState extends State<HomePage> {
       print('isBluetoothEnabled failed: $e');
     }
     await _requestPermissions();
+    // check foreground service status
+    try {
+      final running = await FlutterForegroundTask.isRunningService;
+      setState(() => _bgServiceRunning = running);
+    } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
     _savedId = prefs.getString('saved_device_id');
     if (_savedId != null) {
@@ -115,21 +183,21 @@ class _HomePageState extends State<HomePage> {
     while (mounted && _connectedDevice == null) {
       try {
         setState(() => _status = 'SEARCHING');
-        FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
-        final results = await FlutterBluePlus.scanResults.first;
+        // use our debounced scanner for a short scan window
+        await _startScan();
+        await Future.delayed(const Duration(seconds: 4));
         ScanResult? match;
-        for (final r in results) {
+        for (final r in _found) {
           if (r.device.id.id == id) {
             match = r;
             break;
           }
         }
+        await _stopScan();
         if (match != null) {
-          await FlutterBluePlus.stopScan();
           await _connectTo(match.device, save: false);
           break;
         }
-        await FlutterBluePlus.stopScan();
       } catch (_) {}
       await Future.delayed(const Duration(seconds: 2));
     }
@@ -200,6 +268,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _startScan() async {
+    print('_startScan called; adapterState=$_adapterState, permissions=$_permissionStatuses, scanning=$_scanning, scanSub=${_scanSub != null}');
     // Ensure adapter is ON before attempting to scan
     final ok = await _ensureBluetoothOnBeforeScan();
     if (!ok) {
@@ -209,11 +278,23 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    // debounce rapid start attempts
+    final now = DateTime.now();
+    if (_scanning) return;
+    if (_scanSub != null) return;
+    if (_lastScanStart != null && now.difference(_lastScanStart!) < _scanDebounce) return;
+    _lastScanStart = now;
+
     _found.clear();
-    setState(() {
-      _scanning = true;
-    });
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
+    setState(() => _scanning = true);
+    // start a long-running scan; we'll stop it explicitly or after _scanTimeout
+    try {
+      print('Attempting FlutterBluePlus.startScan()');
+      await FlutterBluePlus.startScan();
+    } catch (e, st) {
+      print('startScan threw: $e');
+      print(st);
+    }
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
         final id = r.device.id.id;
@@ -223,30 +304,98 @@ class _HomePageState extends State<HomePage> {
         } catch (_) {
           _debugInfo[id] = 'rssi:${r.rssi}';
         }
+        // Additional verbose diagnostic printing
+        try {
+          print('scanResult: id=$id name=${r.device.name} rssi=${r.rssi} adv=${r.advertisementData}');
+        } catch (_) {
+          print('scanResult: id=$id rssi=${r.rssi}');
+        }
         if (!_found.any((e) => e.device.id.id == id)) {
-          setState(() => _found.add(r));
+          // keep a local copy for legacy uses
+          _found.add(r);
+          // publish to notifier for UI that lives in the dialog route
+          _foundNotifier.value = List<ScanResult>.from(_foundNotifier.value)..add(r);
+          // refresh any parent UI that still depends on _found
+          setState(() {});
         } else {
-          // update to refresh debug data
+          // update debug payload or rssi updates
           setState(() {});
         }
       }
       // diagnostic log of raw results each time
-      print('scanResults: ${results.map((r) => r.device.id.id).toList()}');
-    });
-    // ensure scanning flag is cleared after timeout
-    Future.delayed(const Duration(seconds: 6), () async {
       try {
-        await FlutterBluePlus.stopScan();
+        print('scanResults: ${results.map((r) => r.device.id.id).toList()}');
       } catch (_) {}
-      await _scanSub?.cancel();
-      if (mounted) setState(() => _scanning = false);
+    }, onError: (e) {
+      print('scanResults stream error: $e');
+    });
+    // schedule an auto-stop in case user doesn't stop manually
+    _scanStopTimer?.cancel();
+    _scanStopTimer = Timer(_scanTimeout, () async {
+      await _stopScan();
     });
   }
 
+  Future<void> _startBackgroundTask() async {
+    if (await FlutterForegroundTask.isRunningService) return;
+    // Ensure required runtime permissions are granted first
+    await _requestPermissions();
+    final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
+    final connectOk = _permissionStatuses['android.permission.BLUETOOTH_CONNECT'] == true || _permissionStatuses['BLUETOOTH_CONNECT'] == true;
+    if (!scanOk || !connectOk) {
+      // prompt user to allow permissions in Settings if request couldn't get them
+      await showDialog<void>(context: context, builder: (c) => AlertDialog(
+        title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
+        content: const Text('Bluetooth permissions are required to run in background. Please grant them in Settings.', style: TextStyle(fontSize: 10)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10))),
+        ],
+      ));
+      return;
+    }
+
+    // respect user preference for notification visibility
+    final prefs = await SharedPreferences.getInstance();
+    final showNotification = prefs.getBool('show_sync_notification') ?? true;
+    final notifText = (_connectedDevice != null && showNotification) ? 'The device is synced' : (_connectedDevice != null ? 'Connected' : (showNotification ? 'Running in background' : '')) ;
+
+    try {
+      await FlutterForegroundTask.startService(
+        serviceId: 1,
+        notificationTitle: 'Sync Companion',
+        notificationText: notifText,
+        callback: startCallback,
+      );
+      setState(() => _bgServiceRunning = true);
+    } catch (e) {
+      // Starting the foreground service may throw if the app lacks the
+      // required Android foreground/location permissions. Show guidance.
+      print('startBackgroundTask failed: $e');
+      await showDialog<void>(context: context, builder: (c) => AlertDialog(
+        title: const Text('Background service failed', style: TextStyle(fontSize: 12)),
+        content: const Text('Could not start the foreground background service. Please ensure the app has the required permissions (location/foreground service) in Android settings.', style: TextStyle(fontSize: 10)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10))),
+        ],
+      ));
+    }
+  }
+
+  Future<void> _stopBackgroundTask() async {
+    if (!await FlutterForegroundTask.isRunningService) return;
+    await FlutterForegroundTask.stopService();
+    setState(() => _bgServiceRunning = false);
+  }
+
   Future<void> _stopScan() async {
-    await FlutterBluePlus.stopScan();
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (_) {}
     await _scanSub?.cancel();
-    setState(() => _scanning = false);
+    _scanSub = null;
+    _scanStopTimer?.cancel();
+    _scanStopTimer = null;
+    if (mounted) setState(() => _scanning = false);
   }
 
   Future<bool> _ensureBluetoothOnBeforeScan() async {
@@ -316,12 +465,77 @@ class _HomePageState extends State<HomePage> {
       builder: (c) => Dialog(
         backgroundColor: Colors.white,
         child: Container(
-          constraints: const BoxConstraints(maxHeight: 400),
+          // increase vertical size so more devices are visible at once
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(c).size.height * 0.7),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Diagnostics + incoming data moved into Settings dialog
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Adapter: $_adapterState', style: const TextStyle(fontSize: 8)),
+                    const SizedBox(height: 4),
+                    Text('Perms: ${_permissionStatuses.entries.map((e) => '${e.key.split('.').last}:${e.value?"Y":"N"}').join(', ')}', style: const TextStyle(fontSize: 8)),
+                    const SizedBox(height: 6),
+                    if (_connectedDevice != null)
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+                        child: SingleChildScrollView(
+                          child: Text(
+                            '${_connectedDevice!.name.isNotEmpty ? _connectedDevice!.name : _connectedDevice!.id.id}\n${_incoming.isEmpty ? '—' : _incoming}',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Background service controls: service runs automatically.
+              // Provide a user preference to control whether the persistent
+              // sync notification is shown. Note: Android requires a
+              // foreground service to display a notification while running;
+              // so the service will keep running even if the user chooses to
+              // 'hide' the notification — on Android this may be limited by
+              // OS rules; we at least store the user's preference and try to
+              // update the notification text accordingly.
+              FutureBuilder<bool>(
+                future: SharedPreferences.getInstance().then((p) => p.getBool('show_sync_notification') ?? true),
+                builder: (ctx, snap) {
+                  final show = snap.data ?? true;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Show sync notification', style: TextStyle(fontSize: 10)),
+                      TextButton(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          final newVal = !(prefs.getBool('show_sync_notification') ?? true);
+                          await prefs.setBool('show_sync_notification', newVal);
+                          setState(() {});
+                          // If service is running, try to restart it with updated text
+                          if (_bgServiceRunning) {
+                            try {
+                              await _stopBackgroundTask();
+                            } catch (_) {}
+                            await _startBackgroundTask();
+                          }
+                        },
+                        child: Text(show ? 'ON' : 'OFF', style: const TextStyle(fontSize: 10)),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -340,20 +554,28 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const Divider(color: Colors.black, thickness: 2),
+              // Use a ValueListenableBuilder so the dialog updates live as devices
+              // are discovered without relying on parent `setState` rebuilding
+              // the dialog route.
               Expanded(
-                child: ListView.separated(
-                  itemCount: _found.length,
-                  separatorBuilder: (_, __) => const Divider(color: Colors.black, thickness: 2),
-                  itemBuilder: (ctx, i) {
-                    final r = _found[i];
-                    final name = r.device.name.isNotEmpty ? r.device.name : r.device.id.id;
-                    return ListTile(
-                      title: Text(name, style: const TextStyle(fontSize: 10)),
-                      subtitle: Text('${r.device.id.id}\n${_debugInfo[r.device.id.id] ?? ''}', style: const TextStyle(fontSize: 8)),
-                      onTap: () async {
-                        await _stopScan();
-                        Navigator.of(context).pop();
-                        await _connectTo(r.device, save: true);
+                child: ValueListenableBuilder<List<ScanResult>>(
+                  valueListenable: _foundNotifier,
+                  builder: (ctx, found, _) {
+                    return ListView.separated(
+                      itemCount: found.length,
+                      separatorBuilder: (_, __) => const Divider(color: Colors.black, thickness: 2),
+                      itemBuilder: (ctx2, i) {
+                        final r = found[i];
+                        final name = r.device.name.isNotEmpty ? r.device.name : r.device.id.id;
+                        return ListTile(
+                          title: Text(name, style: const TextStyle(fontSize: 10)),
+                          subtitle: Text('${r.device.id.id}\n${_debugInfo[r.device.id.id] ?? ''}', style: const TextStyle(fontSize: 8)),
+                          onTap: () async {
+                            await _stopScan();
+                            Navigator.of(context).pop();
+                            await _connectTo(r.device, save: true);
+                          },
+                        );
                       },
                     );
                   },
@@ -379,7 +601,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SYNC COMPANION'),
+        title: Text('SYNC COMPANION', style: const TextStyle(fontSize: 14, fontFamily: 'Monocraft')),
         centerTitle: true,
         toolbarHeight: 56,
         elevation: 0,
@@ -389,38 +611,32 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+            // Compact status row: indicator + text (no surrounding box or settings button)
+            Padding(
+              padding: const EdgeInsets.all(8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(_status, style: const TextStyle(fontSize: 8)),
-                  Text(_savedId ?? 'No saved device', style: const TextStyle(fontSize: 8)),
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _connectedDevice != null ? Colors.green : Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(width: 2, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(_connectedDevice != null ? 'CONNECTED' : _status, style: const TextStyle(fontSize: 10)),
                 ],
               ),
             ),
             const SizedBox(height: 8),
-            // Diagnostics: adapter state and permission list
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Adapter: $_adapterState', style: const TextStyle(fontSize: 8)),
-                  const SizedBox(height: 4),
-                  Text('Perms: ${_permissionStatuses.entries.map((e) => '${e.key.split('.').last}:${e.value?"Y":"N"}').join(', ')}', style: const TextStyle(fontSize: 8)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 160,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
-              child: SingleChildScrollView(
-                child: Text(_incoming.isEmpty ? '—' : _incoming, style: const TextStyle(fontSize: 10)),
+            // Placeholder image between the status indicator and the settings button
+            Center(
+              child: SizedBox(
+                height: 80,
+                child: Image.asset('placeholder.png', fit: BoxFit.contain),
               ),
             ),
             const SizedBox(height: 8),
@@ -433,15 +649,6 @@ class _HomePageState extends State<HomePage> {
                     child: const Text('SETTINGS', style: TextStyle(fontSize: 10)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (_connectedDevice != null)
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
-                      onPressed: _forget,
-                      child: const Text('DISCONNECT', style: TextStyle(fontSize: 10)),
-                    ),
-                  ),
               ],
             ),
           ],
