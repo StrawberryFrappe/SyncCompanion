@@ -61,9 +61,33 @@ class BluetoothService {
   // `_activeChar` was removed because characteristic handling uses subscriptions directly.
   StreamSubscription<List<int>>? _charSub;
   String? _savedId;
+  bool _nativeEventsAttached = false;
 
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   Completer<Map<String, dynamic>>? _pendingPermissionCompleter;
+
+  String _getDeviceName(ScanResult r) {
+    String name = '';
+    try {
+      final platformName = r.device.platformName;
+      final advName = r.advertisementData.localName;
+      if (platformName.isNotEmpty) {
+        name = platformName;
+      } else if (advName.isNotEmpty) {
+        name = advName;
+      }
+    } catch (_) {
+      try {
+        final advName = r.advertisementData.localName;
+        if (advName.isNotEmpty) name = advName;
+      } catch (_) {}
+    }
+    return name;
+  }
+
+  bool _isPriorityDevice(ScanResult r) {
+    return _getDeviceName(r) == 'M5-IMU-Sensor';
+  }
 
   // Expose current permission snapshot for UI convenience.
   Map<String, bool> _permissionStatuses = {};
@@ -74,16 +98,39 @@ class BluetoothService {
     try {
       final prefs = await SharedPreferences.getInstance();
       _savedId = prefs.getString('saved_device_id');
-      // If a native Android BLE service is available, subscribe to its events
+      // Detect native service and attach EventChannel early.
       bool nativeRunning = false;
       try {
         nativeRunning = await _platform.invokeMethod('isNativeServiceRunning') == true;
-        if (nativeRunning) {
-          _attachNativeEventStream();
-          // Ask native service to emit current status immediately
-          try {
-            await _platform.invokeMethod('requestNativeStatus');
-          } catch (_) {}
+      } catch (_) {}
+      try {
+        _attachNativeEventStream();
+      } catch (_) {}
+      // Emit persisted native state immediately only if native service is not running
+      // to avoid UI reset when native status will override it.
+      if (!nativeRunning) {
+        try {
+          final persistedConnected = _savedId != null;
+          _nativeConnectedController.add(persistedConnected);
+          final lastB64 = prefs.getString('last_bytes_b64');
+          if (lastB64 != null) {
+            try {
+              final bytes = base64.decode(lastB64);
+              if (bytes.isNotEmpty) {
+                _incomingRawController.add(List<int>.from(bytes));
+                _incomingController.add(_decode(bytes));
+              }
+            } catch (_) {}
+          }
+          if (BLE_DEBUG) print('BLE: emitted persisted native connected=$persistedConnected lastBytesLen=${lastB64 != null ? base64.decode(lastB64).length : 0}');
+        } catch (_) {}
+      }
+      // Ask for native status and wait for its reply so UI doesn't flip.
+      try {
+        final res = await _platform.invokeMethod('requestNativeStatus');
+        if (res is Map) {
+          final m = Map<String, dynamic>.from(res);
+          _handleNativeStatusMap(m);
         }
       } catch (_) {}
       // Only attempt Flutter-side auto-reconnect if native service is NOT running.
@@ -95,41 +142,104 @@ class BluetoothService {
       // flows will start it deliberately to avoid scanning/running BLE when
       // the user hasn't requested it.
     } catch (_) {}
-  }
-
-  void _attachNativeEventStream() {
+  }  void _attachNativeEventStream() {
+    if (_nativeEventsAttached) return;
     try {
       final ev = EventChannel('sync_companion/ble_events');
       ev.receiveBroadcastStream().listen((dynamic event) {
         try {
-              if (event is List) {
+          if (BLE_DEBUG) print('BLE: native event received type=${event.runtimeType}');
+          if (event is List) {
             final bytes = List<int>.from(event.map((e) => e as int));
+            if (BLE_DEBUG) print('BLE: received bytes len=${bytes.length}');
             _incomingRawController.add(bytes);
             final s = _decode(bytes);
             _incomingController.add(s);
           } else if (event is Map) {
-            // status event from native service
             try {
               final m = Map<String, dynamic>.from(event);
+              if (BLE_DEBUG) print('BLE: event map keys=${m.keys}');
               if (m.containsKey('status')) {
-                final connected = m['status'] == true;
-                    // emit native-connected boolean so UI can react without
-                    // needing a concrete `BluetoothDevice` object.
-                    _nativeConnectedController.add(connected);
-                    if (!connected) {
-                      _connected = null;
-                      _connectedController.add(null);
-                    }
+                _handleNativeStatusMap(m);
               }
-            } catch (_) {}
+              // If native sent lastBytes inside a map (e.g. BLE_EVENT was emitted
+              // as a map by the platform), also replay those bytes into the
+              // incoming streams so the terminal and other listeners receive them.
+              if (m.containsKey('lastBytes')) {
+                try {
+                  final lb = m['lastBytes'];
+                  if (lb is List) {
+                    final bytes = List<int>.from(lb.map((e) => (e as int)));
+                    if (bytes.isNotEmpty) {
+                      if (BLE_DEBUG) print('BLE: map lastBytes len=${bytes.length}');
+                      _incomingRawController.add(bytes);
+                      _incomingController.add(_decode(bytes));
+                    }
+                  }
+                } catch (e) {
+                  if (BLE_DEBUG) print('BLE: failed to handle lastBytes in map: $e');
+                }
+              }
+            } catch (e) {
+              if (BLE_DEBUG) print('BLE: failed to handle map event: $e');
+            }
           }
         } catch (_) {}
       }, onError: (e) {
         if (BLE_DEBUG) print('BLE: native event stream error: $e');
       });
+      _nativeEventsAttached = true;
     } catch (e) {
       if (BLE_DEBUG) print('BLE: attachNativeEventStream failed: $e');
     }
+  }
+
+  void _handleNativeStatusMap(Map<String, dynamic> m) {
+    try {
+      final connected = m['status'] == true;
+      if (BLE_DEBUG) print('BLE: native status map connected=$connected');
+      // Emit canonical native-connected state (use this to reconcile optimistic UI)
+      _nativeConnectedController.add(connected);
+      if (!connected) {
+        _connected = null;
+        _connectedController.add(null);
+      }
+      // If native provided a device id, update saved id
+      if (m.containsKey('deviceId')) {
+        try {
+          final id = m['deviceId'] as String?;
+          if (id != null) {
+            _savedId = id;
+            SharedPreferences.getInstance().then((prefs) => prefs.setString('saved_device_id', id));
+          }
+        } catch (_) {}
+      }
+      // If native provided lastBytes, replay once into incoming streams
+      if (m.containsKey('lastBytes')) {
+        try {
+          final lb = m['lastBytes'];
+          List<int> bytes = [];
+          if (lb is List) {
+            bytes = List<int>.from(lb.map((e) => (e as int)));
+          }
+          if (bytes.isNotEmpty) {
+            if (BLE_DEBUG) print('BLE: replaying lastBytes len=${bytes.length}');
+            _incomingRawController.add(bytes);
+            _incomingController.add(_decode(bytes));
+            // Optional: acknowledge native status receipt so native can cancel its short timeout
+            try {
+              if (m.containsKey('deviceId')) {
+                final id = m['deviceId'] as String?;
+                if (id != null) {
+                  _platform.invokeMethod('nativeStatusAck', {'deviceId': id, 'timestamp': DateTime.now().millisecondsSinceEpoch});
+                  if (BLE_DEBUG) print('BLE: sent nativeStatusAck for device=$id');
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   Future<void> startScan({Duration? timeout}) async {
@@ -192,6 +302,8 @@ class BluetoothService {
       _foundEmitTimer ??= Timer(const Duration(milliseconds: 250), () {
         if (_foundDirty) {
           try {
+            // Prioritize M5-IMU-Sensor device in scan results
+            _found.sort((a, b) => _isPriorityDevice(a) ? -1 : _isPriorityDevice(b) ? 1 : 0);
             _foundController.add(List<ScanResult>.from(_found));
           } catch (_) {}
         }
@@ -305,8 +417,22 @@ class BluetoothService {
       // Always use native service to manage connections. Native service runs
       // in a foreground process and will survive app swipe kills.
       final did = device.remoteId.str;
+      // Ensure we are listening for native events (attach before/after connect)
+      try {
+        _attachNativeEventStream();
+      } catch (_) {}
       await _platform.invokeMethod('connect', {'id': did});
+      // Ask native service to emit current status and reconcile when it replies
+      try {
+        final res = await _platform.invokeMethod('requestNativeStatus');
+        if (res is Map) {
+          final m = Map<String, dynamic>.from(res);
+          _handleNativeStatusMap(m);
+        }
+      } catch (_) {}
       _connected = device;
+      // Optimistically mark native-connected locally so UI updates immediately.
+      _nativeConnectedController.add(true);
       if (save) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('saved_device_id', did);
@@ -339,6 +465,8 @@ class BluetoothService {
     try {
       await _platform.invokeMethod('disconnect');
     } catch (_) {}
+    // reflect disconnect immediately in UI
+    _nativeConnectedController.add(false);
   }
 
   Future<void> disconnect() async {
@@ -353,6 +481,8 @@ class BluetoothService {
     _charSub = null;
     _connected = null;
     _connectedController.add(null);
+    // immediately reflect native disconnected state in the UI
+    _nativeConnectedController.add(false);
   }
 
   Future<void> _autoReconnect(String id) async {

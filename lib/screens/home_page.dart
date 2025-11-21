@@ -40,22 +40,41 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<String>? _incomingSub;
   StreamSubscription<bt_service.BluetoothUserAction>? _userActionSub;
 
+  bool _isConnected = false;
+  String? _deviceId;
+
   @override
   void initState() {
     super.initState();
     _init();
     _bt.init();
+    _loadPersisted();
     _userActionSub = _bt.userAction$.listen((a) => _handleUserAction(a));
     _connSub = _bt.connectedDevice$.listen((d) {
       setState(() {
         _connectedDevice = d;
-        _status = d != null ? 'LINKED' : 'SEARCHING';
+        if (d != null) {
+          _isConnected = true;
+          _deviceId = d.remoteId.str;
+          _status = 'LINKED';
+        } else {
+          _isConnected = false;
+          _deviceId = null;
+          _status = 'SEARCHING';
+        }
       });
       // If a device became connected, ensure background service is running
       // so the notification updater can reflect incoming packets.
       if (d != null) {
         // Fire-and-forget; this will request permissions if needed.
         _startBackgroundTask();
+      }
+    });
+    _bt.nativeConnected$.listen((connected) {
+      setState(() => _isConnected = connected);
+      if (connected && _deviceId == null) {
+        // If connected but no device, perhaps load from prefs
+        _loadPersistedDeviceId();
       }
     });
     _incomingSub = _bt.incomingData$.listen((s) {
@@ -86,6 +105,26 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
     // preload debug info reference
     setState(() => _debugInfo = Map<String, String>.from(_bt.debugInfo));
+  }
+
+  Future<void> _loadPersisted() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString('saved_device_id');
+    if (id != null) {
+      setState(() {
+        _isConnected = true;
+        _deviceId = id;
+        _status = 'LINKED';
+      });
+    }
+  }
+
+  Future<void> _loadPersistedDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString('saved_device_id');
+    if (id != null) {
+      setState(() => _deviceId = id);
+    }
   }
 
   Future<void> _handleUserAction(bt_service.BluetoothUserAction action) async {
@@ -214,6 +253,8 @@ class _HomePageState extends State<HomePage> {
       _incoming = '';
       _status = 'SEARCHING';
       _connectedDevice = null;
+      _isConnected = false;
+      _deviceId = null;
     });
   }
 
@@ -249,6 +290,15 @@ class _HomePageState extends State<HomePage> {
                             '${(_connectedDevice!.platformName.isNotEmpty ? _connectedDevice!.platformName : _connectedDevice!.remoteId.str)}',
                             style: const TextStyle(fontSize: 10),
                           ),
+                        ),
+                      ),
+                    if (_connectedDevice == null && _deviceId != null)
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+                        child: Text(
+                          'Persisted: $_deviceId',
+                          style: const TextStyle(fontSize: 10),
                         ),
                       ),
                     const SizedBox(height: 6),
@@ -331,13 +381,13 @@ class _HomePageState extends State<HomePage> {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: _connectedDevice != null ? Colors.green : Colors.red,
+                      color: _isConnected ? Colors.green : Colors.red,
                       shape: BoxShape.circle,
                       border: Border.all(width: 2, color: Colors.black),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(_connectedDevice != null ? 'CONNECTED' : _status, style: const TextStyle(fontSize: 10)),
+                  Text(_isConnected ? (_connectedDevice != null ? 'CONNECTED' : 'PERSISTED') : _status, style: const TextStyle(fontSize: 10)),
                 ],
               ),
             ),

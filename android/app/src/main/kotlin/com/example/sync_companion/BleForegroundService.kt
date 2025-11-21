@@ -18,6 +18,7 @@ import android.bluetooth.BluetoothDevice
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import android.util.Log
+import android.util.Base64
 import android.os.Handler
 import android.os.Looper
 
@@ -28,9 +29,13 @@ class BleForegroundService : Service() {
         const val ACTION_UPDATE_NOTIFICATION = "ACTION_UPDATE_NOTIFICATION"
         const val ACTION_QUERY_STATUS = "ACTION_QUERY_STATUS"
         const val PREF_SAVED_ID = "saved_device_id"
+        const val PREF_CONNECTED = "native_connected"
+        const val PREF_LAST_BYTES = "last_bytes_b64"
         const val CHANNEL_ID = "sync_companion_native"
         val TARGET_CHAR = java.util.UUID.fromString("04933a4f-756a-4801-9823-7b199fe93b5e")
         val CCC_UUID = java.util.UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        // Set to true when debugging raw notify payloads; keep false for normal runs.
+        const val DATA_LOG = false
     }
 
     private var adapter: BluetoothAdapter? = null
@@ -40,6 +45,9 @@ class BleForegroundService : Service() {
     private var lastBytes: ByteArray? = null
     private val handler = Handler(Looper.getMainLooper())
     private var reconnectAttempts = 0
+    // awaiting ACK from Dart when we emit cached status/lastBytes
+    private var awaitingAck: Boolean = false
+    private var ackClearRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -47,6 +55,9 @@ class BleForegroundService : Service() {
         adapter = BluetoothAdapter.getDefaultAdapter()
         createNotificationChannel()
         startForeground(2001, buildNotification("Initializing BLE service"))
+        // Do not clear the persisted connected flag here — keep the last known
+        // native state so UI can display it immediately. The service will update
+        // the persisted flag when a real connection/disconnection occurs.
         // If saved device id exists, attempt reconnect
         val did = prefs?.getString(PREF_SAVED_ID, null)
         if (did != null) {
@@ -65,9 +76,42 @@ class BleForegroundService : Service() {
                 ACTION_DISCONNECT -> disconnectGatt()
                 ACTION_UPDATE_NOTIFICATION -> updateNotificationForData()
                 ACTION_QUERY_STATUS -> {
-                    val connectedNow = gatt != null
-                    sendStatusBroadcast(connectedNow)
+                    // Reply with canonical persisted connected state and emit lastBytes
+                    val connectedNow = prefs?.getString(PREF_SAVED_ID, null) != null
+                        try { Log.i("BleForegroundService", "query status: connected=$connectedNow lastBytesLen=${lastBytes?.size ?: 0}") } catch (e: Exception) {}
+                        sendStatusBroadcast(connectedNow)
+                        try {
+                            if (lastBytes != null) {
+                                val bcast = Intent("com.example.sync_companion.BLE_EVENT")
+                                bcast.putExtra("data", lastBytes)
+                                sendBroadcast(bcast)
+                            }
+                            // Start short awaiting-ACK window so Dart can ack receipt if desired
+                            try {
+                                awaitingAck = true
+                                ackClearRunnable?.let { handler.removeCallbacks(it) }
+                                ackClearRunnable = Runnable {
+                                    if (awaitingAck) {
+                                        if (DATA_LOG) Log.w("BleForegroundService", "native status ack not received within timeout")
+                                        awaitingAck = false
+                                    }
+                                }
+                                handler.postDelayed(ackClearRunnable!!, 2000)
+                            } catch (e: Exception) {}
+                        } catch (e: Exception) {}
                 }
+                    "ACTION_NATIVE_ACK" -> {
+                        try {
+                            // Clear awaiting ACK state if matches device (deviceId optional)
+                            val did = intent?.getStringExtra("deviceId")
+                            val ts = intent?.getLongExtra("timestamp", 0L)
+                            awaitingAck = false
+                            ackClearRunnable?.let { handler.removeCallbacks(it) }
+                            if (DATA_LOG) {
+                                try { Log.i("BleForegroundService", "received nativeStatusAck device=$did ts=$ts") } catch (e: Exception) {}
+                            }
+                        } catch (e: Exception) {}
+                    }
                 else -> {
                     // plain start: attempt auto-reconnect if saved id exists
                     val did = prefs?.getString(PREF_SAVED_ID, null)
@@ -110,6 +154,12 @@ class BleForegroundService : Service() {
     private fun updateNotificationForData() {
         try {
             val showLive = prefs?.getBoolean("notif_show_data", true) ?: true
+            // debug: log prefs read for tests
+            try {
+                if (DATA_LOG) {
+                    Log.i("BleForegroundService", "updateNotificationForData prefs: notif_show_data=$showLive saved_id=${prefs?.getString(PREF_SAVED_ID, null)} connected=${prefs?.getBoolean(PREF_CONNECTED, false)}")
+                }
+            } catch (e: Exception) {}
             val text = if (showLive && lastBytes != null) {
                 // show a short hex preview
                 val hex = lastBytes!!.joinToString(" ") { String.format("%02x", it) }
@@ -117,7 +167,11 @@ class BleForegroundService : Service() {
             } else {
                 "Your device is synced"
             }
-            startForeground(2001, buildNotification(text))
+            try {
+                val nm = getSystemService(NotificationManager::class.java)
+                nm.notify(2001, buildNotification(text))
+                if (DATA_LOG) try { Log.i("BleForegroundService", "notify(notificationId=2001) used for data update") } catch (e: Exception) {}
+            } catch (e: Exception) {}
         } catch (e: Exception) { }
     }
 
@@ -132,8 +186,12 @@ class BleForegroundService : Service() {
             // Save for reboot auto-start
             prefs?.edit()?.putString(PREF_SAVED_ID, id)?.apply()
             gatt = device.connectGatt(this, false, gattCallback)
-            // update notification
-            startForeground(2001, buildNotification("Connecting to device"))
+            // update notification (use notify to change visible content; keep service foreground started in onCreate)
+            try {
+                val nm = getSystemService(NotificationManager::class.java)
+                nm.notify(2001, buildNotification("Connecting to device"))
+                if (DATA_LOG) try { Log.i("BleForegroundService", "notify(notificationId=2001) used for connecting") } catch (e: Exception) {}
+            } catch (e: Exception) {}
         } catch (e: Exception) {
             // schedule reconnect
             scheduleReconnect()
@@ -166,12 +224,22 @@ class BleForegroundService : Service() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 reconnectAttempts = 0
+                // persist connected state
+                try { prefs?.edit()?.putBoolean(PREF_CONNECTED, true)?.apply() } catch (e: Exception) {}
                 sendStatusBroadcast(true)
-                startForeground(2001, buildNotification("Connected"))
+                try {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(2001, buildNotification("Connected"))
+                    if (DATA_LOG) try { Log.i("BleForegroundService", "notify(notificationId=2001) used for connected") } catch (e: Exception) {}
+                } catch (e: Exception) {}
                 g.discoverServices()
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 sendStatusBroadcast(false)
-                startForeground(2001, buildNotification("Disconnected"))
+                try {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(2001, buildNotification("Disconnected"))
+                    if (DATA_LOG) try { Log.i("BleForegroundService", "notify(notificationId=2001) used for disconnected") } catch (e: Exception) {}
+                } catch (e: Exception) {}
                 // try to reconnect
                 g.close()
                 gatt = null
@@ -222,14 +290,33 @@ class BleForegroundService : Service() {
             try {
                 val bytes = characteristic.value
                 lastBytes = bytes
-                // Log raw data so it appears in logcat/terminal
+                // persist a short replay buffer (base64) for UI attach
                 try {
-                    val hex = bytes.joinToString(" ") { String.format("%02x", it) }
-                    Log.i("BleForegroundService", "notify ${TARGET_CHAR} len=${bytes.size} hex=$hex")
+                    val b64 = Base64.encodeToString(bytes, Base64.DEFAULT)
+                    prefs?.edit()?.putString(PREF_LAST_BYTES, b64)?.apply()
                 } catch (e: Exception) {}
+                // Log raw data so it appears in logcat/terminal
+                if (DATA_LOG) {
+                    try {
+                        val hex = bytes.joinToString(" ") { String.format("%02x", it) }
+                        Log.i("BleForegroundService", "notify ${TARGET_CHAR} len=${bytes.size} hex=$hex")
+                    } catch (e: Exception) {}
+                }
                 val bcast = Intent("com.example.sync_companion.BLE_EVENT")
                 bcast.putExtra("data", bytes)
                 sendBroadcast(bcast)
+                // When broadcasting live data, allow Dart to acknowledge receipt if desired.
+                try {
+                    awaitingAck = true
+                    ackClearRunnable?.let { handler.removeCallbacks(it) }
+                    ackClearRunnable = Runnable {
+                        if (awaitingAck) {
+                            if (DATA_LOG) Log.w("BleForegroundService", "live data ack not received within timeout")
+                            awaitingAck = false
+                        }
+                    }
+                    handler.postDelayed(ackClearRunnable!!, 2000)
+                } catch (e: Exception) {}
                 // update notification according to user preference
                 updateNotificationForData()
             } catch (e: Exception) {}
@@ -239,6 +326,10 @@ class BleForegroundService : Service() {
     private fun sendStatusBroadcast(connected: Boolean) {
         val i = Intent("com.example.sync_companion.BLE_STATUS")
         i.putExtra("connected", connected)
+        try {
+            // keep preferences in sync so other processes can read canonical state
+            prefs?.edit()?.putBoolean(PREF_CONNECTED, connected)?.apply()
+        } catch (e: Exception) {}
         sendBroadcast(i)
     }
 }

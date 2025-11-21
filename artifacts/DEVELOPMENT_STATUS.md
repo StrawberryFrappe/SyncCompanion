@@ -3,7 +3,8 @@
 **Purpose**
 - **App summary**: SyncCompanion is a Flutter mobile app that scans for Bluetooth Low Energy (BLE) peripherals, connects to a selected device, subscribes to characteristic notifications, and displays incoming data. It also supports a foreground/background service, persists a preferred device id in `SharedPreferences`, and exposes UI controls for scanning, connecting and a "Show sync notification" foreground toggle.
 
-**Main Functions (runtime behavior)**n- **Scan**: Start/stop BLE scans and collect `ScanResult`s for visible peripherals.
+**Main Functions (runtime behavior)**
+- **Scan**: Start/stop BLE scans and collect `ScanResult`s for visible peripherals.
 - **Connect**: Connect to a chosen BLE peripheral, request MTU, discover services and characteristics.
 - **Subscribe**: Enable notifications on a data characteristic and route incoming bytes into an app-visible stream.
 - **Persist**: Save the selected device identifier in `SharedPreferences` so the app can auto-reconnect or remember the last device.
@@ -38,6 +39,8 @@ Additional objectives to align with the connectivity-stage vision:
   - Implement `adapterState$` and `isScanning$` streams in `BluetoothService`, and expose `permissionStatuses$` so UI and other services can react without directly calling platform APIs.
   - Move debounce/timer logic for scanning entirely into `BluetoothService` (so UI only calls `startScan()`/`stopScan()` and renders the `foundDevices$` stream).
   - Add a small `status` stream or enum for `BluetoothService` to emit states like `idle`, `scanning`, `connecting`, `connected`, `error`.
+  - Add a tiny EventChannel ACK handshake so Flutter can confirm successful EventChannel attachment:
+    - Flutter should send a one-shot ACK (via MethodChannel or a reserved EventChannel reply) after it processes the immediate status message. Native can use this ACK to confirm delivery and optionally clear or mark `lastBytes` as delivered. This reduces replay ambiguity and provides a simple handshake.
 
 - **Medium-term (cross-cutting)**
   - Add unit tests using a mocked BLE plugin (or abstract BLE client interface) to validate reconnection, characteristic subscription, and persistence behavior.

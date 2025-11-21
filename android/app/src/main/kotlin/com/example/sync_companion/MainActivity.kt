@@ -15,6 +15,9 @@ import androidx.core.app.NotificationManagerCompat
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
+import android.preference.PreferenceManager
+import android.util.Base64
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -31,6 +34,7 @@ class MainActivity : FlutterActivity() {
 
 	override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
 		super.configureFlutterEngine(flutterEngine)
+
 		MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
 			when (call.method) {
 				"enableBluetooth" -> {
@@ -69,34 +73,11 @@ class MainActivity : FlutterActivity() {
 					result.success(adapter != null && adapter.isEnabled)
 				}
 				"updateNotification" -> {
-					// If the native service is running, ask it to refresh its own
-					// foreground notification (it reads prefs and lastBytes itself).
 					try {
-						val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-						val list = am.getRunningServices(Integer.MAX_VALUE)
-						val running = list.any { it.service.className == BleForegroundService::class.java.name }
-						if (running) {
-							val intent = Intent(this, BleForegroundService::class.java)
-							intent.action = "ACTION_UPDATE_NOTIFICATION"
-							ContextCompat.startForegroundService(this, intent)
-							result.success(true)
-						} else {
-							// Fallback: post a simple notification from activity
-							val text = call.argument<String>("text") ?: ""
-							val channelId = "sync_companion_channel"
-							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-								val nm = getSystemService(NotificationManager::class.java)
-								val ch = NotificationChannel(channelId, "Sync Companion", NotificationManager.IMPORTANCE_LOW)
-								nm.createNotificationChannel(ch)
-							}
-							val builder = NotificationCompat.Builder(this, channelId)
-								.setContentTitle("Sync Companion")
-								.setContentText(text.take(128))
-								.setSmallIcon(android.R.drawable.ic_dialog_info)
-								.setPriority(NotificationCompat.PRIORITY_LOW)
-							NotificationManagerCompat.from(this).notify(1001, builder.build())
-							result.success(true)
-						}
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_UPDATE_NOTIFICATION"
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
 					} catch (e: Exception) {
 						result.error("notif_failed", e.toString(), null)
 					}
@@ -156,20 +137,75 @@ class MainActivity : FlutterActivity() {
 						val intent = Intent(this, BleForegroundService::class.java)
 						intent.action = "ACTION_QUERY_STATUS"
 						ContextCompat.startForegroundService(this, intent)
-						result.success(true)
+						val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+						val connected = prefs.getString("saved_device_id", null) != null
+						val did = prefs.getString("saved_device_id", null)
+						val lastB64 = prefs.getString("last_bytes_b64", null)
+						var lastList: List<Int>? = null
+						if (lastB64 != null) {
+							try {
+								val bytes = Base64.decode(lastB64, Base64.DEFAULT)
+								lastList = bytes.map { (it.toInt() and 0xFF) }
+							} catch (e: Exception) { }
+						}
+						val map = mutableMapOf<String, Any?>()
+						map["status"] = connected
+						map["deviceId"] = did
+						if (lastList != null) map["lastBytes"] = lastList
+						try { Log.i("MainActivity", "requestNativeStatus replying prefs status=$connected device=$did lastBytes=${lastList?.size}") } catch (e: Exception) {}
+						result.success(map)
 					} catch (e: Exception) {
 						result.error("request_failed", e.toString(), null)
 					}
 				}
+				"nativeStatusAck" -> {
+					try {
+						val deviceId = call.argument<String>("deviceId")
+						val ts = call.argument<Long>("timestamp") ?: System.currentTimeMillis()
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_NATIVE_ACK"
+						if (deviceId != null) intent.putExtra("deviceId", deviceId)
+						intent.putExtra("timestamp", ts)
+						ContextCompat.startForegroundService(this, intent)
+						if (BleForegroundService.DATA_LOG) try { Log.i("MainActivity", "nativeStatusAck sent device=$deviceId ts=$ts") } catch (e: Exception) {}
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("ack_failed", e.toString(), null)
+					}
+				}
 				else -> result.notImplemented()
 			}
-
 		}
 
-			// EventChannel: forward broadcasts from native service as byte[] -> List<int>
+		// EventChannel: forward broadcasts from native service as byte[] -> List<int>
 		EventChannel(flutterEngine.dartExecutor.binaryMessenger, "sync_companion/ble_events").setStreamHandler(object: EventChannel.StreamHandler {
 			var receiver: BroadcastReceiver? = null
 			override fun onListen(args: Any?, events: EventChannel.EventSink?) {
+				try {
+					val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+					val connected = prefs.getString("saved_device_id", null) != null
+					val did = prefs.getString("saved_device_id", null)
+					val lastB64 = prefs.getString("last_bytes_b64", null)
+					var lastList: List<Int>? = null
+					if (lastB64 != null) {
+						try {
+							val bytes = Base64.decode(lastB64, Base64.DEFAULT)
+							lastList = bytes.map { (it.toInt() and 0xFF) }
+						} catch (e: Exception) { }
+					}
+					val m = mutableMapOf<String, Any?>()
+					m["status"] = connected
+					m["deviceId"] = did
+					if (lastList != null) m["lastBytes"] = lastList
+					try { Log.i("MainActivity", "onListen emitting saved status=$connected device=$did lastBytes=${lastList?.size}") } catch (e: Exception) {}
+					events?.success(m)
+					try {
+						val intent = Intent(this@MainActivity, BleForegroundService::class.java)
+						intent.action = "ACTION_QUERY_STATUS"
+						ContextCompat.startForegroundService(this@MainActivity, intent)
+						try { Log.i("MainActivity", "onListen requested live status broadcast from service") } catch (e: Exception) {}
+					} catch (e: Exception) {}
+				} catch (e: Exception) { }
 				receiver = object: BroadcastReceiver() {
 					override fun onReceive(context: Context?, intent: Intent?) {
 						try {
@@ -179,12 +215,14 @@ class MainActivity : FlutterActivity() {
 									val data = intent.getByteArrayExtra("data")
 									if (data != null) {
 										val list = data.map { (it.toInt() and 0xFF) }
-										events?.success(list)
+										events?.success(mapOf("lastBytes" to list))
+										try { Log.i("MainActivity", "onReceive BLE_EVENT len=${list.size}") } catch (e: Exception) {}
 									}
 								}
 								"com.example.sync_companion.BLE_STATUS" -> {
 									val connected = intent.getBooleanExtra("connected", false)
 									events?.success(mapOf("status" to connected))
+									try { Log.i("MainActivity", "onReceive BLE_STATUS status=$connected") } catch (e: Exception) {}
 								}
 							}
 						} catch (e: Exception) { }
@@ -197,7 +235,6 @@ class MainActivity : FlutterActivity() {
 					try {
 						applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
 					} catch (e: NoSuchMethodError) {
-						// Fallback for older toolchains where the 3-arg overload may not be available.
 						applicationContext.registerReceiver(receiver, filter)
 					}
 				} else {
