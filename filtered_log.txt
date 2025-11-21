@@ -1,0 +1,8 @@
+﻿--------- beginning of main
+11-20 22:44:17.608 28400 28400 I MainActivity: onListen emitting saved status=false device=00:4B:12:C3:A7:BE lastBytes=12
+11-20 22:44:17.613 28400 28400 I MainActivity: onListen requested live status broadcast from service
+11-20 22:44:17.676 28400 28400 I MainActivity: requestNativeStatus replying prefs status=false device=00:4B:12:C3:A7:BE lastBytes=12
+11-20 22:44:43.911 28400 28400 I MainActivity: onListen emitting saved status=false device=null lastBytes=12
+11-20 22:44:43.917 28400 28400 I MainActivity: onListen requested live status broadcast from service
+11-20 22:44:43.960 28400 28400 I MainActivity: requestNativeStatus replying prefs status=false device=null lastBytes=12
+11-20 22:44:51.424 28400 28400 I MainActivity: requestNativeStatus replying prefs status=false device=7C:64:56:B0:A8:8D lastBytes=12

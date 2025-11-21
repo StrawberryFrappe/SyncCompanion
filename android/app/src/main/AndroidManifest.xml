@@ -9,6 +9,11 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <!-- Required for running a foreground service to keep BLE active while app is backgrounded -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- For Android target SDKs that require specific foreground service types (connectedDevice) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android 13+ requires runtime notification permission to post notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Optional: if you plan to scan in background without a foreground service you may need background location on some API levels -->
     <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
     <application
@@ -44,6 +49,14 @@
             android:value="2" />
         <!-- Foreground service required by flutter_foreground_task plugin. Keeps a persistent notification while service runs. -->
         <service android:name="com.pravera.flutter_foreground_task.service.ForegroundService" android:exported="false" android:foregroundServiceType="connectedDevice" />
+        <!-- Native BLE foreground service implemented in Kotlin -->
+        <service android:name=".BleForegroundService" android:exported="false" android:foregroundServiceType="connectedDevice" android:process=":ble_service" />
+
+        <receiver android:name=".BootReceiver" android:enabled="true" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
