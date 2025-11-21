@@ -14,7 +14,7 @@
 - NOTE: The list below is the global, project-level TODO where the development team (humans) should add and edit items. An LLM (or automated assistant) MUST NOT modify this section  it can only read it. This file contains the authoritative human TODOs for planning and coordination.
 
 - [ ] Conectar a Thingsboard mediante MQTT para sincronización de datos.
-- [ ] Leer lo que entrega el dispositivo BLE
+- [X] Leer lo que entrega el dispositivo BLE
 - [ ] Descodificar los datos según el protocolo definido.
 - [ ] Confirmar conexion y persistencia del dispositivo BLE preferido.
 - [ ] Agrandar placeholder.png 

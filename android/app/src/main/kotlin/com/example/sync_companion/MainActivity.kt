@@ -69,21 +69,34 @@ class MainActivity : FlutterActivity() {
 					result.success(adapter != null && adapter.isEnabled)
 				}
 				"updateNotification" -> {
-					val text = call.argument<String>("text") ?: ""
+					// If the native service is running, ask it to refresh its own
+					// foreground notification (it reads prefs and lastBytes itself).
 					try {
-						val channelId = "sync_companion_channel"
-						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-							val nm = getSystemService(NotificationManager::class.java)
-							val ch = NotificationChannel(channelId, "Sync Companion", NotificationManager.IMPORTANCE_LOW)
-							nm.createNotificationChannel(ch)
+						val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+						val list = am.getRunningServices(Integer.MAX_VALUE)
+						val running = list.any { it.service.className == BleForegroundService::class.java.name }
+						if (running) {
+							val intent = Intent(this, BleForegroundService::class.java)
+							intent.action = "ACTION_UPDATE_NOTIFICATION"
+							ContextCompat.startForegroundService(this, intent)
+							result.success(true)
+						} else {
+							// Fallback: post a simple notification from activity
+							val text = call.argument<String>("text") ?: ""
+							val channelId = "sync_companion_channel"
+							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+								val nm = getSystemService(NotificationManager::class.java)
+								val ch = NotificationChannel(channelId, "Sync Companion", NotificationManager.IMPORTANCE_LOW)
+								nm.createNotificationChannel(ch)
+							}
+							val builder = NotificationCompat.Builder(this, channelId)
+								.setContentTitle("Sync Companion")
+								.setContentText(text.take(128))
+								.setSmallIcon(android.R.drawable.ic_dialog_info)
+								.setPriority(NotificationCompat.PRIORITY_LOW)
+							NotificationManagerCompat.from(this).notify(1001, builder.build())
+							result.success(true)
 						}
-						val builder = NotificationCompat.Builder(this, channelId)
-							.setContentTitle("Sync Companion")
-							.setContentText(text.take(128))
-							.setSmallIcon(android.R.drawable.ic_dialog_info)
-							.setPriority(NotificationCompat.PRIORITY_LOW)
-						NotificationManagerCompat.from(this).notify(1001, builder.build())
-						result.success(true)
 					} catch (e: Exception) {
 						result.error("notif_failed", e.toString(), null)
 					}
@@ -138,27 +151,58 @@ class MainActivity : FlutterActivity() {
 						result.error("disconnect_failed", e.toString(), null)
 					}
 				}
+				"requestNativeStatus" -> {
+					try {
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_QUERY_STATUS"
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("request_failed", e.toString(), null)
+					}
+				}
 				else -> result.notImplemented()
 			}
+
 		}
 
-		// EventChannel: forward broadcasts from native service as byte[] -> List<int>
+			// EventChannel: forward broadcasts from native service as byte[] -> List<int>
 		EventChannel(flutterEngine.dartExecutor.binaryMessenger, "sync_companion/ble_events").setStreamHandler(object: EventChannel.StreamHandler {
 			var receiver: BroadcastReceiver? = null
 			override fun onListen(args: Any?, events: EventChannel.EventSink?) {
 				receiver = object: BroadcastReceiver() {
 					override fun onReceive(context: Context?, intent: Intent?) {
 						try {
-							val data = intent?.getByteArrayExtra("data")
-							if (data != null) {
-								val list = data.map { (it.toInt() and 0xFF) }
-								events?.success(list)
+							if (intent == null) return
+							when (intent.action) {
+								"com.example.sync_companion.BLE_EVENT" -> {
+									val data = intent.getByteArrayExtra("data")
+									if (data != null) {
+										val list = data.map { (it.toInt() and 0xFF) }
+										events?.success(list)
+									}
+								}
+								"com.example.sync_companion.BLE_STATUS" -> {
+									val connected = intent.getBooleanExtra("connected", false)
+									events?.success(mapOf("status" to connected))
+								}
 							}
 						} catch (e: Exception) { }
 					}
 				}
-				val filter = IntentFilter("com.example.sync_companion.BLE_EVENT")
-				applicationContext.registerReceiver(receiver, filter)
+				val filter = IntentFilter()
+				filter.addAction("com.example.sync_companion.BLE_EVENT")
+				filter.addAction("com.example.sync_companion.BLE_STATUS")
+				if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+					try {
+						applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+					} catch (e: NoSuchMethodError) {
+						// Fallback for older toolchains where the 3-arg overload may not be available.
+						applicationContext.registerReceiver(receiver, filter)
+					}
+				} else {
+					applicationContext.registerReceiver(receiver, filter)
+				}
 			}
 
 			override fun onCancel(args: Any?) {

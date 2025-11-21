@@ -35,11 +35,13 @@ class BluetoothService {
   // Broadcast controllers to allow multiple UI listeners.
   final StreamController<List<ScanResult>> _foundController = StreamController.broadcast();
   final StreamController<BluetoothDevice?> _connectedController = StreamController.broadcast();
+  final StreamController<bool> _nativeConnectedController = StreamController.broadcast();
   final StreamController<String> _incomingController = StreamController.broadcast();
   final StreamController<List<int>> _incomingRawController = StreamController.broadcast();
 
   Stream<List<ScanResult>> get foundDevices$ => _foundController.stream;
   Stream<BluetoothDevice?> get connectedDevice$ => _connectedController.stream;
+  Stream<bool> get nativeConnected$ => _nativeConnectedController.stream;
   Stream<String> get incomingData$ => _incomingController.stream;
   Stream<List<int>> get incomingRaw$ => _incomingRawController.stream;
 
@@ -72,17 +74,26 @@ class BluetoothService {
     try {
       final prefs = await SharedPreferences.getInstance();
       _savedId = prefs.getString('saved_device_id');
-      if (_savedId != null) {
+      // If a native Android BLE service is available, subscribe to its events
+      bool nativeRunning = false;
+      try {
+        nativeRunning = await _platform.invokeMethod('isNativeServiceRunning') == true;
+        if (nativeRunning) {
+          _attachNativeEventStream();
+          // Ask native service to emit current status immediately
+          try {
+            await _platform.invokeMethod('requestNativeStatus');
+          } catch (_) {}
+        }
+      } catch (_) {}
+      // Only attempt Flutter-side auto-reconnect if native service is NOT running.
+      if (!nativeRunning && _savedId != null) {
         // try a background auto-reconnect without UI prompts
         _autoReconnect(_savedId!);
       }
-      // If a native Android BLE service is available, subscribe to its events
-      try {
-        final nativeRunning = await _platform.invokeMethod('isNativeServiceRunning');
-        if (nativeRunning == true) {
-          _attachNativeEventStream();
-        }
-      } catch (_) {}
+      // NOTE: do not auto-start the native service here. The UI or connect
+      // flows will start it deliberately to avoid scanning/running BLE when
+      // the user hasn't requested it.
     } catch (_) {}
   }
 
@@ -91,11 +102,26 @@ class BluetoothService {
       final ev = EventChannel('sync_companion/ble_events');
       ev.receiveBroadcastStream().listen((dynamic event) {
         try {
-          if (event is List) {
+              if (event is List) {
             final bytes = List<int>.from(event.map((e) => e as int));
             _incomingRawController.add(bytes);
             final s = _decode(bytes);
             _incomingController.add(s);
+          } else if (event is Map) {
+            // status event from native service
+            try {
+              final m = Map<String, dynamic>.from(event);
+              if (m.containsKey('status')) {
+                final connected = m['status'] == true;
+                    // emit native-connected boolean so UI can react without
+                    // needing a concrete `BluetoothDevice` object.
+                    _nativeConnectedController.add(connected);
+                    if (!connected) {
+                      _connected = null;
+                      _connectedController.add(null);
+                    }
+              }
+            } catch (_) {}
           }
         } catch (_) {}
       }, onError: (e) {
@@ -276,112 +302,53 @@ class BluetoothService {
 
   Future<void> connect(BluetoothDevice device, {bool save = true}) async {
     try {
-      // If native service is running, prefer it and ask native side to connect
-      try {
-        final nativeRunning = await _platform.invokeMethod('isNativeServiceRunning');
-        if (nativeRunning == true) {
-          final did = device.remoteId.str;
-          await _platform.invokeMethod('connect', {'id': did});
-          _connected = device;
-          if (save) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('saved_device_id', did);
-            _savedId = did;
-          }
-          _connectedController.add(_connected);
-          return;
-        }
-      } catch (_) {}
-      if (BLE_DEBUG) print('BLE: connecting to ${device.remoteId.str}');
-      _connectedController.add(null);
-      await device.connect(autoConnect: false).timeout(const Duration(seconds: 8));
+      // Always use native service to manage connections. Native service runs
+      // in a foreground process and will survive app swipe kills.
+      final did = device.remoteId.str;
+      await _platform.invokeMethod('connect', {'id': did});
       _connected = device;
       if (save) {
         final prefs = await SharedPreferences.getInstance();
-        final did = device.remoteId.str;
         await prefs.setString('saved_device_id', did);
         _savedId = did;
       }
       _connectedController.add(_connected);
-
-      final services = await device.discoverServices();
-      if (BLE_DEBUG) print('BLE: discovered ${services.length} services');
-      // Look for the specific custom characteristic UUID from the device
-      BluetoothCharacteristic? chosen;
-      const targetCharUuid = '04933a4f-756a-4801-9823-7b199fe93b5e';
-      for (final s in services) {
-        for (final c in s.characteristics) {
-          if (c.uuid.toString().toLowerCase() == targetCharUuid) {
-            chosen = c;
-            break;
-          }
-        }
-        if (chosen != null) break;
-      }
-      // Fallback: find any notify characteristic if custom UUID not found
-      if (chosen == null) {
-        for (final s in services) {
-          for (final c in s.characteristics) {
-            if (c.properties.notify) {
-              chosen = c;
-              break;
-            }
-          }
-          if (chosen != null) break;
-        }
-      }
-      _charSub?.cancel();
-      if (chosen != null && chosen.properties.notify) {
-        final charUuid = chosen.uuid.toString();
-        if (BLE_DEBUG) print('BLE: enabling notify on $charUuid');
-        await chosen.setNotifyValue(true);
-        _charSub = chosen.lastValueStream.listen((b) {
-          try {
-            // publish raw payload immediately
-            _incomingRawController.add(List<int>.from(b));
-          } catch (_) {}
-          // Debug log the payload
-          if (BLE_DEBUG) {
-            try {
-              final hex = b.map((e) => e.toRadixString(16).padLeft(2, '0')).join(' ');
-              final decoded = _decode(b);
-              print('BLE: notify $charUuid len=${b.length} hex=$hex decoded=$decoded');
-            } catch (e) {
-              print('BLE: notify logging failed: $e');
-            }
-          }
-          final s = _decode(b);
-          _incomingController.add(s);
-        }, onError: (e) {
-          if (BLE_DEBUG) print('BLE: char stream error: $e');
-        });
-      } else {
-        if (BLE_DEBUG) print('BLE: no notify characteristic available');
-      }
     } catch (e) {
-      if (BLE_DEBUG) print('BLE: connect failed: $e');
-      try {
-        await device.disconnect();
-      } catch (_) {}
+      if (BLE_DEBUG) print('BLE: native connect failed: $e');
       _connected = null;
       _connectedController.add(null);
     }
   }
 
+  /// Instruct native service to refresh its notification text. Useful after
+  /// toggling the `notif_show_data` preference so the native foreground
+  /// notification reflects the new setting immediately.
+  Future<void> updateNativeNotification() async {
+    try {
+      await _platform.invokeMethod('updateNotification');
+    } catch (_) {}
+  }
+
+  /// Forget any saved device id and request disconnect from native service.
+  Future<void> forget() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('saved_device_id');
+      _savedId = null;
+    } catch (_) {}
+    try {
+      await _platform.invokeMethod('disconnect');
+    } catch (_) {}
+  }
+
   Future<void> disconnect() async {
     try {
-      // If native service is running, ask it to disconnect
+      await _platform.invokeMethod('disconnect');
+    } catch (_) {
       try {
-        final nativeRunning = await _platform.invokeMethod('isNativeServiceRunning');
-        if (nativeRunning == true) {
-          await _platform.invokeMethod('disconnect');
-        } else {
-          await _connected?.disconnect();
-        }
-      } catch (_) {
         await _connected?.disconnect();
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
     _charSub?.cancel();
     _charSub = null;
     _connected = null;
@@ -419,6 +386,10 @@ class BluetoothService {
     }
   }
 
+  /// Return the saved device id if any (used by UI to display which device
+  /// the native service may be holding).
+  String? getSavedDeviceId() => _savedId;
+
   // Optional platform utility used by UI if needed.
   Future<bool> isBluetoothEnabled() async {
     try {
@@ -440,6 +411,7 @@ class BluetoothService {
   void dispose() {
     _foundController.close();
     _connectedController.close();
+    _nativeConnectedController.close();
     _incomingController.close();
     _incomingRawController.close();
     _scanSub?.cancel();

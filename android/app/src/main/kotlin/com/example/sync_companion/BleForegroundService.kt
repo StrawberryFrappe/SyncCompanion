@@ -17,6 +17,7 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothDevice
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
+import android.util.Log
 import android.os.Handler
 import android.os.Looper
 
@@ -24,6 +25,8 @@ class BleForegroundService : Service() {
     companion object {
         const val ACTION_CONNECT = "ACTION_CONNECT"
         const val ACTION_DISCONNECT = "ACTION_DISCONNECT"
+        const val ACTION_UPDATE_NOTIFICATION = "ACTION_UPDATE_NOTIFICATION"
+        const val ACTION_QUERY_STATUS = "ACTION_QUERY_STATUS"
         const val PREF_SAVED_ID = "saved_device_id"
         const val CHANNEL_ID = "sync_companion_native"
         val TARGET_CHAR = java.util.UUID.fromString("04933a4f-756a-4801-9823-7b199fe93b5e")
@@ -34,6 +37,7 @@ class BleForegroundService : Service() {
     private var gatt: BluetoothGatt? = null
     private var connectedDeviceId: String? = null
     private var prefs: SharedPreferences? = null
+    private var lastBytes: ByteArray? = null
     private val handler = Handler(Looper.getMainLooper())
     private var reconnectAttempts = 0
 
@@ -53,21 +57,29 @@ class BleForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
             val action = intent?.action
-            if (action == ACTION_CONNECT) {
-                val id = intent.getStringExtra("id")
-                if (id != null) connectToDevice(id)
-            } else if (action == ACTION_DISCONNECT) {
-                disconnectGatt()
-            } else {
-                // plain start: attempt auto-reconnect if saved id exists
-                val did = prefs?.getString(PREF_SAVED_ID, null)
-                if (did != null && gatt == null) {
-                    handler.postDelayed({ connectToDevice(did) }, 1000)
+            when (action) {
+                ACTION_CONNECT -> {
+                    val id = intent?.getStringExtra("id")
+                    if (id != null) connectToDevice(id)
+                }
+                ACTION_DISCONNECT -> disconnectGatt()
+                ACTION_UPDATE_NOTIFICATION -> updateNotificationForData()
+                ACTION_QUERY_STATUS -> {
+                    val connectedNow = gatt != null
+                    sendStatusBroadcast(connectedNow)
+                }
+                else -> {
+                    // plain start: attempt auto-reconnect if saved id exists
+                    val did = prefs?.getString(PREF_SAVED_ID, null)
+                    if (did != null && gatt == null) {
+                        handler.postDelayed({ connectToDevice(did) }, 1000)
+                    }
                 }
             }
         } catch (e: Exception) {
-            // ignore
+            Log.e("BleForegroundService", "onStartCommand error: ${e}")
         }
+
         return START_STICKY
     }
 
@@ -94,6 +106,20 @@ class BleForegroundService : Service() {
         .setSmallIcon(android.R.drawable.ic_dialog_info)
         .setPriority(NotificationCompat.PRIORITY_LOW)
         .build()
+
+    private fun updateNotificationForData() {
+        try {
+            val showLive = prefs?.getBoolean("notif_show_data", true) ?: true
+            val text = if (showLive && lastBytes != null) {
+                // show a short hex preview
+                val hex = lastBytes!!.joinToString(" ") { String.format("%02x", it) }
+                if (hex.length > 120) hex.substring(0, 120) + "..." else hex
+            } else {
+                "Your device is synced"
+            }
+            startForeground(2001, buildNotification(text))
+        } catch (e: Exception) { }
+    }
 
     private fun connectToDevice(id: String) {
         try {
@@ -195,11 +221,17 @@ class BleForegroundService : Service() {
         override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             try {
                 val bytes = characteristic.value
+                lastBytes = bytes
+                // Log raw data so it appears in logcat/terminal
+                try {
+                    val hex = bytes.joinToString(" ") { String.format("%02x", it) }
+                    Log.i("BleForegroundService", "notify ${TARGET_CHAR} len=${bytes.size} hex=$hex")
+                } catch (e: Exception) {}
                 val bcast = Intent("com.example.sync_companion.BLE_EVENT")
                 bcast.putExtra("data", bytes)
                 sendBroadcast(bcast)
-                // update notification text with brief indicator
-                startForeground(2001, buildNotification("Receiving data (${bytes.size} bytes)"))
+                // update notification according to user preference
+                updateNotificationForData()
             } catch (e: Exception) {}
         }
     }

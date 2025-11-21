@@ -3,12 +3,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../foreground_handler.dart';
+// foreground_handler not needed in this file
+import 'settings_page.dart';
 import '../services/bluetooth_service.dart' as bt_service;
 import '../services/foreground_notification.dart';
 
@@ -34,7 +34,6 @@ class _HomePageState extends State<HomePage> {
   Map<String, bool> _permissionStatuses = {};
   Map<String, String> _debugInfo = {};
   bool _bgServiceRunning = false;
-  bool _showSyncNotification = true;
   ForegroundNotificationUpdater? _notifUpdater;
 
   StreamSubscription<BluetoothDevice?>? _connSub;
@@ -82,12 +81,9 @@ class _HomePageState extends State<HomePage> {
       print('isBluetoothEnabled failed: $e');
     }
     try {
-      final running = await FlutterForegroundTask.isRunningService;
-      setState(() => _bgServiceRunning = running);
+      final running = await _platform.invokeMethod('isNativeServiceRunning');
+      setState(() => _bgServiceRunning = (running == true));
     } catch (_) {}
-    final prefs = await SharedPreferences.getInstance();
-    final show = prefs.getBool('show_sync_notification');
-    if (show != null) setState(() => _showSyncNotification = show);
     // preload debug info reference
     setState(() => _debugInfo = Map<String, String>.from(_bt.debugInfo));
   }
@@ -140,14 +136,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _startBackgroundTask() async {
-    final running = await FlutterForegroundTask.isRunningService;
-    if (running) {
-      // ensure the notification updater is running when service already active
-      _notifUpdater ??= ForegroundNotificationUpdater(_bt);
-      _notifUpdater?.start();
-      setState(() => _bgServiceRunning = true);
-      return;
-    }
+    // Ensure permissions first, then start the native BLE foreground service.
     await _bt.performRequestPermissions();
     setState(() => _permissionStatuses = _bt.permissionStatuses);
     final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
@@ -155,7 +144,7 @@ class _HomePageState extends State<HomePage> {
     if (!scanOk || !connectOk) {
       await showDialog<void>(context: context, builder: (c) => AlertDialog(
         title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
-        content: const Text('Bluetooth permissions are required to run in background. Please grant them in Settings.', style: TextStyle(fontSize: 10)),
+        content: const Text('Bluetooth permissions are required to run the native BLE service. Please grant them in Settings.', style: TextStyle(fontSize: 10)),
         actions: [
           TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10))),
         ],
@@ -163,33 +152,14 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final persisted = prefs.getBool('show_sync_notification');
-    final showNotification = _showSyncNotification || (persisted == null ? true : persisted);
-    String notifText;
-    if (showNotification) {
-      notifText = (_connectedDevice != null) ? 'The device is synced' : 'Running in background';
-    } else {
-      notifText = ' ';
-    }
-
     try {
-      await FlutterForegroundTask.startService(
-        serviceId: 1,
-        notificationTitle: 'Sync Companion',
-        notificationText: notifText,
-        callback: startCallback,
-      );
+      await _platform.invokeMethod('startNativeService');
       setState(() => _bgServiceRunning = true);
-      // start the notification updater to reflect raw BLE packets in the
-      // foreground notification (connected-only by default)
-      _notifUpdater = ForegroundNotificationUpdater(_bt);
-      _notifUpdater?.start();
     } catch (e) {
-      print('startBackgroundTask failed: $e');
+      print('startNativeService failed: $e');
       await showDialog<void>(context: context, builder: (c) => AlertDialog(
-        title: const Text('Background service failed', style: TextStyle(fontSize: 12)),
-        content: const Text('Could not start the foreground background service. Please ensure the app has the required permissions (location/foreground service) in Android settings.', style: TextStyle(fontSize: 10)),
+        title: const Text('Native service failed', style: TextStyle(fontSize: 12)),
+        content: const Text('Could not start the native BLE foreground service. Please ensure the app has the required permissions.', style: TextStyle(fontSize: 10)),
         actions: [
           TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10))),
         ],
@@ -198,14 +168,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _stopBackgroundTask() async {
-    if (!await FlutterForegroundTask.isRunningService) return;
-    // Ensure required runtime permissions are granted first. The service
-    // manages the actual permission request; UI simply invokes it and
-    // updates its view of statuses.
-    await _bt.performRequestPermissions();
-    setState(() => _permissionStatuses = _bt.permissionStatuses);
     try {
-      await FlutterForegroundTask.stopService();
+      await _platform.invokeMethod('stopNativeService');
     } catch (_) {}
     _notifUpdater?.stop();
     _notifUpdater = null;
@@ -385,17 +349,17 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
-                    onPressed: _openScanner,
-                    child: const Text('SETTINGS', style: TextStyle(fontSize: 10)),
-                  ),
-                ),
-              ],
-            ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt))),
+                            child: const Text('SETTINGS', style: TextStyle(fontSize: 10)),
+                          ),
+                        ),
+                      ],
+                    ),
           ],
         ),
       ),

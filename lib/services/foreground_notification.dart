@@ -98,6 +98,14 @@ class ForegroundNotificationUpdater {
     _lastSent = text;
     try {
       if (BluetoothService.BLE_DEBUG) print('ForegroundNotification: updating service text: $text');
+      // Prefer native service notification update when available
+      try {
+        final nativeRunning = await _platform.invokeMethod('isNativeServiceRunning');
+        if (nativeRunning == true) {
+          await _platform.invokeMethod('updateNotification', {'text': text});
+          return;
+        }
+      } catch (_) {}
       await FlutterForegroundTask.updateService(notificationText: text);
     } catch (e) {
       if (BluetoothService.BLE_DEBUG) print('ForegroundNotification: updateService failed: $e');
