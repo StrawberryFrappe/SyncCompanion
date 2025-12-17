@@ -43,6 +43,8 @@ Testing & verification
 Next steps
 - Add a secure configuration mechanism for the ThingsBoard token (don't hardcode in source in production).
 - Harden reconnection logic and battery-friendly sampling for long-term usage.
-- Add end-to-end tests that validate device discovery, background uploads, and ThingsBoard telemetry arrival.
+- **[Completed]** Initial connectivity and background telemetry logic.
+
+This concludes **Phase 1**. The project is now moving to **Phase 2: Virtual Pet Base**.
 
 If you want, I can: run the repo locally, add a small config file for ThingsBoard credentials, or create a checklist for the remaining connectivity hardening tasks.
