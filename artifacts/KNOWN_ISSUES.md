@@ -110,10 +110,28 @@ Debug tips and commands
 Change history (branch: stage-1)
 - 2025-11-20: Dart handler updated to replay `lastBytes` from map events.
 - 2025-11-21: Settings terminal updated to append packets, expanded layout.
+- 2025-12-17: Fixed 5 user-reported issues (see below).
 
-If you want, I can:
-- remove the temporary debug prints after you confirm the terminal is receiving repeated packets; or
-- add more explicit debug (sequence numbers, event counters) to both native broadcasts and Dart EventChannel handling to root-cause any remaining drop.
+
+3) Fixed issues (2025-12-17)
+----------------------------
+
+The following issues were identified and fixed:
+
+| Issue | Root Cause | Fix Applied |
+|-------|------------|-------------|
+| App shows "closing too much" popup | Service restarting too rapidly | Increased auto-reconnect delay to 2000ms |
+| Terminal not receiving packets | Dart only processed `lastBytes` when `status` key present | Handle `lastBytes`-only map events separately |
+| Notification not live-updating | Missing notification flags | Added `setOngoing(true)` and `setOnlyAlertOnce(true)` |
+| Obfuscate toggle not working | SharedPreferences storage mismatch | Added `setNotifShowData` platform method to write to Android's PreferenceManager |
+| UI state inconsistency after swipe-kill | SEARCHING shown before native status received | Added `_nativeStatusReceived` flag; show LOADING until confirmed |
+
+Files modified:
+- `android/.../BleForegroundService.kt` (issues 1, 3)
+- `android/.../MainActivity.kt` (issue 4)
+- `lib/services/bluetooth_service.dart` (issues 2, 4)
+- `lib/screens/settings_page.dart` (issue 4)
+- `lib/screens/home_page.dart` (issue 5)
 
 
 End of document

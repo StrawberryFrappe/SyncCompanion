@@ -143,9 +143,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notif_show_data', v);
     setState(() => _notifShowData = v);
-    // Tell native service to refresh its notification immediately.
+    // Use native method to write pref to Android's PreferenceManager
     try {
-      await widget.bt.updateNativeNotification();
+      await widget.bt.setNotifShowData(v);
     } catch (_) {}
   }
 

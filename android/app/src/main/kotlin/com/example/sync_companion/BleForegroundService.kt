@@ -61,7 +61,7 @@ class BleForegroundService : Service() {
         // If saved device id exists, attempt reconnect
         val did = prefs?.getString(PREF_SAVED_ID, null)
         if (did != null) {
-            handler.postDelayed({ connectToDevice(did) }, 1000)
+            handler.postDelayed({ connectToDevice(did) }, 2000)
         }
     }
 
@@ -149,6 +149,8 @@ class BleForegroundService : Service() {
         .setContentText(text)
         .setSmallIcon(android.R.drawable.ic_dialog_info)
         .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
         .build()
 
     private fun updateNotificationForData() {

@@ -159,25 +159,24 @@ class BluetoothService {
             try {
               final m = Map<String, dynamic>.from(event);
               if (BLE_DEBUG) print('BLE: event map keys=${m.keys}');
+              // Handle status events
               if (m.containsKey('status')) {
                 _handleNativeStatusMap(m);
               }
-              // If native sent lastBytes inside a map (e.g. BLE_EVENT was emitted
-              // as a map by the platform), also replay those bytes into the
-              // incoming streams so the terminal and other listeners receive them.
-              if (m.containsKey('lastBytes')) {
+              // Handle lastBytes events that come without status (live BLE_EVENT broadcasts)
+              if (m.containsKey('lastBytes') && !m.containsKey('status')) {
                 try {
                   final lb = m['lastBytes'];
                   if (lb is List) {
                     final bytes = List<int>.from(lb.map((e) => (e as int)));
                     if (bytes.isNotEmpty) {
-                      if (BLE_DEBUG) print('BLE: map lastBytes len=${bytes.length}');
+                      if (BLE_DEBUG) print('BLE: live lastBytes len=${bytes.length}');
                       _incomingRawController.add(bytes);
                       _incomingController.add(_decode(bytes));
                     }
                   }
                 } catch (e) {
-                  if (BLE_DEBUG) print('BLE: failed to handle lastBytes in map: $e');
+                  if (BLE_DEBUG) print('BLE: failed to handle live lastBytes: $e');
                 }
               }
             } catch (e) {
@@ -452,6 +451,14 @@ class BluetoothService {
   Future<void> updateNativeNotification() async {
     try {
       await _platform.invokeMethod('updateNotification');
+    } catch (_) {}
+  }
+
+  /// Set the notif_show_data preference in Android's PreferenceManager storage
+  /// so that the native foreground service can read it correctly.
+  Future<void> setNotifShowData(bool value) async {
+    try {
+      await _platform.invokeMethod('setNotifShowData', {'value': value});
     } catch (_) {}
   }
 

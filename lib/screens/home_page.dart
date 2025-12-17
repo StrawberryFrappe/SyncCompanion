@@ -41,6 +41,7 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<bt_service.BluetoothUserAction>? _userActionSub;
 
   bool _isConnected = false;
+  bool _nativeStatusReceived = false;
   String? _deviceId;
 
   @override
@@ -71,7 +72,13 @@ class _HomePageState extends State<HomePage> {
       }
     });
     _bt.nativeConnected$.listen((connected) {
-      setState(() => _isConnected = connected);
+      _nativeStatusReceived = true;
+      setState(() {
+        _isConnected = connected;
+        if (!connected) {
+          _status = 'SEARCHING';
+        }
+      });
       if (connected && _deviceId == null) {
         // If connected but no device, perhaps load from prefs
         _loadPersistedDeviceId();
@@ -387,7 +394,10 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(_isConnected ? (_connectedDevice != null ? 'CONNECTED' : 'PERSISTED') : _status, style: const TextStyle(fontSize: 10)),
+                  Text(_isConnected 
+                      ? (_connectedDevice != null ? 'CONNECTED' : 'SYNCED') 
+                      : (_nativeStatusReceived ? 'SEARCHING' : 'LOADING'), 
+                      style: const TextStyle(fontSize: 10)),
                 ],
               ),
             ),

@@ -173,6 +173,20 @@ class MainActivity : FlutterActivity() {
 						result.error("ack_failed", e.toString(), null)
 					}
 				}
+				"setNotifShowData" -> {
+					try {
+						val value = call.argument<Boolean>("value") ?: true
+						val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+						prefs.edit().putBoolean("notif_show_data", value).apply()
+						// Trigger notification refresh
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_UPDATE_NOTIFICATION"
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("pref_failed", e.toString(), null)
+					}
+				}
 				else -> result.notImplemented()
 			}
 		}
