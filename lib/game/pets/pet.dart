@@ -53,7 +53,8 @@ abstract class Pet extends PositionComponent {
     stats.update(dt, isDeviceSynced: isSynced);
     
     // Apply rotation based on wellbeing
-    angle = rotationAngle;
+    // DISABLED: Sprite expressions now show wellbeing instead of rotation
+    // angle = rotationAngle;
   }
 
   /// Subclasses must implement their own rendering
