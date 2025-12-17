@@ -72,7 +72,8 @@ class PetStats {
       _happiness = max(0.0, _happiness - (happinessDecayRate * dt));
     }
     
-    _lastUpdateTime = DateTime.now();
+    // NOTE: Do NOT update _lastUpdateTime here!
+    // It should only be updated when saving to prefs (for background time tracking)
   }
 
   /// Calculate and apply stats changes that occurred while app was in background.
@@ -82,18 +83,29 @@ class PetStats {
     final now = DateTime.now();
     final elapsedSeconds = now.difference(_lastUpdateTime).inMilliseconds / 1000.0;
     
-    if (elapsedSeconds <= 0) return;
+    print('[PetStats] applyBackgroundUpdates: elapsedSeconds=$elapsedSeconds, hungerDecayRate=$hungerDecayRate');
+    print('[PetStats] Before: hunger=$_hunger, happiness=$_happiness');
+    
+    if (elapsedSeconds <= 0) {
+      print('[PetStats] Skipping - elapsed time is <= 0');
+      return;
+    }
+    
+    final hungerDelta = hungerDecayRate * elapsedSeconds;
+    final happinessDelta = happinessDecayRate * elapsedSeconds;
     
     // Hunger always decreases while in background
-    _hunger = max(0.0, _hunger - (hungerDecayRate * elapsedSeconds));
+    _hunger = max(0.0, _hunger - hungerDelta);
     
     // Happiness decreases while in background (even if synced)
-    _happiness = max(0.0, _happiness - (happinessDecayRate * elapsedSeconds));
+    _happiness = max(0.0, _happiness - happinessDelta);
     
     // If linked, the happiness buffer was accumulating
     if (wasDeviceSynced) {
       _happinessBuffer = min(1.0, _happinessBuffer + (happinessGainRate * elapsedSeconds));
     }
+    
+    print('[PetStats] After: hunger=$_hunger (delta=$hungerDelta), happiness=$_happiness (delta=$happinessDelta)');
     
     _lastUpdateTime = now;
   }
@@ -123,6 +135,11 @@ class PetStats {
   /// Save current state to SharedPreferences
   Future<void> saveToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Update the timestamp to "now" - this marks when we saved, for background time tracking
+    _lastUpdateTime = DateTime.now();
+    
+    print('[PetStats] saveToPrefs: hunger=$_hunger, happiness=$_happiness, lastUpdate=$_lastUpdateTime');
     await prefs.setDouble('pet_hunger', _hunger);
     await prefs.setDouble('pet_happiness', _happiness);
     await prefs.setDouble('pet_happiness_buffer', _happinessBuffer);
@@ -139,6 +156,8 @@ class PetStats {
     _happinessBuffer = prefs.getDouble('pet_happiness_buffer') ?? 0.0;
     
     final lastUpdateMs = prefs.getInt('pet_last_update');
+    print('[PetStats] loadFromPrefs: hunger=$_hunger, happiness=$_happiness, lastUpdateMs=$lastUpdateMs, now=${DateTime.now().millisecondsSinceEpoch}');
+    
     if (lastUpdateMs != null) {
       _lastUpdateTime = DateTime.fromMillisecondsSinceEpoch(lastUpdateMs);
       

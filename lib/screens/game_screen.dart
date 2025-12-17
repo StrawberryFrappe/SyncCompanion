@@ -54,18 +54,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    print('[GameScreen] Lifecycle state changed: $state');
     
     switch (state) {
       case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.detached:
-      case AppLifecycleState.hidden:
-        // App going to background - save current state
+        // App fully backgrounded - save current state with timestamp
+        // NOTE: Only save on 'paused', not 'inactive'/'hidden' which also fire when RETURNING
+        print('[GameScreen] Saving stats (app paused/backgrounded)');
         _saveStats();
         break;
       case AppLifecycleState.resumed:
         // App returning to foreground - restore and apply background updates
+        print('[GameScreen] Restoring stats (returning to foreground)');
         _restoreStats();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        // These states happen both when leaving AND returning - don't save here
+        print('[GameScreen] Lifecycle transition state: $state (no action)');
         break;
     }
   }
