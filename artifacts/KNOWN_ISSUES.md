@@ -110,10 +110,33 @@ Debug tips and commands
 Change history (branch: stage-1)
 - 2025-11-20: Dart handler updated to replay `lastBytes` from map events.
 - 2025-11-21: Settings terminal updated to append packets, expanded layout.
+- 2025-12-17: Fixed 5 user-reported issues (see below).
 
-If you want, I can:
-- remove the temporary debug prints after you confirm the terminal is receiving repeated packets; or
-- add more explicit debug (sequence numbers, event counters) to both native broadcasts and Dart EventChannel handling to root-cause any remaining drop.
+
+3) Fixed issues (2025-12-17)
+----------------------------
+
+The following issues were identified and fixed across multiple sessions:
+
+| Issue | Root Cause | Fix Applied |
+|-------|------------|-------------|
+| App shows "closing too much" popup | Service restarting too rapidly | Increased auto-reconnect delay to 2000ms |
+| Terminal not receiving packets | Implicit broadcasts not delivered on Android 13+ | Added `setPackage()` to BLE_EVENT broadcasts |
+| Obfuscate toggle not working | Service in separate process couldn't see SharedPreferences changes | Removed `android:process=":ble_service"` from manifest |
+| App crash on Android 16 | `connectedDevice` foreground service type requires Bluetooth permissions first | Changed to `dataSync` service type |
+
+**Note on notification live-update**: Android does not reliably refresh notification content visually even with `setOnlyAlertOnce(true)`. Users must swipe to refresh. This is an Android limitation, not a bug.
+
+**Package renamed**: `com.example.sync_companion` → `com.strawberryFrappe.sync_companion`
+
+Files modified:
+- `android/app/build.gradle.kts` (package name)
+- `android/app/src/main/AndroidManifest.xml` (process, service type, permissions)
+- `android/app/src/main/kotlin/com/strawberryFrappe/sync_companion/*.kt` (all moved)
+- `lib/services/bluetooth_service.dart` (lastBytes handling, setNotifShowData)
+- `lib/screens/settings_page.dart` (button layout)
+- `lib/screens/home_page.dart` (nativeStatusReceived flag)
 
 
 End of document
+

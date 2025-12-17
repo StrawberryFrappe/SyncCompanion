@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 // Note: using bundled `Monocraft` font; removed runtime google_fonts usage.
 
-import 'screens/home_page.dart';
+import 'screens/game_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,7 +58,7 @@ class SyncCompanionApp extends StatelessWidget {
         textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
         elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
       ),
-      home: const HomePage(),
+      home: const GameScreen(),
     );
   }
 }

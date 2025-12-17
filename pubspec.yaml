@@ -13,6 +13,7 @@ dependencies:
   flutter_blue_plus: ^1.4.0
   shared_preferences: ^2.1.0
   flutter_foreground_task: ^9.1.0
+  flame: ^1.21.0
   # permission_handler removed due to Android embedding compatibility; runtime
   # permissions are requested via platform prompts where possible.
   # google_fonts removed in favor of bundled Monocraft.ttf

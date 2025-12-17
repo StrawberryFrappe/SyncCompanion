@@ -1,4 +1,4 @@
-package com.example.sync_companion
+package com.strawberryFrappe.sync_companion
 
 import android.app.Service
 import android.content.Intent
@@ -61,7 +61,7 @@ class BleForegroundService : Service() {
         // If saved device id exists, attempt reconnect
         val did = prefs?.getString(PREF_SAVED_ID, null)
         if (did != null) {
-            handler.postDelayed({ connectToDevice(did) }, 1000)
+            handler.postDelayed({ connectToDevice(did) }, 2000)
         }
     }
 
@@ -82,7 +82,8 @@ class BleForegroundService : Service() {
                         sendStatusBroadcast(connectedNow)
                         try {
                             if (lastBytes != null) {
-                                val bcast = Intent("com.example.sync_companion.BLE_EVENT")
+                                val bcast = Intent("com.strawberryFrappe.sync_companion.BLE_EVENT")
+                                bcast.setPackage("com.strawberryFrappe.sync_companion")
                                 bcast.putExtra("data", lastBytes)
                                 sendBroadcast(bcast)
                             }
@@ -149,6 +150,8 @@ class BleForegroundService : Service() {
         .setContentText(text)
         .setSmallIcon(android.R.drawable.ic_dialog_info)
         .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
         .build()
 
     private fun updateNotificationForData() {
@@ -302,7 +305,8 @@ class BleForegroundService : Service() {
                         Log.i("BleForegroundService", "notify ${TARGET_CHAR} len=${bytes.size} hex=$hex")
                     } catch (e: Exception) {}
                 }
-                val bcast = Intent("com.example.sync_companion.BLE_EVENT")
+                val bcast = Intent("com.strawberryFrappe.sync_companion.BLE_EVENT")
+                bcast.setPackage("com.strawberryFrappe.sync_companion")
                 bcast.putExtra("data", bytes)
                 sendBroadcast(bcast)
                 // When broadcasting live data, allow Dart to acknowledge receipt if desired.
@@ -324,7 +328,8 @@ class BleForegroundService : Service() {
     }
 
     private fun sendStatusBroadcast(connected: Boolean) {
-        val i = Intent("com.example.sync_companion.BLE_STATUS")
+        val i = Intent("com.strawberryFrappe.sync_companion.BLE_STATUS")
+        i.setPackage("com.strawberryFrappe.sync_companion")
         i.putExtra("connected", connected)
         try {
             // keep preferences in sync so other processes can read canonical state

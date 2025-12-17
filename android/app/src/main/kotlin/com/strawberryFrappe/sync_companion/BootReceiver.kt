@@ -1,4 +1,4 @@
-package com.example.sync_companion
+package com.strawberryFrappe.sync_companion
 
 import android.content.BroadcastReceiver
 import android.content.Context

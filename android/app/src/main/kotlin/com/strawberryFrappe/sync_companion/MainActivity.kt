@@ -1,4 +1,4 @@
-package com.example.sync_companion
+package com.strawberryFrappe.sync_companion
 
 import android.app.Activity
 import android.content.Intent
@@ -173,6 +173,20 @@ class MainActivity : FlutterActivity() {
 						result.error("ack_failed", e.toString(), null)
 					}
 				}
+				"setNotifShowData" -> {
+					try {
+						val value = call.argument<Boolean>("value") ?: true
+						val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+						prefs.edit().putBoolean("notif_show_data", value).apply()
+						// Trigger notification refresh
+						val intent = Intent(this, BleForegroundService::class.java)
+						intent.action = "ACTION_UPDATE_NOTIFICATION"
+						ContextCompat.startForegroundService(this, intent)
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("pref_failed", e.toString(), null)
+					}
+				}
 				else -> result.notImplemented()
 			}
 		}
@@ -211,7 +225,7 @@ class MainActivity : FlutterActivity() {
 						try {
 							if (intent == null) return
 							when (intent.action) {
-								"com.example.sync_companion.BLE_EVENT" -> {
+								"com.strawberryFrappe.sync_companion.BLE_EVENT" -> {
 									val data = intent.getByteArrayExtra("data")
 									if (data != null) {
 										val list = data.map { (it.toInt() and 0xFF) }
@@ -219,7 +233,7 @@ class MainActivity : FlutterActivity() {
 										try { Log.i("MainActivity", "onReceive BLE_EVENT len=${list.size}") } catch (e: Exception) {}
 									}
 								}
-								"com.example.sync_companion.BLE_STATUS" -> {
+								"com.strawberryFrappe.sync_companion.BLE_STATUS" -> {
 									val connected = intent.getBooleanExtra("connected", false)
 									events?.success(mapOf("status" to connected))
 									try { Log.i("MainActivity", "onReceive BLE_STATUS status=$connected") } catch (e: Exception) {}
@@ -229,8 +243,8 @@ class MainActivity : FlutterActivity() {
 					}
 				}
 				val filter = IntentFilter()
-				filter.addAction("com.example.sync_companion.BLE_EVENT")
-				filter.addAction("com.example.sync_companion.BLE_STATUS")
+				filter.addAction("com.strawberryFrappe.sync_companion.BLE_EVENT")
+				filter.addAction("com.strawberryFrappe.sync_companion.BLE_STATUS")
 				if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
 					try {
 						applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)

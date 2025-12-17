@@ -143,9 +143,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notif_show_data', v);
     setState(() => _notifShowData = v);
-    // Tell native service to refresh its notification immediately.
+    // Use native method to write pref to Android's PreferenceManager
     try {
-      await widget.bt.updateNativeNotification();
+      await widget.bt.setNotifShowData(v);
     } catch (_) {}
   }
 
@@ -256,27 +256,16 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Text(label, style: const TextStyle(fontSize: 12)),
                         const SizedBox(height: 8),
-                        Row(children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
-                              onPressed: () async {
-                                await widget.bt.disconnect();
-                              },
-                              child: const Text('DISCONNECT', style: TextStyle(fontSize: 12)),
-                            ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
+                            onPressed: () async {
+                              await widget.bt.forget();
+                            },
+                            child: const Text('DISCONNECT & FORGET', style: TextStyle(fontSize: 12)),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
-                              onPressed: () async {
-                                await widget.bt.forget();
-                              },
-                              child: const Text('FORGET', style: TextStyle(fontSize: 12)),
-                            ),
-                          ),
-                        ]),
+                        ),
                         const Divider(color: Colors.black, thickness: 2),
                         const SizedBox(height: 8),
                         ConstrainedBox(
