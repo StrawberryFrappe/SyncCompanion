@@ -62,6 +62,7 @@ class BluetoothService {
   StreamSubscription<List<int>>? _charSub;
   String? _savedId;
   bool _nativeEventsAttached = false;
+  StreamSubscription? _nativeEventsSub;
 
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   Completer<Map<String, dynamic>>? _pendingPermissionCompleter;
@@ -146,7 +147,7 @@ class BluetoothService {
     if (_nativeEventsAttached) return;
     try {
       final ev = EventChannel('sync_companion/ble_events');
-      ev.receiveBroadcastStream().listen((dynamic event) {
+      _nativeEventsSub = ev.receiveBroadcastStream().listen((dynamic event) {
         try {
           if (BLE_DEBUG) print('BLE: native event received type=${event.runtimeType}');
           if (event is List) {
@@ -553,5 +554,6 @@ class BluetoothService {
     _incomingRawController.close();
     _scanSub?.cancel();
     _charSub?.cancel();
+    _nativeEventsSub?.cancel();
   }
 }

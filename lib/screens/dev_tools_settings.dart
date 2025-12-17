@@ -7,19 +7,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// foreground_handler not needed in this file
 import 'settings_page.dart';
 import '../services/bluetooth_service.dart' as bt_service;
 import '../services/foreground_notification.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+/// DevToolsSettings - Contains all Bluetooth pairing, telemetry, and diagnostic
+/// functionality. This was previously the main content of HomePage but is now
+/// encapsulated into a modal dialog accessed via the cog button.
+class DevToolsSettings extends StatefulWidget {
+  const DevToolsSettings({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<DevToolsSettings> createState() => _DevToolsSettingsState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _DevToolsSettingsState extends State<DevToolsSettings> {
   final bt_service.BluetoothService _bt = bt_service.BluetoothService();
   BluetoothDevice? _connectedDevice;
   String _incoming = '';
@@ -367,61 +369,164 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('SYNC COMPANION', style: const TextStyle(fontSize: 14, fontFamily: 'Monocraft')),
-        centerTitle: true,
-        toolbarHeight: 56,
-        elevation: 0,
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border.all(width: 2, color: Colors.black),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(width: 2, color: Colors.black)),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'DEV TOOLS',
+                    style: TextStyle(fontSize: 14, fontFamily: 'Monocraft', fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+          
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Connection Status
                   Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _isConnected ? Colors.green : Colors.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(width: 2, color: Colors.black),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: _isConnected ? Colors.green : Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(width: 2, color: Colors.black),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(_isConnected 
+                            ? (_connectedDevice != null ? 'CONNECTED' : 'SYNCED') 
+                            : (_nativeStatusReceived ? 'SEARCHING' : 'LOADING'), 
+                            style: const TextStyle(fontSize: 10)),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(_isConnected 
-                      ? (_connectedDevice != null ? 'CONNECTED' : 'SYNCED') 
-                      : (_nativeStatusReceived ? 'SEARCHING' : 'LOADING'), 
-                      style: const TextStyle(fontSize: 10)),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Device Info
+                  if (_deviceId != null)
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(border: Border.all(width: 1, color: Colors.black)),
+                      child: Text(
+                        'Device: ${_deviceId!.length > 12 ? '...${_deviceId!.substring(_deviceId!.length - 12)}' : _deviceId}',
+                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                      ),
+                    ),
+                  
+                  // Action Buttons
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white, 
+                      foregroundColor: Colors.black, 
+                      side: const BorderSide(width: 2, color: Colors.black),
+                    ),
+                    onPressed: _openScanner,
+                    child: const Text('SCAN FOR DEVICES', style: TextStyle(fontSize: 10)),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white, 
+                      foregroundColor: Colors.black, 
+                      side: const BorderSide(width: 2, color: Colors.black),
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt)),
+                    ),
+                    child: const Text('ADVANCED SETTINGS', style: TextStyle(fontSize: 10)),
+                  ),
+                  
+                  if (_isConnected) ...[
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade100, 
+                        foregroundColor: Colors.black, 
+                        side: const BorderSide(width: 2, color: Colors.black),
+                      ),
+                      onPressed: _forget,
+                      child: const Text('DISCONNECT & FORGET', style: TextStyle(fontSize: 10)),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Debug Info Section
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(border: Border.all(width: 1, color: Colors.grey)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Debug Info:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('Adapter: $_adapterState', style: const TextStyle(fontSize: 8)),
+                        Text('BG Service: ${_bgServiceRunning ? "Running" : "Stopped"}', style: const TextStyle(fontSize: 8)),
+                        Text('Status: $_status', style: const TextStyle(fontSize: 8)),
+                        if (_permissionStatuses.isNotEmpty)
+                          Text(
+                            'Perms: ${_permissionStatuses.entries.map((e) => '${e.key.split('.').last}:${e.value?"Y":"N"}').join(', ')}',
+                            style: const TextStyle(fontSize: 8),
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Telemetry Terminal (if connected)
+                  if (_isConnected) ...[
+                    const SizedBox(height: 12),
+                    const Text('Incoming Data:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 150,
+                      child: ConnectedTerminal(bt: _bt, maxLines: 100),
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: SizedBox(
-                height: 80,
-                child: Image.asset('placeholder.png', fit: BoxFit.contain),
-              ),
-            ),
-            const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: const BorderSide(width: 2, color: Colors.black)),
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt))),
-                            child: const Text('SETTINGS', style: TextStyle(fontSize: 10)),
-                          ),
-                        ),
-                      ],
-                    ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
