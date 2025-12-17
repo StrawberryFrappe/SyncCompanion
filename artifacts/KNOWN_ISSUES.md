@@ -116,22 +116,27 @@ Change history (branch: stage-1)
 3) Fixed issues (2025-12-17)
 ----------------------------
 
-The following issues were identified and fixed:
+The following issues were identified and fixed across multiple sessions:
 
 | Issue | Root Cause | Fix Applied |
 |-------|------------|-------------|
 | App shows "closing too much" popup | Service restarting too rapidly | Increased auto-reconnect delay to 2000ms |
-| Terminal not receiving packets | Dart only processed `lastBytes` when `status` key present | Handle `lastBytes`-only map events separately |
-| Notification not live-updating | Missing notification flags | Added `setOngoing(true)` and `setOnlyAlertOnce(true)` |
-| Obfuscate toggle not working | SharedPreferences storage mismatch | Added `setNotifShowData` platform method to write to Android's PreferenceManager |
-| UI state inconsistency after swipe-kill | SEARCHING shown before native status received | Added `_nativeStatusReceived` flag; show LOADING until confirmed |
+| Terminal not receiving packets | Implicit broadcasts not delivered on Android 13+ | Added `setPackage()` to BLE_EVENT broadcasts |
+| Obfuscate toggle not working | Service in separate process couldn't see SharedPreferences changes | Removed `android:process=":ble_service"` from manifest |
+| App crash on Android 16 | `connectedDevice` foreground service type requires Bluetooth permissions first | Changed to `dataSync` service type |
+
+**Note on notification live-update**: Android does not reliably refresh notification content visually even with `setOnlyAlertOnce(true)`. Users must swipe to refresh. This is an Android limitation, not a bug.
+
+**Package renamed**: `com.example.sync_companion` → `com.strawberryFrappe.sync_companion`
 
 Files modified:
-- `android/.../BleForegroundService.kt` (issues 1, 3)
-- `android/.../MainActivity.kt` (issue 4)
-- `lib/services/bluetooth_service.dart` (issues 2, 4)
-- `lib/screens/settings_page.dart` (issue 4)
-- `lib/screens/home_page.dart` (issue 5)
+- `android/app/build.gradle.kts` (package name)
+- `android/app/src/main/AndroidManifest.xml` (process, service type, permissions)
+- `android/app/src/main/kotlin/com/strawberryFrappe/sync_companion/*.kt` (all moved)
+- `lib/services/bluetooth_service.dart` (lastBytes handling, setNotifShowData)
+- `lib/screens/settings_page.dart` (button layout)
+- `lib/screens/home_page.dart` (nativeStatusReceived flag)
 
 
 End of document
+
