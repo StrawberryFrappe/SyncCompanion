@@ -8,14 +8,21 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'settings_page.dart';
+import '../game/virtual_pet_game.dart';
 import '../services/bluetooth_service.dart' as bt_service;
 import '../services/foreground_notification.dart';
 
-/// DevToolsSettings - Contains all Bluetooth pairing, telemetry, and diagnostic
-/// functionality. This was previously the main content of HomePage but is now
-/// encapsulated into a modal dialog accessed via the cog button.
+/// DevToolsSettings - Contains all Bluetooth pairing, telemetry, diagnostic
+/// functionality, and pet stat controls.
 class DevToolsSettings extends StatefulWidget {
-  const DevToolsSettings({super.key});
+  const DevToolsSettings({
+    super.key,
+    this.game,
+    this.onSyncStatusChanged,
+  });
+
+  final VirtualPetGame? game;
+  final void Function(bool synced)? onSyncStatusChanged;
 
   @override
   State<DevToolsSettings> createState() => _DevToolsSettingsState();
@@ -46,12 +53,26 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   bool _nativeStatusReceived = false;
   String? _deviceId;
 
+  // Pet stat rate sliders
+  double _hungerDecayRate = 0.01;
+  double _happinessGainRate = 0.02;
+  double _happinessDecayRate = 0.01;
+
+  // Stat display update timer
+  Timer? _statDisplayTimer;
+  
+  // Debug: Fake sync override
+  bool _fakeSyncEnabled = false;
+  bool _fakeSyncValue = false;
+
   @override
   void initState() {
     super.initState();
     _init();
     _bt.init();
     _loadPersisted();
+    _loadPersistedRates();
+    _loadFakeSyncSettings();
     _userActionSub = _bt.userAction$.listen((a) => _handleUserAction(a));
     _connSub = _bt.connectedDevice$.listen((d) {
       setState(() {
@@ -60,16 +81,15 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           _isConnected = true;
           _deviceId = d.remoteId.str;
           _status = 'LINKED';
+          _notifySyncStatus(true);
         } else {
           _isConnected = false;
           _deviceId = null;
           _status = 'SEARCHING';
+          _notifySyncStatus(false);
         }
       });
-      // If a device became connected, ensure background service is running
-      // so the notification updater can reflect incoming packets.
       if (d != null) {
-        // Fire-and-forget; this will request permissions if needed.
         _startBackgroundTask();
       }
     });
@@ -81,18 +101,24 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           _status = 'SEARCHING';
         }
       });
+      _notifySyncStatus(connected);
       if (connected && _deviceId == null) {
-        // If connected but no device, perhaps load from prefs
         _loadPersistedDeviceId();
       }
     });
     _incomingSub = _bt.incomingData$.listen((s) {
       setState(() => _incoming = s);
     });
+
+    // Update stat display every 500ms
+    _statDisplayTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _statDisplayTimer?.cancel();
     _notifUpdater?.stop();
     _connSub?.cancel();
     _incomingSub?.cancel();
@@ -112,7 +138,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
       final running = await _platform.invokeMethod('isNativeServiceRunning');
       setState(() => _bgServiceRunning = (running == true));
     } catch (_) {}
-    // preload debug info reference
     setState(() => _debugInfo = Map<String, String>.from(_bt.debugInfo));
   }
 
@@ -125,7 +150,24 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
         _deviceId = id;
         _status = 'LINKED';
       });
+      _notifySyncStatus(true);
     }
+  }
+
+  Future<void> _loadPersistedRates() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hungerDecayRate = prefs.getDouble('pet_hunger_decay_rate') ?? 0.01;
+      _happinessGainRate = prefs.getDouble('pet_happiness_gain_rate') ?? 0.02;
+      _happinessDecayRate = prefs.getDouble('pet_happiness_decay_rate') ?? 0.01;
+    });
+  }
+
+  Future<void> _saveRates() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('pet_hunger_decay_rate', _hungerDecayRate);
+    await prefs.setDouble('pet_happiness_gain_rate', _happinessGainRate);
+    await prefs.setDouble('pet_happiness_decay_rate', _happinessDecayRate);
   }
 
   Future<void> _loadPersistedDeviceId() async {
@@ -134,6 +176,26 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     if (id != null) {
       setState(() => _deviceId = id);
     }
+  }
+
+  Future<void> _loadFakeSyncSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _fakeSyncEnabled = prefs.getBool('debug_fake_sync_enabled') ?? false;
+      _fakeSyncValue = prefs.getBool('debug_fake_sync_value') ?? false;
+    });
+  }
+
+  Future<void> _saveFakeSyncSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('debug_fake_sync_enabled', _fakeSyncEnabled);
+    await prefs.setBool('debug_fake_sync_value', _fakeSyncValue);
+  }
+
+  void _notifySyncStatus(bool realStatus) {
+    // If fake sync is enabled, use fake value; otherwise use real status
+    final effectiveStatus = _fakeSyncEnabled ? _fakeSyncValue : realStatus;
+    widget.onSyncStatusChanged?.call(effectiveStatus);
   }
 
   Future<void> _handleUserAction(bt_service.BluetoothUserAction action) async {
@@ -184,7 +246,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   }
 
   Future<void> _startBackgroundTask() async {
-    // Ensure permissions first, then start the native BLE foreground service.
     await _bt.performRequestPermissions();
     setState(() => _permissionStatuses = _bt.permissionStatuses);
     final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
@@ -223,8 +284,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     _notifUpdater = null;
     setState(() => _bgServiceRunning = false);
   }
-
-  // Permission and adapter flows are handled by `BluetoothService` now.
 
   Future<void> _startScan() async {
     if (_scanning) return;
@@ -265,6 +324,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
       _isConnected = false;
       _deviceId = null;
     });
+    widget.onSyncStatusChanged?.call(false);
   }
 
   void _openScanner() async {
@@ -329,7 +389,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                               final r = found[i];
                               final idStr = r.device.remoteId.str;
                               final name = (r.device.platformName.isNotEmpty ? r.device.platformName : idStr);
-                              // Simplified row: show name and two small numbers (RSSI and short id)
                               final shortId = idStr.length > 6 ? idStr.substring(idStr.length - 6) : idStr;
                               return ListTile(
                                 title: Text(name, style: const TextStyle(fontSize: 12)),
@@ -367,11 +426,138 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     await _stopScan();
   }
 
+  Widget _buildStatRateInput({
+    required String label,
+    required double currentRate,
+    required ValueChanged<double> onApply,
+  }) {
+    // Display current rate as "X% over 10s"
+    final percentOver10s = (currentRate * 10 * 100).toStringAsFixed(1);
+    
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        border: Border.all(width: 1, color: Colors.black26),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                Text('$percentOver10s% / 10s  (${(currentRate * 100).toStringAsFixed(3)}%/s)', 
+                  style: const TextStyle(fontSize: 9, color: Colors.grey)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 28,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade100,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: Size.zero,
+              ),
+              onPressed: () => _showRateEditDialog(label, currentRate, onApply),
+              child: const Text('EDIT', style: TextStyle(fontSize: 9)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showRateEditDialog(String label, double currentRate, ValueChanged<double> onApply) async {
+    final percentController = TextEditingController(text: (currentRate * 10 * 100).toStringAsFixed(1));
+    final secondsController = TextEditingController(text: '10');
+    
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(label, style: const TextStyle(fontSize: 14)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Set rate as N% over T seconds:', style: TextStyle(fontSize: 11)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: percentController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Percent',
+                      suffixText: '%',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('over'),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: secondsController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Seconds',
+                      suffixText: 's',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              try {
+                final percent = double.parse(percentController.text);
+                final seconds = double.parse(secondsController.text);
+                if (seconds > 0 && percent >= 0) {
+                  final rate = (percent / 100.0) / seconds;
+                  Navigator.of(ctx).pop(rate);
+                }
+              } catch (e) {
+                // Invalid input
+              }
+            },
+            child: const Text('APPLY'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null) {
+      onApply(result);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final stats = widget.game?.getStatValues();
+    final hunger = stats?['hunger'] ?? 0.0;
+    final happiness = stats?['happiness'] ?? 0.0;
+    final wellbeing = stats?['wellbeing'] ?? 0.0;
+
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -412,6 +598,123 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Pet Stats Section
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 2, color: Colors.black),
+                      color: const Color(0xFFF5F5F5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('PET STATS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        _buildStatBar('Hunger', hunger, Colors.orange),
+                        const SizedBox(height: 4),
+                        _buildStatBar('Happiness', happiness, Colors.pink),
+                        const SizedBox(height: 4),
+                        _buildStatBar('Wellbeing', wellbeing, Colors.green),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade100,
+                                  foregroundColor: Colors.black,
+                                  side: const BorderSide(width: 1, color: Colors.black),
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                ),
+                                onPressed: () => widget.game?.feedPet(),
+                                child: const Text('FEED', style: TextStyle(fontSize: 10)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue.shade100,
+                                  foregroundColor: Colors.black,
+                                  side: const BorderSide(width: 1, color: Colors.black),
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                ),
+                                onPressed: () => widget.game?.resetPetStats(),
+                                child: const Text('RESET', style: TextStyle(fontSize: 10)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Stat Rate Controls
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 2, color: Colors.black),
+                      color: const Color(0xFFF5F5F5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('STAT RATES', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text('(${(_hungerDecayRate * 100).toStringAsFixed(3)}%/s, ${(_happinessGainRate * 100).toStringAsFixed(3)}%/s, ${(_happinessDecayRate * 100).toStringAsFixed(3)}%/s)', 
+                              style: const TextStyle(fontSize: 8, color: Colors.grey)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _buildStatRateInput(
+                          label: 'Hunger Decay',
+                          currentRate: _hungerDecayRate,
+                          onApply: (rate) {
+                            setState(() => _hungerDecayRate = rate);
+                            widget.game?.setStatRates(
+                              hungerDecayRate: _hungerDecayRate,
+                              happinessGainRate: _happinessGainRate,
+                              happinessDecayRate: _happinessDecayRate,
+                            );
+                            _saveRates();
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        _buildStatRateInput(
+                          label: 'Happiness Gain (synced)',
+                          currentRate: _happinessGainRate,
+                          onApply: (rate) {
+                            setState(() => _happinessGainRate = rate);
+                            widget.game?.setStatRates(
+                              hungerDecayRate: _hungerDecayRate,
+                              happinessGainRate: _happinessGainRate,
+                              happinessDecayRate: _happinessDecayRate,
+                            );
+                            _saveRates();
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        _buildStatRateInput(
+                          label: 'Happiness Decay (not synced)',
+                          currentRate: _happinessDecayRate,
+                          onApply: (rate) {
+                            setState(() => _happinessDecayRate = rate);
+                            widget.game?.setStatRates(
+                              hungerDecayRate: _hungerDecayRate,
+                              happinessGainRate: _happinessGainRate,
+                              happinessDecayRate: _happinessDecayRate,
+                            );
+                            _saveRates();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
                   // Connection Status
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -491,6 +794,81 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                   
                   const SizedBox(height: 16),
                   
+                  // Debug: Fake Sync Toggle
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 2, color: Colors.orange),
+                      color: Colors.orange.shade50,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('DEBUG: FAKE SYNC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _fakeSyncEnabled,
+                              onChanged: (val) {
+                                setState(() {
+                                  _fakeSyncEnabled = val ?? false;
+                                  if (_fakeSyncEnabled) {
+                                    // When enabling, notify with the fake value
+                                    _notifySyncStatus(_isConnected);
+                                  } else {
+                                    // When disabling, restore real status
+                                    _notifySyncStatus(_isConnected);
+                                  }
+                                });
+                                _saveFakeSyncSettings();
+                              },
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            const Text('Override Sync Status', style: TextStyle(fontSize: 10)),
+                          ],
+                        ),
+                        if (_fakeSyncEnabled) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const SizedBox(width: 16),
+                              Radio<bool>(
+                                value: true,
+                                groupValue: _fakeSyncValue,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _fakeSyncValue = val ?? true;
+                                    _notifySyncStatus(_isConnected);
+                                  });
+                                  _saveFakeSyncSettings();
+                                },
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const Text('SYNCED', style: TextStyle(fontSize: 10, color: Colors.green)),
+                              const SizedBox(width: 16),
+                              Radio<bool>(
+                                value: false,
+                                groupValue: _fakeSyncValue,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _fakeSyncValue = val ?? false;
+                                    _notifySyncStatus(_isConnected);
+                                  });
+                                  _saveFakeSyncSettings();
+                                },
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const Text('NOT SYNCED', style: TextStyle(fontSize: 10, color: Colors.red)),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
                   // Debug Info Section
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -528,6 +906,44 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatBar(String label, double value, Color color) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(label, style: const TextStyle(fontSize: 10)),
+        ),
+        Expanded(
+          child: Container(
+            height: 12,
+            decoration: BoxDecoration(
+              border: Border.all(width: 1, color: Colors.black),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: value.clamp(0.0, 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 35,
+          child: Text('${(value * 100).toStringAsFixed(0)}%', 
+            style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
     );
   }
 }
