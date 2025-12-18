@@ -26,6 +26,15 @@ class PetStats {
   
   /// Timestamp of last update (for background calculations)
   DateTime _lastUpdateTime;
+  
+  /// Callback triggered when wellbeing drops below threshold
+  void Function()? onLowWellbeing;
+  
+  /// Threshold for low wellbeing notification (0.0 to 1.0)
+  double lowWellbeingThreshold;
+  
+  /// Whether low wellbeing notification was already sent (resets when recovered)
+  bool _lowWellbeingNotified = false;
 
   PetStats({
     double hunger = 1.0,
@@ -34,6 +43,7 @@ class PetStats {
     this.hungerDecayRate = 0.01,
     this.happinessGainRate = 0.02,
     this.happinessDecayRate = 0.01,
+    this.lowWellbeingThreshold = 0.25,
     DateTime? lastUpdateTime,
   })  : _hunger = hunger.clamp(0.0, 1.0),
         _happiness = happiness.clamp(0.0, 1.0),
@@ -72,8 +82,27 @@ class PetStats {
       _happiness = max(0.0, _happiness - (happinessDecayRate * dt));
     }
     
+    // Check for low wellbeing threshold crossing
+    _checkLowWellbeing();
+    
     // NOTE: Do NOT update _lastUpdateTime here!
     // It should only be updated when saving to prefs (for background time tracking)
+  }
+  
+  /// Check if wellbeing has dropped below threshold and trigger callback
+  void _checkLowWellbeing() {
+    final wellbeing = overallWellbeing;
+    
+    if (wellbeing <= lowWellbeingThreshold) {
+      // Only trigger once per threshold crossing
+      if (!_lowWellbeingNotified) {
+        _lowWellbeingNotified = true;
+        onLowWellbeing?.call();
+      }
+    } else {
+      // Reset flag when wellbeing recovers above threshold
+      _lowWellbeingNotified = false;
+    }
   }
 
   /// Calculate and apply stats changes that occurred while app was in background.

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/virtual_pet_game.dart';
+import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
 
 /// GameScreen - The main screen of the app.
@@ -36,8 +37,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _initializeGame();
     _listenToSyncStatus();
     
-    // Auto-save stats every 30 seconds while app is active
-    _autoSaveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Auto-save stats every 15 seconds while app is active
+    _autoSaveTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       _saveStats();
     });
   }
@@ -98,12 +99,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final hungerRate = prefs.getDouble('pet_hunger_decay_rate');
     final happinessGain = prefs.getDouble('pet_happiness_gain_rate');
     final happinessDecay = prefs.getDouble('pet_happiness_decay_rate');
+    final lowWellbeingThreshold = prefs.getDouble('pet_low_wellbeing_threshold') ?? 0.25;
     
     _game.setStatRates(
       hungerDecayRate: hungerRate,
       happinessGainRate: happinessGain,
       happinessDecayRate: happinessDecay,
     );
+    
+    // Set up low wellbeing notification
+    await _game.initialized;
+    _game.currentPet.stats.lowWellbeingThreshold = lowWellbeingThreshold;
+    _game.currentPet.stats.onLowWellbeing = () {
+      PetNotificationService().showLowWellbeingNotification();
+    };
   }
 
   Future<void> _saveStats() async {

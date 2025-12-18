@@ -57,6 +57,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   double _hungerDecayRate = 0.01;
   double _happinessGainRate = 0.02;
   double _happinessDecayRate = 0.01;
+  
+  // Low wellbeing notification threshold (0.0 to 1.0)
+  double _lowWellbeingThreshold = 0.25;
 
   // Stat display update timer
   Timer? _statDisplayTimer;
@@ -160,7 +163,10 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
       _hungerDecayRate = prefs.getDouble('pet_hunger_decay_rate') ?? 0.01;
       _happinessGainRate = prefs.getDouble('pet_happiness_gain_rate') ?? 0.02;
       _happinessDecayRate = prefs.getDouble('pet_happiness_decay_rate') ?? 0.01;
+      _lowWellbeingThreshold = prefs.getDouble('pet_low_wellbeing_threshold') ?? 0.25;
     });
+    // Update game pet stats threshold
+    widget.game?.currentPet.stats.lowWellbeingThreshold = _lowWellbeingThreshold;
   }
 
   Future<void> _saveRates() async {
@@ -168,6 +174,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     await prefs.setDouble('pet_hunger_decay_rate', _hungerDecayRate);
     await prefs.setDouble('pet_happiness_gain_rate', _happinessGainRate);
     await prefs.setDouble('pet_happiness_decay_rate', _happinessDecayRate);
+    await prefs.setDouble('pet_low_wellbeing_threshold', _lowWellbeingThreshold);
   }
 
   Future<void> _loadPersistedDeviceId() async {
@@ -708,6 +715,40 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                             );
                             _saveRates();
                           },
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Low Wellbeing Notification Threshold
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 2, color: Colors.black),
+                      color: const Color(0xFFF5F5F5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('NOTIFICATIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        _buildStatRateInput(
+                          label: 'Low Wellbeing Alert Threshold',
+                          currentRate: _lowWellbeingThreshold / 10, // Display as "N% over 10s" format would show 25% threshold
+                          onApply: (rate) {
+                            // Convert back from rate format to threshold (rate * 10 = threshold as 0-1)
+                            final threshold = (rate * 10).clamp(0.0, 1.0);
+                            setState(() => _lowWellbeingThreshold = threshold);
+                            widget.game?.currentPet.stats.lowWellbeingThreshold = threshold;
+                            _saveRates();
+                          },
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Notify when wellbeing drops to ${(_lowWellbeingThreshold * 100).toStringAsFixed(0)}% or below',
+                          style: const TextStyle(fontSize: 9, color: Colors.grey),
                         ),
                       ],
                     ),
