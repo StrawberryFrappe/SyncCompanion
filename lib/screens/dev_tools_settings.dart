@@ -678,8 +678,13 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                       side: const BorderSide(width: 2, color: Colors.black),
                     ),
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt)),
-                    ),
+                      MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt, game: widget.game)),
+                    ).then((_) {
+                      // Reload fake sync settings after returning from Advanced Settings
+                      _loadFakeSyncSettings().then((_) {
+                        _notifySyncStatus(_isConnected);
+                      });
+                    }),
                     child: const Text('ADVANCED SETTINGS', style: TextStyle(fontSize: 10)),
                   ),
                   
