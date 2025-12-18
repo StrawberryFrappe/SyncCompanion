@@ -27,6 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
   double _happinessGainRate = 0.02;
   double _happinessDecayRate = 0.01;
   double _lowWellbeingThreshold = 0.25;
+  int _flappyCoinDivisor = 1;
   
   // Debug: Fake sync
   bool _fakeSyncEnabled = false;
@@ -103,6 +104,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _happinessGainRate = prefs.getDouble('happiness_gain_rate') ?? 0.02;
       _happinessDecayRate = prefs.getDouble('happiness_decay_rate') ?? 0.01;
       _lowWellbeingThreshold = prefs.getDouble('low_wellbeing_threshold') ?? 0.25;
+      _flappyCoinDivisor = prefs.getInt('flappy_coin_divisor') ?? 1;
     });
   }
   
@@ -112,6 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.setDouble('happiness_gain_rate', _happinessGainRate);
     await prefs.setDouble('happiness_decay_rate', _happinessDecayRate);
     await prefs.setDouble('low_wellbeing_threshold', _lowWellbeingThreshold);
+    await prefs.setInt('flappy_coin_divisor', _flappyCoinDivisor);
   }
   
   Future<void> _loadFakeSyncSettings() async {
@@ -479,6 +482,73 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(height: 4),
                 Text(
                   'Notify when wellbeing drops to ${(_lowWellbeingThreshold * 100).toStringAsFixed(0)}% or below',
+                  style: const TextStyle(fontSize: 9, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Flappy Bird Game Settings
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              border: Border.all(width: 2, color: Colors.black),
+              color: Colors.cyan.shade50,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('FLAPPY BOB GAME', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Coin Divisor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                          Text('Silver = Score / Divisor', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove, size: 16),
+                          onPressed: _flappyCoinDivisor > 1 ? () {
+                            setState(() => _flappyCoinDivisor--);
+                            _saveRates();
+                          } : null,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text('$_flappyCoinDivisor', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add, size: 16),
+                          onPressed: _flappyCoinDivisor < 20 ? () {
+                            setState(() => _flappyCoinDivisor++);
+                            _saveRates();
+                          } : null,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Score 10 = ${10 ~/ _flappyCoinDivisor} silver coins',
                   style: const TextStyle(fontSize: 9, color: Colors.grey),
                 ),
               ],

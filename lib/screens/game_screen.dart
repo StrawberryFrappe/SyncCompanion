@@ -6,12 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/virtual_pet_game.dart';
+import '../services/bluetooth_service.dart';
 import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
+import 'flappy_bird_screen.dart';
 import 'widgets/stat_indicator.dart';
 import 'widgets/currency_display.dart';
 import '../game/items/food_item.dart';
 import 'widgets/food_menu.dart'; // Is now FoodStore inside
+import 'widgets/game_menu.dart';
 import 'widgets/wardrobe_menu.dart';
 import 'widgets/fridge_widget.dart';
 
@@ -27,6 +30,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final VirtualPetGame _game;
+  late final BluetoothService _bluetoothService;
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   
   bool _isDeviceSynced = false;
@@ -44,6 +48,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _game = VirtualPetGame();
+    _bluetoothService = BluetoothService();
+    _bluetoothService.init();
     _initializeGame();
     _listenToSyncStatus();
     
@@ -199,8 +205,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           // Layer 1: The Flame game (background) with DragTarget
           Positioned.fill(
             child: DragTarget<FoodItem>(
-              onWillAccept: (data) => true,
-              onAccept: (item) {
+              onWillAcceptWithDetails: (details) => true,
+              onAcceptWithDetails: (details) {
+                final item = details.data;
                 // Guard against accessing pet before initialized
                 if (!_game.isReady) return;
                 // Determine if successful
@@ -214,7 +221,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // Visual feedback when dragging food over the game area
                 if (candidates.isNotEmpty) {
                   return Container(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withAlpha(25),
                     child: GameWidget(game: _game),
                   );
                 }
@@ -388,22 +395,41 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Layer 6: Wardrobe Button (Bottom Left)
+          // Layer 6: Wardrobe + Games Buttons (Bottom Left)
           SafeArea(
             child: Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
                 padding: EdgeInsets.all(padding),
-                child: SizedBox(
-                  width: buttonSize,
-                  height: buttonSize,
-                  child: FloatingActionButton(
-                    heroTag: 'clothing_btn',
-                    backgroundColor: Colors.purple.shade200,
-                    shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
-                    onPressed: _openWardrobeMenu,
-                    child: Icon(Icons.checkroom, color: Colors.black, size: iconSize),
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Games Button
+                    SizedBox(
+                      width: buttonSize,
+                      height: buttonSize,
+                      child: FloatingActionButton(
+                        heroTag: 'games_btn',
+                        backgroundColor: Colors.cyan.shade200,
+                        shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                        onPressed: _openGameMenu,
+                        child: Icon(Icons.sports_esports, color: Colors.black, size: iconSize),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Wardrobe Button
+                    SizedBox(
+                      width: buttonSize,
+                      height: buttonSize,
+                      child: FloatingActionButton(
+                        heroTag: 'clothing_btn',
+                        backgroundColor: Colors.purple.shade200,
+                        shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                        onPressed: _openWardrobeMenu,
+                        child: Icon(Icons.checkroom, color: Colors.black, size: iconSize),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -462,5 +488,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       setState(() {});
       _game.currentPet.updateEquipment(); // Ensure synced
     });
+  }
+  
+  void _openGameMenu() {
+    showDialog(
+      context: context,
+      builder: (context) => GameMenu(
+        onClose: () => Navigator.of(context).pop(),
+        onPlay: (gameId) {
+          Navigator.of(context).pop(); // Close menu
+          if (gameId == 'flappy_bird') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => FlappyBirdScreen(
+                  bluetoothService: _bluetoothService,
+                  petStats: _game.currentPet.stats,
+                  isDeviceConnected: _isDeviceSynced,
+                ),
+              ),
+            ).then((_) {
+              // Refresh stats after returning from game
+              _saveStats();
+              setState(() {});
+            });
+          }
+        },
+      ),
+    );
   }
 }

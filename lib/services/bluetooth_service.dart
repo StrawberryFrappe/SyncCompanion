@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'telemetry_data.dart';
+
 // Events that instruct the UI to show a dialog or request user input.
 enum BluetoothUserActionType { enableBluetooth, requestPermissions }
 
@@ -15,7 +17,12 @@ class BluetoothUserAction {
 
 // TODO: add more robust error reporting and expose status events if needed.
 class BluetoothService {
-  BluetoothService();
+  // Singleton instance
+  static final BluetoothService _instance = BluetoothService._internal();
+  
+  factory BluetoothService() => _instance;
+  
+  BluetoothService._internal();
 
   // Toggle detailed BLE debug logs (set false to silence)
   static const bool BLE_DEBUG = true;
@@ -44,6 +51,23 @@ class BluetoothService {
   Stream<bool> get nativeConnected$ => _nativeConnectedController.stream;
   Stream<String> get incomingData$ => _incomingController.stream;
   Stream<List<int>> get incomingRaw$ => _incomingRawController.stream;
+  
+  /// Decoded telemetry stream for game input and visualization.
+  /// Filters out invalid packets (non-12-byte payloads).
+  Stream<TelemetryData> get telemetryData$ => _incomingRawController.stream
+      .map((bytes) {
+        final data = TelemetryData.fromBytes(bytes);
+        if (BLE_DEBUG) {
+          if (data != null) {
+            print('BLE: Decoded telemetry: mag=${data.magnitude.toStringAsFixed(2)}g from ${bytes.length} bytes');
+          } else {
+            print('BLE: Failed to decode telemetry from ${bytes.length} bytes (need 12)');
+          }
+        }
+        return data;
+      })
+      .where((data) => data != null)
+      .cast<TelemetryData>();
 
   // Debug information mapping (rssi/adv payload) for UI diagnostics.
   final Map<String, String> _debugInfo = {};
@@ -171,7 +195,7 @@ class BluetoothService {
                   if (lb is List) {
                     final bytes = List<int>.from(lb.map((e) => (e as int)));
                     if (bytes.isNotEmpty) {
-                      if (BLE_DEBUG) print('BLE: live lastBytes len=${bytes.length}');
+                      if (BLE_DEBUG) print('BLE: live lastBytes len=${bytes.length}, rawListeners=${_incomingRawController.hasListener}');
                       _incomingRawController.add(bytes);
                       _incomingController.add(_decode(bytes));
                     }
