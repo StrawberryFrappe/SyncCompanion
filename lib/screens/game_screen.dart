@@ -8,6 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../game/virtual_pet_game.dart';
 import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
+import 'widgets/stat_indicator.dart';
+import 'widgets/currency_display.dart';
+import 'widgets/food_menu.dart';
+import 'widgets/wardrobe_menu.dart';
 
 /// GameScreen - The main screen of the app.
 /// Uses a Stack to layer the Flame game underneath a minimal HUD overlay.
@@ -28,6 +32,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   
   // For periodic stat saving while app is active
   Timer? _autoSaveTimer;
+  // For UI updates
+  Timer? _uiUpdateTimer;
 
   @override
   void initState() {
@@ -41,10 +47,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _autoSaveTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       _saveStats();
     });
+
+    // Update UI every second to reflect stat changes
+    _uiUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _uiUpdateTimer?.cancel();
     _autoSaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _syncSub?.cancel();
@@ -165,35 +177,83 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Get current stats
+    final stats = _game.getStatValues();
+    final hunger = stats['hunger'] ?? 0.0;
+    final happiness = stats['happiness'] ?? 0.0;
+
     return Scaffold(
       body: Stack(
         children: [
           // Layer 1: The Flame game (background)
           GameWidget(game: _game),
           
-          // Layer 2: HUD overlay (foreground)
+          // Layer 2: Main HUD (Top Center)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Happiness (Hearts)
+                    StatIndicator(
+                      value: happiness,
+                      assetPath: 'assets/images/ui_heart.png',
+                      totalIcons: 5,
+                      iconSize: 28,
+                    ),
+                    const SizedBox(height: 4),
+                    // Hunger (Drumsticks)
+                    StatIndicator(
+                      value: hunger,
+                      assetPath: 'assets/images/ui_hunger.png',
+                      totalIcons: 5,
+                      iconSize: 28,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Layer 3: HUD overlay (foreground) - Settings & Currency
           SafeArea(
             child: Align(
               alignment: Alignment.topRight,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xE6FFFFFF),
-                    shape: BoxShape.circle,
-                    border: Border.all(width: 2, color: Colors.black),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.black),
-                    onPressed: _openDevTools,
-                    tooltip: 'Dev Tools',
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xE6FFFFFF),
+                        shape: BoxShape.circle,
+                        border: Border.all(width: 2, color: Colors.black),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.black),
+                        onPressed: _openDevTools,
+                        tooltip: 'Dev Tools',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    CurrencyDisplay(
+                      gold: stats['gold']?.toInt() ?? 0,
+                      silver: stats['silver']?.toInt() ?? 0,
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+
           
-          // Layer 3: Sync status indicator (top-left)
+
+          // Layer 4: Sync status indicator (top-left)
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
@@ -232,8 +292,98 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+
+          // Layer 5: Food Shop Button (Bottom Right)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: FloatingActionButton(
+                    heroTag: 'food_btn',
+                    backgroundColor: Colors.orange.shade300,
+                    shape: CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                    onPressed: _openFoodMenu,
+                    child: const Icon(Icons.lunch_dining, color: Colors.black, size: 32),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Layer 6: Wardrobe Button (Bottom Left)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: FloatingActionButton(
+                    heroTag: 'clothing_btn',
+                    backgroundColor: Colors.purple.shade200,
+                    shape: CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                    onPressed: _openWardrobeMenu,
+                    child: const Icon(Icons.checkroom, color: Colors.black, size: 32),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _openFoodMenu() {
+    showDialog(
+      context: context,
+      builder: (context) => FoodMenu(
+        currentSilver: _game.currentPet.stats.silverCoins,
+        onBuy: (item) {
+          // Check affordability again just in case
+          if (_game.currentPet.stats.spendSilver(item.cost)) {
+             _game.currentPet.eat(item);
+             _saveStats(); // Save immediately
+             setState(() {}); // Update UI to show new silver/stats
+          }
+        },
+      ),
+    ).then((_) => setState(() {})); // Refresh when closing loop
+  }
+
+  void _openWardrobeMenu() {
+    showDialog(
+      context: context,
+      builder: (context) => WardrobeMenuWidget(
+        stats: _game.currentPet.stats,
+        onBuy: (item) {
+          if (_game.currentPet.stats.spendGold(item.cost)) {
+            _game.currentPet.stats.unlockClothing(item.id);
+            _saveStats();
+            setState(() {});
+          }
+        },
+        onEquip: (item) {
+          _game.currentPet.stats.equipClothing(item.slot.name, item.id);
+          _game.currentPet.updateEquipment();
+          _saveStats();
+          setState(() {});
+        },
+        onUnequip: (item) {
+          _game.currentPet.stats.unequipClothing(item.slot.name);
+          _game.currentPet.updateEquipment();
+          _saveStats();
+          setState(() {});
+        },
+      ),
+    ).then((_) {
+      setState(() {});
+      _game.currentPet.updateEquipment(); // Ensure synced
+    });
   }
 }

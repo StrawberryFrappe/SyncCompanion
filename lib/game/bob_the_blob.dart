@@ -1,7 +1,9 @@
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 import 'package:flame/flame.dart';
+import 'package:flutter/animation.dart';
 
 import 'pets/pet.dart';
 import 'pets/body_type.dart';
@@ -58,7 +60,10 @@ class BobTheBlob extends Pet {
   }
 
   Future<void> _loadSprite() async {
-    _spriteImage = await Flame.images.load('BobTheBlob.png');
+    // Check if the basic hat is equipped
+    final hasBasicHat = stats.equippedClothing['head'] == 'hat_basic';
+    final spriteName = hasBasicHat ? 'BobTheBlob.png' : 'BobTheBlobHatless.png';
+    _spriteImage = await Flame.images.load(spriteName);
     _spriteLoaded = true;
   }
 
@@ -107,9 +112,63 @@ class BobTheBlob extends Pet {
     
     // Update current frame based on wellbeing
     _currentFrame = _getFrameForWellbeing(stats.overallWellbeing);
+  }
+
+  @override
+  Future<void> playEatAnimation() async {
+    // Squash and stretch effect:
+    // 1. Stretch vertically (scale Y > 1, scale X < 1)
+    // 2. Return to normal
+    await add(
+      ScaleEffect.to(
+        Vector2(0.8, 1.2),
+        EffectController(
+          duration: 0.15,
+          reverseDuration: 0.15,
+          curve: Curves.easeInOut,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<void> updateEquipment() async {
+    // Reload sprite based on current equipment (switches between hatted/hatless)
+    await _loadSprite();
     
-    // Rotation disabled - sprite expressions now show wellbeing instead
-    // angle = rotationAngle;
+    // Remove all existing clothing components
+    children.whereType<SpriteComponent>().where((c) => c != this).forEach((c) => c.removeFromParent());
+    
+    final equipped = stats.equippedClothing;
+    
+    for (final entry in equipped.entries) {
+      final slot = entry.key; // e.g. "head"
+      final id = entry.value;
+      
+      // Skip hat_basic - it's built into the BobTheBlob.png sprite
+      if (id == 'hat_basic') continue;
+      
+      // Map ID to asset path
+      String? assetPath;
+      if (id.startsWith('hat_')) assetPath = 'clothing_$id.png';
+      
+      if (assetPath != null) {
+        try {
+          final image = await Flame.images.load(assetPath);
+          final sprite = Sprite(image);
+          add(
+            SpriteComponent(
+              sprite: sprite,
+              size: size,
+              position: Vector2.zero(), // Centered on pet
+              anchor: Anchor.center,
+            ),
+          );
+        } catch (e) {
+          print('Error loading clothing sprite $assetPath: $e');
+        }
+      }
+    }
   }
 
   @override

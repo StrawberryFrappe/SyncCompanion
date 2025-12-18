@@ -652,6 +652,39 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      // Money Debug Controls
+                      const Text('ECONOMY (DEBUG)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber.shade100,
+                                foregroundColor: Colors.black,
+                                side: const BorderSide(width: 1, color: Colors.black),
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                              ),
+                              onPressed: () => widget.game?.currentPet.stats.addGold(100),
+                              child: const Text('+100 GOLD', style: TextStyle(fontSize: 9)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueGrey.shade100,
+                                foregroundColor: Colors.black,
+                                side: const BorderSide(width: 1, color: Colors.black),
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                              ),
+                              onPressed: () => widget.game?.currentPet.stats.addSilver(100),
+                              child: const Text('+100 SILVER', style: TextStyle(fontSize: 9)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

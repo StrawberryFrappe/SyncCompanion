@@ -54,15 +54,34 @@ class VirtualPetGame extends FlameGame {
 
   /// Get current pet stats for display in DevTools
   Map<String, double> getStatValues() {
+    if (_currentPet == null) {
+      // Return defaults while game is loading
+      return {
+        'hunger': 1.0,
+        'happiness': 1.0,
+        'wellbeing': 1.0,
+        'gold': 0.0,
+        'silver': 0.0,
+      };
+    }
     return {
       'hunger': currentPet.stats.hunger,
       'happiness': currentPet.stats.happiness,
       'wellbeing': currentPet.stats.overallWellbeing,
+      'gold': currentPet.stats.goldCoins.toDouble(),
+      'silver': currentPet.stats.silverCoins.toDouble(),
     };
   }
 
   /// Get current stat rates for display in DevTools
   Map<String, double> getStatRates() {
+    if (_currentPet == null) {
+      return {
+        'hungerDecayRate': 0.01,
+        'happinessGainRate': 0.02,
+        'happinessDecayRate': 0.01,
+      };
+    }
     return {
       'hungerDecayRate': currentPet.stats.hungerDecayRate,
       'happinessGainRate': currentPet.stats.happinessGainRate,

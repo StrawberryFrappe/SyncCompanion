@@ -57,6 +57,24 @@ abstract class Pet extends PositionComponent {
     // angle = rotationAngle;
   }
 
+  /// Eat a food item, play animation, and update stats
+  Future<void> eat(dynamic foodItem) async {
+    // Note: foodItem is dynamic here to avoid circular dependencies if needed, 
+    // but ideally import FoodItem.
+    // Assuming FoodItem has hungerRestore and happinessBonus properties.
+    
+    stats.hunger = stats.hunger + foodItem.hungerRestore;
+    stats.happiness = stats.happiness + foodItem.happinessBonus;
+    
+    await playEatAnimation();
+  }
+
+  /// Play a short animation when eating (e.g. stretch/squash)
+  Future<void> playEatAnimation();
+
+  /// Update the visual representation of equipped items
+  Future<void> updateEquipment();
+
   /// Subclasses must implement their own rendering
   @override
   void render(Canvas canvas);
