@@ -1,18 +1,16 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/flame.dart';
 
 import '../../pets/pet_stats.dart';
-import 'tone_player.dart';
 
-/// A pet sprite that can "sing" when activated.
-/// Each PetMusician has a fixed pitch (based on X position) and
-/// variable volume (based on Y input).
+/// A pet sprite that provides visual feedback when "singing".
+/// Audio is now managed by OrchestraGame directly for smooth pitch glide.
 class PetMusician extends PositionComponent {
   final PetStats petStats;
-  final double pitch; // Hz
-  final TonePlayer _tonePlayer = TonePlayer();
+  final double pitch; // For reference (not used for audio anymore)
   
   bool isSinging = false;
   double _currentVolume = 0.5;
@@ -41,7 +39,6 @@ class PetMusician extends PositionComponent {
   }
   
   Future<void> _loadSprite() async {
-    // Same sprite logic as FlappyPet
     final headItem = petStats.equippedClothing['head'];
     
     String spriteName;
@@ -57,33 +54,20 @@ class PetMusician extends PositionComponent {
     _loaded = true;
   }
   
-  /// Start singing at the given volume (0.0 - 1.0)
-  Future<void> startSinging(double volume) async {
-    if (isSinging) {
-      // Just update volume
-      _currentVolume = volume;
-      await _tonePlayer.setVolume(volume);
-      return;
-    }
-    
+  /// Start singing visual animation at the given volume (0.0 - 1.0)
+  void startSinging(double volume) {
     isSinging = true;
     _currentVolume = volume;
-    await _tonePlayer.startTone(pitch, volume);
   }
   
-  /// Update volume while singing
-  Future<void> updateVolume(double volume) async {
+  /// Update volume for animation intensity
+  void updateVolume(double volume) {
     _currentVolume = volume;
-    if (isSinging) {
-      await _tonePlayer.setVolume(volume);
-    }
   }
   
-  /// Stop singing
-  Future<void> stopSinging() async {
-    if (!isSinging) return;
+  /// Stop singing visual animation
+  void stopSinging() {
     isSinging = false;
-    await _tonePlayer.stopTone();
   }
   
   @override
@@ -101,7 +85,6 @@ class PetMusician extends PositionComponent {
   @override
   void render(Canvas canvas) {
     if (!_loaded || _spriteImage == null) {
-      // Placeholder
       canvas.drawOval(
         Rect.fromLTWH(0, 0, size.x, size.y),
         Paint()..color = const Color(0xFF306230),
@@ -114,8 +97,8 @@ class PetMusician extends PositionComponent {
     double scaleY = 1.0;
     if (isSinging) {
       final wobble = 0.05 * _currentVolume;
-      scaleX = 1.0 + wobble * (1 + (0.5 * (1 + (_scalePhase).remainder(1.0))));
-      scaleY = 1.0 - wobble * 0.5 * (1 + (_scalePhase).remainder(1.0));
+      scaleX = 1.0 + wobble * (1 + math.sin(_scalePhase) * 0.5);
+      scaleY = 1.0 - wobble * 0.3 * (1 + math.sin(_scalePhase) * 0.5);
     }
     
     canvas.save();
@@ -129,7 +112,6 @@ class PetMusician extends PositionComponent {
     const frameWidth = 25.0;
     const frameHeight = 29.0;
     
-    // Frame 1 is top-right (col=1, row=0)
     final srcRect = Rect.fromLTWH(
       borderPadding + 1 * (frameWidth + spriteGap),
       borderPadding + 0 * (frameHeight + spriteGap),
@@ -140,11 +122,5 @@ class PetMusician extends PositionComponent {
     
     canvas.drawImageRect(_spriteImage!, srcRect, dstRect, Paint());
     canvas.restore();
-  }
-  
-  @override
-  void onRemove() {
-    _tonePlayer.dispose();
-    super.onRemove();
   }
 }

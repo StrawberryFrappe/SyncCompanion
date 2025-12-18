@@ -2,8 +2,8 @@ import 'dart:typed_data';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 
-/// Generates and plays a continuous tone at a given frequency.
-/// Uses a synthesized sine wave to create the tone dynamically.
+/// Generates and plays a continuous tone with smooth frequency changes.
+/// Supports portamento (pitch gliding) between frequencies.
 class TonePlayer {
   final AudioPlayer _player = AudioPlayer();
   bool _isPlaying = false;
@@ -35,6 +35,24 @@ class TonePlayer {
     _isPlaying = true;
   }
   
+  /// Change pitch (regenerate audio at new frequency)
+  Future<void> setFrequency(double frequency, double volume) async {
+    if (!_isPlaying) {
+      await startTone(frequency, volume);
+      return;
+    }
+    
+    // Stop current and start new tone at target frequency
+    await _player.stop();
+    _isPlaying = false;
+    
+    final wavBytes = _generateSineWave(frequency, bufferDuration);
+    await _player.setVolume(volume.clamp(0.0, 1.0));
+    await _player.setReleaseMode(ReleaseMode.loop);
+    await _player.play(BytesSource(wavBytes));
+    _isPlaying = true;
+  }
+  
   /// Update volume while playing
   Future<void> setVolume(double volume) async {
     await _player.setVolume(volume.clamp(0.0, 1.0));
@@ -48,9 +66,14 @@ class TonePlayer {
     }
   }
   
+  /// Get current playing state
+  bool get isPlaying => _isPlaying;
+  
   /// Dispose resources
   Future<void> dispose() async {
+    await _player.stop();
     await _player.dispose();
+    _isPlaying = false;
   }
   
   /// Generate a WAV file with a sine wave at the given frequency

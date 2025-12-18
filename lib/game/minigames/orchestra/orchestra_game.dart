@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -9,13 +10,14 @@ import '../../../services/bluetooth_service.dart';
 import '../../../services/telemetry_data.dart';
 import '../../pets/pet_stats.dart';
 import 'pet_musician.dart';
+import 'tone_player.dart';
 
-/// Orchestra minigame where multiple pets sing at different pitches.
-/// - Horizontal position determines pitch (left = low, right = high)
-/// - Vertical position of touch determines volume (top = loud, bottom = quiet)
+/// Orchestra minigame where pets sing at different pitches based on touch position.
+/// - Horizontal position determines pitch (smooth glide, not discrete notes)
+/// - Vertical position determines volume (top = loud, bottom = quiet)
 /// - Hold to sing, release to stop
 /// - Multiple simultaneous touches for polyphony
-class OrchestraGame extends FlameGame with MultiTouchDragDetector {
+class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTapDetector {
   final BluetoothService bluetoothService;
   final PetStats petStats;
   final VoidCallback onExit;
@@ -24,26 +26,21 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector {
   /// Number of pets in the orchestra
   final int petCount;
   
-  /// Musical notes (frequencies in Hz) - one octave of C major scale
-  static const List<double> notes = [
-    261.63, // C4
-    293.66, // D4
-    329.63, // E4
-    349.23, // F4
-    392.00, // G4
-    440.00, // A4
-    493.88, // B4
-    523.25, // C5
-  ];
+  /// Musical frequency range (Hz)
+  static const double minFrequency = 220.0; // A3
+  static const double maxFrequency = 880.0; // A5
   
   // Components
   final List<PetMusician> _musicians = [];
   
-  // Touch tracking: pointerId -> pet index
-  final Map<int, int> _activeTouches = {};
+  // Touch tracking: pointerId -> TonePlayer
+  final Map<int, TonePlayer> _touchPlayers = {};
+  // Touch tracking: pointerId -> current pet index (for visuals)
+  final Map<int, int> _touchPetIndex = {};
   
   // Motion control
   StreamSubscription<List<int>>? _telemetrySub;
+  TonePlayer? _motionPlayer;
   int? _motionPetIndex;
   Vector2 _calibrationOffset = Vector2.zero();
   bool _isCalibrated = false;
@@ -68,14 +65,13 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector {
     final petHeight = petWidth * 1.16; // Maintain aspect ratio
     final baseY = size.y * 0.6; // Position pets at 60% down
     
-    // Create musicians
+    // Create musicians (visual only - no audio attached)
     for (int i = 0; i < petCount; i++) {
-      final frequency = notes[i % notes.length];
       final xPos = petWidth * (i + 1);
       
       final musician = PetMusician(
         petStats: petStats,
-        pitch: frequency,
+        pitch: 0, // Not used for audio anymore
         position: Vector2(xPos, baseY),
         size: Vector2(petWidth * 0.8, petHeight * 0.8),
       );
@@ -88,10 +84,11 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector {
     add(TitleDisplay(game: this));
     
     // Add exit button
-    add(ExitButton(onTap: onExit, game: this));
+    add(ExitButton(onTap: _handleExit, game: this));
     
     // Subscribe to motion controls if connected
     if (isDeviceConnected) {
+      _motionPlayer = TonePlayer();
       _telemetrySub = bluetoothService.incomingRaw$.listen(
         (bytes) {
           final data = TelemetryData.fromBytes(bytes);
@@ -105,103 +102,25 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector {
     }
   }
   
-  void _onTelemetry(TelemetryData data) {
-    if (!_isCalibrated) {
-      // First reading sets calibration
-      _calibrationOffset = Vector2(data.ax, data.ay);
-      _isCalibrated = true;
-      return;
-    }
-    
-    // Map accelerometer to screen position
-    // X axis: -1 to 1 -> left to right
-    // Y axis: use for volume
-    final relativeX = data.ax - _calibrationOffset.x;
-    final relativeY = data.ay - _calibrationOffset.y;
-    
-    // Map to pet index (sensitivity of 0.5g per pet)
-    final normalizedX = (relativeX / 0.5).clamp(-1.0, 1.0);
-    final petIndex = ((normalizedX + 1) / 2 * (petCount - 1)).round().clamp(0, petCount - 1);
-    
-    // Map Y to volume (0.2 to 1.0)
-    final normalizedY = (relativeY / 0.5).clamp(-1.0, 1.0);
-    final volume = 0.6 + normalizedY * 0.4; // 0.2 to 1.0
-    
-    // Check if we should activate a new pet
-    if (_motionPetIndex != petIndex) {
-      // Stop old pet
-      if (_motionPetIndex != null && _motionPetIndex! < _musicians.length) {
-        _musicians[_motionPetIndex!].stopSinging();
-      }
-      _motionPetIndex = petIndex;
-    }
-    
-    // Keep current pet singing with updated volume
-    if (petIndex < _musicians.length) {
-      _musicians[petIndex].startSinging(volume);
-    }
+  void _handleExit() {
+    _cleanup();
+    onExit();
   }
   
-  /// Recalibrate motion controls to current orientation
-  void recalibrate() {
-    _isCalibrated = false;
-    _motionPetIndex = null;
+  /// Calculate frequency from horizontal position (smooth interpolation)
+  double _getFrequencyFromX(double x) {
+    final normalized = (x / size.x).clamp(0.0, 1.0);
+    // Exponential interpolation for more natural pitch perception
+    final logMin = math.log(minFrequency);
+    final logMax = math.log(maxFrequency);
+    return math.exp(logMin + normalized * (logMax - logMin));
   }
   
-  @override
-  void onDragStart(int pointerId, DragStartInfo info) {
-    final petIndex = _getPetAtPosition(info.eventPosition.global);
-    if (petIndex != null) {
-      _activeTouches[pointerId] = petIndex;
-      final volume = _getVolumeFromY(info.eventPosition.global.y);
-      _musicians[petIndex].startSinging(volume);
-    }
-  }
-  
-  @override
-  void onDragUpdate(int pointerId, DragUpdateInfo info) {
-    final currentPetIndex = _activeTouches[pointerId];
-    if (currentPetIndex == null) return;
-    
-    final newPetIndex = _getPetAtPosition(info.eventPosition.global);
-    final volume = _getVolumeFromY(info.eventPosition.global.y);
-    
-    if (newPetIndex != null && newPetIndex != currentPetIndex) {
-      // Moved to a different pet
-      _musicians[currentPetIndex].stopSinging();
-      _activeTouches[pointerId] = newPetIndex;
-      _musicians[newPetIndex].startSinging(volume);
-    } else if (newPetIndex == currentPetIndex) {
-      // Same pet, just update volume
-      _musicians[currentPetIndex].updateVolume(volume);
-    }
-  }
-  
-  @override
-  void onDragEnd(int pointerId, DragEndInfo info) {
-    _stopTouchPet(pointerId);
-  }
-  
-  @override
-  void onDragCancel(int pointerId) {
-    _stopTouchPet(pointerId);
-  }
-  
-  void _stopTouchPet(int pointerId) {
-    final petIndex = _activeTouches.remove(pointerId);
-    if (petIndex != null && petIndex < _musicians.length) {
-      _musicians[petIndex].stopSinging();
-    }
-  }
-  
-  int? _getPetAtPosition(Vector2 globalPos) {
-    // Find which pet column the touch is in
+  /// Get pet index from x position for visual feedback
+  int _getPetIndexFromX(double x) {
     final petWidth = size.x / (petCount + 1);
-    final index = (globalPos.x / petWidth - 0.5).round();
-    if (index >= 0 && index < petCount) {
-      return index;
-    }
-    return null;
+    final index = (x / petWidth - 0.5).round();
+    return index.clamp(0, petCount - 1);
   }
   
   double _getVolumeFromY(double y) {
@@ -210,12 +129,167 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector {
     return 0.2 + normalized * 0.8;
   }
   
+  void _onTelemetry(TelemetryData data) {
+    if (_motionPlayer == null) return;
+    
+    if (!_isCalibrated) {
+      _calibrationOffset = Vector2(data.ax, data.ay);
+      _isCalibrated = true;
+      return;
+    }
+    
+    final relativeX = data.ax - _calibrationOffset.x;
+    final relativeY = data.ay - _calibrationOffset.y;
+    
+    // Map to screen position
+    final normalizedX = ((relativeX / 0.5) + 1) / 2; // 0 to 1
+    final screenX = normalizedX.clamp(0.0, 1.0) * size.x;
+    final screenY = ((relativeY / 0.5) + 1) / 2 * size.y;
+    
+    final frequency = _getFrequencyFromX(screenX);
+    final volume = _getVolumeFromY(screenY);
+    final petIndex = _getPetIndexFromX(screenX);
+    
+    // Update visual feedback
+    if (_motionPetIndex != null && _motionPetIndex != petIndex) {
+      if (_motionPetIndex! < _musicians.length) {
+        _musicians[_motionPetIndex!].stopSinging();
+      }
+    }
+    _motionPetIndex = petIndex;
+    
+    if (petIndex < _musicians.length) {
+      _musicians[petIndex].startSinging(volume);
+    }
+    
+    // Update audio
+    _motionPlayer!.setFrequency(frequency, volume);
+  }
+  
+  // --- TAP HANDLING ---
+  @override
+  void onTapDown(int pointerId, TapDownInfo info) {
+    final pos = info.eventPosition.global;
+    _startTouchSound(pointerId, pos);
+  }
+  
+  @override
+  void onTapUp(int pointerId, TapUpInfo info) {
+    _stopTouchSound(pointerId);
+  }
+  
+  @override
+  void onTapCancel(int pointerId) {
+    _stopTouchSound(pointerId);
+  }
+  
+  // --- DRAG HANDLING ---
+  @override
+  void onDragStart(int pointerId, DragStartInfo info) {
+    final pos = info.eventPosition.global;
+    _startTouchSound(pointerId, pos);
+  }
+  
+  @override
+  void onDragUpdate(int pointerId, DragUpdateInfo info) {
+    final pos = info.eventPosition.global;
+    _updateTouchSound(pointerId, pos);
+  }
+  
+  @override
+  void onDragEnd(int pointerId, DragEndInfo info) {
+    _stopTouchSound(pointerId);
+  }
+  
+  @override
+  void onDragCancel(int pointerId) {
+    _stopTouchSound(pointerId);
+  }
+  
+  void _startTouchSound(int pointerId, Vector2 pos) {
+    // Create new TonePlayer for this touch
+    final player = TonePlayer();
+    _touchPlayers[pointerId] = player;
+    
+    final frequency = _getFrequencyFromX(pos.x);
+    final volume = _getVolumeFromY(pos.y);
+    final petIndex = _getPetIndexFromX(pos.x);
+    
+    _touchPetIndex[pointerId] = petIndex;
+    if (petIndex < _musicians.length) {
+      _musicians[petIndex].startSinging(volume);
+    }
+    
+    player.startTone(frequency, volume);
+  }
+  
+  void _updateTouchSound(int pointerId, Vector2 pos) {
+    final player = _touchPlayers[pointerId];
+    if (player == null) return;
+    
+    final frequency = _getFrequencyFromX(pos.x);
+    final volume = _getVolumeFromY(pos.y);
+    final petIndex = _getPetIndexFromX(pos.x);
+    
+    // Update visual feedback
+    final oldPetIndex = _touchPetIndex[pointerId];
+    if (oldPetIndex != null && oldPetIndex != petIndex) {
+      if (oldPetIndex < _musicians.length) {
+        _musicians[oldPetIndex].stopSinging();
+      }
+    }
+    _touchPetIndex[pointerId] = petIndex;
+    if (petIndex < _musicians.length) {
+      _musicians[petIndex].startSinging(volume);
+    }
+    
+    // Update audio with smooth frequency change
+    player.setFrequency(frequency, volume);
+  }
+  
+  void _stopTouchSound(int pointerId) {
+    final player = _touchPlayers.remove(pointerId);
+    final petIndex = _touchPetIndex.remove(pointerId);
+    
+    if (petIndex != null && petIndex < _musicians.length) {
+      _musicians[petIndex].stopSinging();
+    }
+    
+    player?.stopTone();
+    player?.dispose();
+  }
+  
+  void _cleanup() {
+    // Stop all touch audio
+    for (final player in _touchPlayers.values) {
+      player.stopTone();
+      player.dispose();
+    }
+    _touchPlayers.clear();
+    
+    // Stop motion audio
+    _motionPlayer?.stopTone();
+    _motionPlayer?.dispose();
+    _motionPlayer = null;
+    
+    // Stop all pet visuals
+    for (final musician in _musicians) {
+      musician.stopSinging();
+    }
+    
+    // Cancel telemetry subscription
+    _telemetrySub?.cancel();
+    _telemetrySub = null;
+  }
+  
   @override
   void onRemove() {
-    _telemetrySub?.cancel();
+    _cleanup();
     super.onRemove();
   }
 }
+
+
 
 /// Title display
 class TitleDisplay extends PositionComponent {
@@ -239,7 +313,6 @@ class TitleDisplay extends PositionComponent {
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
-    // Center horizontally
     textPainter.paint(canvas, Offset((game.size.x - textPainter.width) / 2, 0));
   }
 }
@@ -257,13 +330,11 @@ class ExitButton extends PositionComponent with TapCallbacks {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // Position in top-left
     position = Vector2(60, 50);
   }
   
   @override
   void render(Canvas canvas) {
-    // Button background
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.x, size.y),
       const Radius.circular(8),
@@ -274,7 +345,6 @@ class ExitButton extends PositionComponent with TapCallbacks {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2);
     
-    // Text
     final textPainter = TextPainter(
       text: const TextSpan(
         text: 'EXIT',

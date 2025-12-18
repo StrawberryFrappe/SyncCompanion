@@ -18,7 +18,7 @@
     <!-- Optional: if you plan to scan in background without a foreground service you may need background location on some API levels -->
     <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
     <application
-        android:label="sync_companion"
+        android:label="Therapets"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
