@@ -40,15 +40,17 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   StreamSubscription<List<int>>? _telemetrySub;
   Timer? _pipeSpawnTimer;
   
-  // Physics
-  static const double gravity = 800.0;
-  static const double flapVelocity = -300.0;
-  static const double pipeSpeed = 120.0; // Slower pipes
-  static const double pipeSpawnInterval = 3.0; // More time between pipes
+  // Screen-relative physics (values as % of screen height/width)
+  // These getters compute values based on actual screen size
+  double get gravity => size.y * 1.2; // Falls across screen in ~1.3s
+  double get flapVelocity => size.y * -0.45; // Jumps about 45% of screen height
+  double get pipeSpeed => size.x * 0.15; // Crosses screen in ~6.5s
+  static const double pipeSpawnInterval = 3.0; // Seconds between pipes
   
-  // Layout
-  static const double groundHeight = 50.0;
-  static const double pipeGap = 200.0; // Wider gap for easier gameplay
+  // Screen-relative layout
+  double get groundHeight => size.y * 0.06; // 6% of screen height
+  double get pipeGap => size.y * 0.28; // 28% of screen height for gap
+  double get playerSize => size.y * 0.08; // 8% of screen height
   
   // Debounce for motion input
   DateTime? _lastFlapTime;
@@ -78,6 +80,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     }
     
     _player.position = Vector2(size.x * 0.25, size.y * 0.5);
+    _player.size = Vector2(playerSize, playerSize * 1.16); // Maintain aspect ratio
     add(_player as Component);
     
     // Add ground
@@ -97,6 +100,11 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
         },
         onError: (e) => print('[FlappyBird] Telemetry stream error: $e'),
       );
+      
+      // Request native status to ensure telemetry stream receives fresh data.
+      // This fixes motion controls not responding on first connect or reconnect
+      // because broadcast streams don't replay past events to new subscribers.
+      bluetoothService.requestNativeStatus();
     }
   }
 
@@ -155,6 +163,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
       gapY: gapY,
       gapHeight: pipeGap,
       speed: pipeSpeed,
+      groundHeight: groundHeight,
       onScore: () {
         if (!isGameOver) {
           // Progressive scoring for motion controls
@@ -167,7 +176,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
         }
       },
       onCollision: endGame,
-    )..position = Vector2(size.x + 50, 0));
+    )..position = Vector2(size.x + size.x * 0.05, 0)); // 5% offset
   }
 
   void endGame() {

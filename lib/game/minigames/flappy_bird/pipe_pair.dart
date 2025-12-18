@@ -8,20 +8,22 @@ class PipePair extends PositionComponent with HasGameReference {
   final double gapY;
   final double gapHeight;
   final double speed;
+  final double groundHeight;
   final VoidCallback onScore;
   final VoidCallback onCollision;
   
   bool _scored = false;
-  static const double pipeWidth = 60.0;
+  double get pipeWidth => game.size.x * 0.08; // 8% of screen width
   static const Color pipeColor = Color(0xFF228B22); // Forest green
 
   PipePair({
     required this.gapY,
     required this.gapHeight,
     required this.speed,
+    required this.groundHeight,
     required this.onScore,
     required this.onCollision,
-  }) : super(size: Vector2(pipeWidth, 0));
+  }) : super();
 
   late final RectangleComponent topPipe;
   late final RectangleComponent bottomPipe;
@@ -30,6 +32,7 @@ class PipePair extends PositionComponent with HasGameReference {
   Future<void> onLoad() async {
     await super.onLoad();
     
+    size = Vector2(pipeWidth, 0);
     final screenHeight = game.size.y;
     
     // Top pipe: from top of screen to gap start
@@ -44,7 +47,7 @@ class PipePair extends PositionComponent with HasGameReference {
     
     // Bottom pipe: from gap end to ground
     final bottomY = gapY + gapHeight / 2;
-    final bottomHeight = screenHeight - bottomY - 50; // 50 = ground height
+    final bottomHeight = screenHeight - bottomY - groundHeight;
     bottomPipe = RectangleComponent(
       size: Vector2(pipeWidth, bottomHeight),
       position: Vector2(0, bottomY),

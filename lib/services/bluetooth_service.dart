@@ -570,6 +570,19 @@ class BluetoothService {
     return null;
   }
 
+  /// Request native service to emit current status and telemetry data.
+  /// This ensures the broadcast streams receive fresh data for new subscribers
+  /// (e.g., minigames that need telemetry input).
+  Future<void> requestNativeStatus() async {
+    try {
+      final res = await _platform.invokeMethod('requestNativeStatus');
+      if (res is Map) {
+        final m = Map<String, dynamic>.from(res);
+        _handleNativeStatusMap(m);
+      }
+    } catch (_) {}
+  }
+
   void dispose() {
     _foundController.close();
     _connectedController.close();
