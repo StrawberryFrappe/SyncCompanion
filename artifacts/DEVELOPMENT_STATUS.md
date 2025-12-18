@@ -24,7 +24,7 @@
 *   [X] **Basic Stats**: Implement 1-2 core stats (e.g., Hunger, Happiness).
 *   [X] **Interaction**: Basic interactions (Feeding) to affect stats.
 
-### Phase 3: Telemetry Minigames
+### Phase 3: Telemetry Minigames (NEXT UP)
 *   **Goal**: Fun activities that strictly use device input (IMU/Sensor data).
 *   [ ] **Game Framework**: Independent game screens.
 *   [ ] **Input Hook**: Low-latency sensor data for game control (like Pou games).
