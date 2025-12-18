@@ -10,6 +10,7 @@ import '../services/bluetooth_service.dart';
 import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
 import 'flappy_bird_screen.dart';
+import 'orchestra_screen.dart';
 import 'widgets/stat_indicator.dart';
 import 'widgets/currency_display.dart';
 import '../game/items/food_item.dart';
@@ -509,6 +510,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ).then((_) {
               // Refresh stats after returning from game
               _saveStats();
+              setState(() {});
+            });
+          } else if (gameId == 'orchestra') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => OrchestraScreen(
+                  bluetoothService: _bluetoothService,
+                  petStats: _game.currentPet.stats,
+                  isDeviceConnected: _isDeviceSynced,
+                ),
+              ),
+            ).then((_) {
               setState(() {});
             });
           }

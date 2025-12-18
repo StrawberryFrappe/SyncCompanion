@@ -36,7 +36,13 @@ class GameMenu extends StatelessWidget {
       icon: Icons.flutter_dash,
       color: Color(0xFF87CEEB),
     ),
-    // Future games can be added here
+    GameMenuItem(
+      id: 'orchestra',
+      name: 'Orchestra',
+      description: 'Make your pets sing!',
+      icon: Icons.music_note,
+      color: Color(0xFF9C27B0),
+    ),
   ];
 
   @override
