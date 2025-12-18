@@ -29,10 +29,16 @@ class BobTheBlob extends Pet {
   int _currentFrame = 0;
   
   /// Width of each sprite frame in the sheet (source size)
-  static const double frameWidth = 25.0;
+  double frameWidth = 25.0;
   
   /// Height of each sprite frame (source size)
-  static const double frameHeight = 29.0;
+  double frameHeight = 29.0;
+  
+  /// Offset for the source rect (used for dynamic sprite sizing)
+  Vector2 _frameOffset = Vector2.zero();
+  
+  /// Last known game size for resize recalculation
+  Vector2? _lastGameSize;
   
   /// Border padding around the sprite sheet
   static const double borderPadding = 4.0;
@@ -50,7 +56,8 @@ class BobTheBlob extends Pet {
     bodyType: BodyType.ball,
     stats: stats,
     // Initial size - will be updated in onGameResize
-    size: Vector2(frameWidth * 4, frameHeight * 4),
+    // Initial size - will be updated in onGameResize
+    size: Vector2(25.0 * 4, 116.0), // Use default 25x29 for init
   );
 
   @override
@@ -60,15 +67,42 @@ class BobTheBlob extends Pet {
   }
 
   Future<void> _loadSprite() async {
-    // Check if the basic hat is equipped
-    final hasBasicHat = stats.equippedClothing['head'] == 'hat_basic';
-    final spriteName = hasBasicHat ? 'BobTheBlob.png' : 'BobTheBlobHatless.png';
+    _spriteLoaded = false;
+    
+    // Check equipped items
+    final headItem = stats.equippedClothing['head'];
+    
+    String spriteName;
+    if (headItem == 'hat_spring') {
+      spriteName = 'BobTheFruity.png';
+      // Fruity sprite now matches standard dimensions: 25x29
+      frameWidth = 25.0;
+      frameHeight = 29.0;
+      _frameOffset = Vector2.zero();
+    } else if (headItem == 'hat_basic') {
+      spriteName = 'BobTheBlob.png';
+      frameWidth = 25.0;
+      frameHeight = 29.0;
+      _frameOffset = Vector2.zero();
+    } else {
+      spriteName = 'BobTheBlobHatless.png';
+      frameWidth = 25.0;
+      frameHeight = 29.0;
+      _frameOffset = Vector2.zero();
+    }
+    
     _spriteImage = await Flame.images.load(spriteName);
     _spriteLoaded = true;
+    
+    // Recalculate component size/ratio
+    if (_lastGameSize != null) {
+      onGameResize(_lastGameSize!);
+    }
   }
 
   @override
   void onGameResize(Vector2 gameSize) {
+    _lastGameSize = gameSize;
     super.onGameResize(gameSize);
     
     // Calculate display size based on screen width (1/5 of screen)
@@ -89,8 +123,8 @@ class BobTheBlob extends Pet {
     final row = frameIndex ~/ 2;
     
     // Calculate position with border and gap offsets
-    final x = borderPadding + col * (frameWidth + spriteGap);
-    final y = borderPadding + row * (frameHeight + spriteGap);
+    final x = borderPadding + col * (frameWidth + spriteGap) + _frameOffset.x;
+    final y = borderPadding + row * (frameHeight + spriteGap) + _frameOffset.y;
     
     return Rect.fromLTWH(x, y, frameWidth, frameHeight);
   }
@@ -145,8 +179,8 @@ class BobTheBlob extends Pet {
       final slot = entry.key; // e.g. "head"
       final id = entry.value;
       
-      // Skip hat_basic - it's built into the BobTheBlob.png sprite
-      if (id == 'hat_basic') continue;
+      // Skip items that are baked into the base sprite
+      if (id == 'hat_basic' || id == 'hat_spring') continue;
       
       // Map ID to asset path
       String? assetPath;

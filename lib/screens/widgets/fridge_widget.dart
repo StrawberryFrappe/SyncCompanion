@@ -20,27 +20,27 @@ class FridgeWidget extends StatelessWidget {
     }
 
     return Container(
-      height: 100,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      width: 80, // Fixed width for sidebar
+      margin: const EdgeInsets.only(right: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xE6FFFFFF),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(width: 2, color: Colors.black),
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Padding(
-            padding: EdgeInsets.only(right: 12),
+            padding: EdgeInsets.only(bottom: 12),
             child: Icon(Icons.kitchen, size: 32),
           ),
           Flexible(
             child: ListView.separated(
-              scrollDirection: Axis.horizontal,
+              scrollDirection: Axis.vertical,
               shrinkWrap: true,
               itemCount: ownedItems.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 16),
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 final item = ownedItems[index];
                 final quantity = inventory[item.id] ?? 0;

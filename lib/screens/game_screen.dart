@@ -32,6 +32,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _isDeviceSynced = false;
   StreamSubscription<dynamic>? _syncSub;
   
+  bool _showFridge = false; // Toggle for fridge visibility
+  
   // For periodic stat saving while app is active
   Timer? _autoSaveTimer;
   // For UI updates
@@ -183,6 +185,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final stats = _game.getStatValues();
     final hunger = stats['hunger'] ?? 0.0;
     final happiness = stats['happiness'] ?? 0.0;
+    
+    // Adaptive sizing
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 380;
+    final double buttonSize = isSmallScreen ? 48.0 : 64.0;
+    final double iconSize = isSmallScreen ? 24.0 : 32.0;
+    final double padding = 16.0;
 
     return Scaffold(
       body: Stack(
@@ -319,12 +328,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Layer 6: Fridge (Bottom Center)
-          SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 0, left: 100, right: 100),
+          // Layer 6: Fridge (Animated Sidebar Right)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            right: _showFridge ? 0 : -150,
+            top: 100,
+            bottom: 100,
+            child: SafeArea( 
+              child: Center(
                 child: FridgeWidget(
                   inventory: _game.getFoodInventory(),
                 ),
@@ -332,22 +344,45 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Layer 5: Food Shop Button (Bottom Right)
+          // Layer 5: Food Shop Button & Fridge Toggle (Bottom Right)
           SafeArea(
             child: Align(
               alignment: Alignment.bottomRight,
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: FloatingActionButton(
-                    heroTag: 'food_btn',
-                    backgroundColor: Colors.orange.shade300,
-                    shape: CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
-                    onPressed: _openFoodStore,
-                    child: const Icon(Icons.store, color: Colors.black, size: 32),
-                  ),
+                padding: EdgeInsets.all(padding),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Fridge Toggle Button
+                    SizedBox(
+                      width: buttonSize,
+                      height: buttonSize,
+                      child: FloatingActionButton(
+                        heroTag: 'fridge_btn',
+                        backgroundColor: Colors.blue.shade200,
+                        shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                        onPressed: () {
+                          setState(() {
+                            _showFridge = !_showFridge;
+                          });
+                        },
+                        child: Icon(Icons.kitchen, color: Colors.black, size: iconSize),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Food Store Button
+                    SizedBox(
+                      width: buttonSize,
+                      height: buttonSize,
+                      child: FloatingActionButton(
+                        heroTag: 'food_btn',
+                        backgroundColor: Colors.orange.shade300,
+                        shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                        onPressed: _openFoodStore,
+                        child: Icon(Icons.store, color: Colors.black, size: iconSize),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -358,16 +393,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             child: Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(padding),
                 child: SizedBox(
-                  width: 64,
-                  height: 64,
+                  width: buttonSize,
+                  height: buttonSize,
                   child: FloatingActionButton(
                     heroTag: 'clothing_btn',
                     backgroundColor: Colors.purple.shade200,
-                    shape: CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                    shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
                     onPressed: _openWardrobeMenu,
-                    child: const Icon(Icons.checkroom, color: Colors.black, size: 32),
+                    child: Icon(Icons.checkroom, color: Colors.black, size: iconSize),
                   ),
                 ),
               ),
