@@ -15,15 +15,17 @@ class FoodStore extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      // Increased insetPadding to make dialog smaller (popup style)
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(width: 4, color: Colors.black),
-        ),
+      // Remove insetPadding to allow centering of small constraints
+      insetPadding: EdgeInsets.zero,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(width: 4, color: Colors.black),
+          ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,6 +129,7 @@ class FoodStore extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
