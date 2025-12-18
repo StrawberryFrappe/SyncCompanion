@@ -17,12 +17,12 @@
 *   [X] Crash-free operation and background stability.
 *   [X] Receive raw data from device.
 
-### Phase 2: Virtual Pet Base (NEXT UP)
+### Phase 2: Virtual Pet Base (DONE)
 *   **Goal**: A simple, engaging pet to visualize the user's status.
-*   [ ] **Pet Model**: Render a basic 2D/3D pet character.
-*   [ ] **Customization**: Minimum viable "Clothes" system (e.g., hats/colors).
-*   [ ] **Basic Stats**: Implement 1-2 core stats (e.g., Hunger, Happiness).
-*   [ ] **Interaction**: Basic interactions (Feeding) to affect stats.
+*   [X] **Pet Model**: Render a basic 2D/3D pet character.
+*   [X] **Customization**: Minimum viable "Clothes" system (e.g., hats/colors).
+*   [X] **Basic Stats**: Implement 1-2 core stats (e.g., Hunger, Happiness).
+*   [X] **Interaction**: Basic interactions (Feeding) to affect stats.
 
 ### Phase 3: Telemetry Minigames
 *   **Goal**: Fun activities that strictly use device input (IMU/Sensor data).

@@ -9,10 +9,10 @@ The app currently connects to the device and maintains a stable stream of sensor
 3.  **Interaction**: Allow feeding/petting to influence stats.
 
 ## Completion Criteria for Stage 2
-- [ ] App displays a "Pet" (placeholder or asset) on the main screen.
-- [ ] Pet state (Hunger/Happiness) decays over time or based on logic.
-- [ ] User interactions (buttons/gestures) update the pet's state.
-- [ ] State is persisted between app restarts.
+- [x] App displays a "Pet" (placeholder or asset) on the main screen.
+- [x] Pet state (Hunger/Happiness) decays over time or based on logic.
+- [x] User interactions (buttons/gestures) update the pet's state.
+- [x] State is persisted between app restarts.
 
 ## Where to look
 - **Pet State & Logic**: `lib/features/pet/` (New directory to be created)
