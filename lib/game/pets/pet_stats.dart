@@ -113,8 +113,9 @@ class PetStats {
     // Hunger always decreases
     _hunger = max(0.0, _hunger - (hungerDecayRate * dt));
 
-    // Happiness changes based on sync status
-    if (isDeviceSynced) {
+    // Happiness changes based on sync status AND hunger level
+    // If hunger is critical (< 25%), happiness decays even if synced
+    if (isDeviceSynced && _hunger >= 0.25) {
       _happiness = min(1.0, _happiness + (happinessGainRate * dt));
     } else {
       _happiness = max(0.0, _happiness - (happinessDecayRate * dt));
