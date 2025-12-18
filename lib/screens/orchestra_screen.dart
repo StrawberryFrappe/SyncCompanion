@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../game/minigames/orchestra/orchestra_game.dart';
 import '../game/pets/pet_stats.dart';
@@ -28,6 +29,13 @@ class _OrchestraScreenState extends State<OrchestraScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Force landscape orientation for the orchestra game
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    
     _game = OrchestraGame(
       bluetoothService: widget.bluetoothService,
       petStats: widget.petStats,
@@ -36,6 +44,21 @@ class _OrchestraScreenState extends State<OrchestraScreen> {
         Navigator.of(context).pop();
       },
     );
+  }
+
+  @override
+  void dispose() {
+    // Force cleanup of game audio before disposing
+    _game.cleanup();
+    
+    // Restore all orientations when leaving the orchestra screen
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    super.dispose();
   }
 
   @override

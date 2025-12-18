@@ -13,7 +13,7 @@ class PipePair extends PositionComponent with HasGameReference {
   final VoidCallback onCollision;
   
   bool _scored = false;
-  double get pipeWidth => game.size.x * 0.08; // 8% of screen width
+  double get pipeWidth => game.size.x * 0.16; // 16% of screen width (doubled for mobile visibility)
   static const Color pipeColor = Color(0xFF228B22); // Forest green
 
   PipePair({
@@ -95,17 +95,24 @@ class PipePair extends PositionComponent with HasGameReference {
     final player = players.isNotEmpty ? players.first : null;
     
     if (player != null) {
-      final playerRect = player.toRect();
-      final topRect = Rect.fromLTWH(
-        position.x, 0,
-        pipeWidth, gapY - gapHeight / 2,
-      );
-      final bottomRect = Rect.fromLTWH(
-        position.x, gapY + gapHeight / 2,
-        pipeWidth, game.size.y,
-      );
+      // Use circular hitbox with ~58% radius for ~1/3 collision area (more forgiving)
+      final playerCenter = player.position; // Already centered due to Anchor.center
+      final hitboxRadius = (player.size.x / 2) * 0.58; // sqrt(1/3) ≈ 0.58 for 1/3 area
       
-      if (playerRect.overlaps(topRect) || playerRect.overlaps(bottomRect)) {
+      final topPipeBottom = gapY - gapHeight / 2;
+      final bottomPipeTop = gapY + gapHeight / 2;
+      
+      // Check if circle overlaps with top pipe (extends from y=0 to topPipeBottom)
+      final nearestTopY = playerCenter.y.clamp(0, topPipeBottom);
+      final nearestTopX = playerCenter.x.clamp(position.x, position.x + pipeWidth);
+      final distToTop = (playerCenter - Vector2(nearestTopX, nearestTopY)).length;
+      
+      // Check if circle overlaps with bottom pipe (extends from bottomPipeTop to screen bottom)
+      final nearestBottomY = playerCenter.y.clamp(bottomPipeTop, game.size.y);
+      final nearestBottomX = playerCenter.x.clamp(position.x, position.x + pipeWidth);
+      final distToBottom = (playerCenter - Vector2(nearestBottomX, nearestBottomY)).length;
+      
+      if (distToTop < hitboxRadius || distToBottom < hitboxRadius) {
         onCollision();
       }
     }

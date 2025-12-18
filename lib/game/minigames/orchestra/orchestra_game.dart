@@ -45,6 +45,14 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
   Vector2 _calibrationOffset = Vector2.zero();
   bool _isCalibrated = false;
   
+  // Motion smoothing and dead zone
+  Vector2 _smoothedMotion = Vector2.zero();
+  bool _motionActive = false;
+  DateTime _lastMotionTime = DateTime.now();
+  static const double motionThreshold = 0.1; // Minimum tilt to trigger audio
+  static const Duration motionTimeout = Duration(milliseconds: 400);
+  static const double smoothingFactor = 0.3; // Lower = smoother
+  
   OrchestraGame({
     required this.bluetoothService,
     required this.petStats,
@@ -103,7 +111,7 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
   }
   
   void _handleExit() {
-    _cleanup();
+    cleanup();
     onExit();
   }
   
@@ -134,6 +142,7 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
     
     if (!_isCalibrated) {
       _calibrationOffset = Vector2(data.ax, data.ay);
+      _smoothedMotion = Vector2.zero();
       _isCalibrated = true;
       return;
     }
@@ -141,10 +150,28 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
     final relativeX = data.ax - _calibrationOffset.x;
     final relativeY = data.ay - _calibrationOffset.y;
     
+    // Apply exponential moving average smoothing
+    _smoothedMotion = Vector2(
+      _smoothedMotion.x + smoothingFactor * (relativeX - _smoothedMotion.x),
+      _smoothedMotion.y + smoothingFactor * (relativeY - _smoothedMotion.y),
+    );
+    
+    // Check if motion exceeds the dead zone threshold
+    final motionMagnitude = _smoothedMotion.length;
+    
+    if (motionMagnitude < motionThreshold) {
+      // Below threshold - don't start new audio, existing will timeout
+      return;
+    }
+    
+    // Motion detected - update last motion time
+    _lastMotionTime = DateTime.now();
+    _motionActive = true;
+    
     // Map to screen position
-    final normalizedX = ((relativeX / 0.5) + 1) / 2; // 0 to 1
+    final normalizedX = ((_smoothedMotion.x / 0.5) + 1) / 2; // 0 to 1
     final screenX = normalizedX.clamp(0.0, 1.0) * size.x;
-    final screenY = ((relativeY / 0.5) + 1) / 2 * size.y;
+    final screenY = ((_smoothedMotion.y / 0.5) + 1) / 2 * size.y;
     
     final frequency = _getFrequencyFromX(screenX);
     final volume = _getVolumeFromY(screenY);
@@ -164,6 +191,27 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
     
     // Update audio
     _motionPlayer!.setFrequency(frequency, volume);
+  }
+  
+  @override
+  void update(double dt) {
+    super.update(dt);
+    
+    // Check for motion inactivity timeout
+    if (_motionActive && _motionPlayer != null) {
+      final elapsed = DateTime.now().difference(_lastMotionTime);
+      if (elapsed > motionTimeout) {
+        // Stop motion audio due to inactivity
+        _motionPlayer!.stopTone();
+        _motionActive = false;
+        
+        // Stop visual feedback
+        if (_motionPetIndex != null && _motionPetIndex! < _musicians.length) {
+          _musicians[_motionPetIndex!].stopSinging();
+        }
+        _motionPetIndex = null;
+      }
+    }
   }
   
   // --- TAP HANDLING ---
@@ -259,7 +307,8 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
     player?.dispose();
   }
   
-  void _cleanup() {
+  /// Clean up all audio and subscriptions. Call this when leaving the game.
+  void cleanup() {
     // Stop all touch audio
     for (final player in _touchPlayers.values) {
       player.stopTone();
@@ -268,6 +317,7 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
     _touchPlayers.clear();
     
     // Stop motion audio
+    _motionActive = false;
     _motionPlayer?.stopTone();
     _motionPlayer?.dispose();
     _motionPlayer = null;
@@ -284,7 +334,7 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
   
   @override
   void onRemove() {
-    _cleanup();
+    cleanup();
     super.onRemove();
   }
 }
