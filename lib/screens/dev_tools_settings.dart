@@ -563,12 +563,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     final wellbeing = stats?['wellbeing'] ?? 0.0;
 
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(width: 2, color: Colors.black),
       ),
       child: Column(
@@ -579,6 +576,10 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(width: 2, color: Colors.black)),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
             ),
             child: Row(
               children: [
@@ -599,109 +600,107 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           ),
           
           // Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Pet Stats Section
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      border: Border.all(width: 2, color: Colors.black),
-                      color: const Color(0xFFF5F5F5),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('PET STATS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        _buildStatBar('Hunger', hunger, Colors.orange),
-                        const SizedBox(height: 4),
-                        _buildStatBar('Happiness', happiness, Colors.pink),
-                        const SizedBox(height: 4),
-                        _buildStatBar('Wellbeing', wellbeing, Colors.green),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange.shade100,
-                                  foregroundColor: Colors.black,
-                                  side: const BorderSide(width: 1, color: Colors.black),
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                ),
-                                onPressed: () => widget.game?.feedPet(),
-                                child: const Text('FEED', style: TextStyle(fontSize: 10)),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Pet Stats Section
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 2, color: Colors.black),
+                    color: const Color(0xFFF5F5F5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('PET STATS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      _buildStatBar('Hunger', hunger, Colors.orange),
+                      const SizedBox(height: 4),
+                      _buildStatBar('Happiness', happiness, Colors.pink),
+                      const SizedBox(height: 4),
+                      _buildStatBar('Wellbeing', wellbeing, Colors.green),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange.shade100,
+                                foregroundColor: Colors.black,
+                                side: const BorderSide(width: 1, color: Colors.black),
+                                padding: const EdgeInsets.symmetric(vertical: 4),
                               ),
+                              onPressed: () => widget.game?.feedPet(),
+                              child: const Text('FEED', style: TextStyle(fontSize: 10)),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue.shade100,
-                                  foregroundColor: Colors.black,
-                                  side: const BorderSide(width: 1, color: Colors.black),
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                ),
-                                onPressed: () => widget.game?.resetPetStats(),
-                                child: const Text('RESET', style: TextStyle(fontSize: 10)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue.shade100,
+                                foregroundColor: Colors.black,
+                                side: const BorderSide(width: 1, color: Colors.black),
+                                padding: const EdgeInsets.symmetric(vertical: 4),
                               ),
+                              onPressed: () => widget.game?.resetPetStats(),
+                              child: const Text('RESET', style: TextStyle(fontSize: 10)),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Action Buttons
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white, 
-                      foregroundColor: Colors.black, 
-                      side: const BorderSide(width: 2, color: Colors.black),
-                    ),
-                    onPressed: _openScanner,
-                    child: const Text('SCAN FOR DEVICES', style: TextStyle(fontSize: 10)),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white, 
-                      foregroundColor: Colors.black, 
-                      side: const BorderSide(width: 2, color: Colors.black),
-                    ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt, game: widget.game)),
-                    ).then((_) {
-                      // Reload fake sync settings after returning from Advanced Settings
-                      _loadFakeSyncSettings().then((_) {
-                        _notifySyncStatus(_isConnected);
-                      });
-                    }),
-                    child: const Text('ADVANCED SETTINGS', style: TextStyle(fontSize: 10)),
-                  ),
-                  
-                  if (_isConnected) ...[
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade100, 
-                        foregroundColor: Colors.black, 
-                        side: const BorderSide(width: 2, color: Colors.black),
+                          ),
+                        ],
                       ),
-                      onPressed: _forget,
-                      child: const Text('DISCONNECT & FORGET', style: TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Action Buttons
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white, 
+                    foregroundColor: Colors.black, 
+                    side: const BorderSide(width: 2, color: Colors.black),
+                  ),
+                  onPressed: _openScanner,
+                  child: const Text('SCAN FOR DEVICES', style: TextStyle(fontSize: 10)),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white, 
+                    foregroundColor: Colors.black, 
+                    side: const BorderSide(width: 2, color: Colors.black),
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt, game: widget.game)),
+                  ).then((_) {
+                    // Reload fake sync settings after returning from Advanced Settings
+                    _loadFakeSyncSettings().then((_) {
+                      _notifySyncStatus(_isConnected);
+                    });
+                  }),
+                  child: const Text('ADVANCED SETTINGS', style: TextStyle(fontSize: 10)),
+                ),
+                
+                if (_isConnected) ...[ 
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade100, 
+                      foregroundColor: Colors.black, 
+                      side: const BorderSide(width: 2, color: Colors.black),
                     ),
-                  ],
+                    onPressed: _forget,
+                    child: const Text('DISCONNECT & FORGET', style: TextStyle(fontSize: 10)),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],

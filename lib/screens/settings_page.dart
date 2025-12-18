@@ -281,6 +281,105 @@ class _SettingsPageState extends State<SettingsPage> {
       onApply(result);
     }
   }
+  
+  Widget _buildThresholdInput({
+    required String label,
+    required double currentThreshold,
+    required ValueChanged<double> onApply,
+  }) {
+    // Display current threshold as percentage
+    final percentValue = (currentThreshold * 100).toStringAsFixed(0);
+    
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        border: Border.all(width: 1, color: Colors.black26),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                Text('$percentValue%', 
+                  style: const TextStyle(fontSize: 9, color: Colors.grey)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 28,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade100,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: Size.zero,
+              ),
+              onPressed: () => _showThresholdEditDialog(label, currentThreshold, onApply),
+              child: const Text('EDIT', style: TextStyle(fontSize: 9)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _showThresholdEditDialog(String label, double currentThreshold, ValueChanged<double> onApply) async {
+    final percentController = TextEditingController(text: (currentThreshold * 100).toStringAsFixed(0));
+    
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(label, style: const TextStyle(fontSize: 14)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Set threshold percentage (0-100%):', style: TextStyle(fontSize: 11)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: percentController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Percentage',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              try {
+                final percent = double.parse(percentController.text);
+                if (percent >= 0 && percent <= 100) {
+                  final threshold = (percent / 100.0).clamp(0.0, 1.0);
+                  Navigator.of(ctx).pop(threshold);
+                }
+              } catch (e) {
+                // Invalid input
+              }
+            },
+            child: const Text('APPLY'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null) {
+      onApply(result);
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -368,11 +467,10 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 const Text('NOTIFICATIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                _buildStatRateInput(
+                _buildThresholdInput(
                   label: 'Low Wellbeing Alert Threshold',
-                  currentRate: _lowWellbeingThreshold / 10,
-                  onApply: (rate) {
-                    final threshold = (rate * 10).clamp(0.0, 1.0);
+                  currentThreshold: _lowWellbeingThreshold,
+                  onApply: (threshold) {
                     setState(() => _lowWellbeingThreshold = threshold);
                     widget.game?.currentPet.stats.lowWellbeingThreshold = threshold;
                     _saveRates();

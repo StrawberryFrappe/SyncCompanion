@@ -145,18 +145,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _openDevTools() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DevToolsSettings(
-        game: _game,
-        onSyncStatusChanged: (synced) {
-          setState(() {
-            _isDeviceSynced = synced;
-          });
-          _game.setSyncStatus(synced);
-        },
+      barrierColor: Colors.black54,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: DevToolsSettings(
+          game: _game,
+          onSyncStatusChanged: (synced) {
+            setState(() {
+              _isDeviceSynced = synced;
+            });
+            _game.setSyncStatus(synced);
+          },
+        ),
       ),
     );
   }
