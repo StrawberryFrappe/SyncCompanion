@@ -235,6 +235,37 @@ class PetStats {
     _equippedClothing.remove(slotName);
   }
 
+  // ============ INVENTORY METHODS ============
+
+  /// Map of food item ID to quantity owned
+  Map<String, int> _foodInventory = {};
+
+  /// Get current food inventory
+  Map<String, int> get foodInventory => Map.unmodifiable(_foodInventory);
+
+  /// Add food to inventory
+  void addFood(String id, int quantity) {
+    if (quantity > 0) {
+      _foodInventory[id] = (_foodInventory[id] ?? 0) + quantity;
+    }
+  }
+
+  /// Remove food from inventory. Returns true if successful.
+  bool removeFood(String id, {int quantity = 1}) {
+    final current = _foodInventory[id] ?? 0;
+    if (current >= quantity) {
+      _foodInventory[id] = current - quantity;
+      if (_foodInventory[id] == 0) {
+        _foodInventory.remove(id);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Get quantity of specific food item
+  int getFoodQuantity(String id) => _foodInventory[id] ?? 0;
+
   // ============ PERSISTENCE ============
 
   /// Save current state to SharedPreferences
@@ -251,6 +282,11 @@ class PetStats {
     await prefs.setStringList('pet_unlocked_clothing', _unlockedClothingIds);
     final equippedList = _equippedClothing.entries.map((e) => '${e.key}:${e.value}').toList();
     await prefs.setStringList('pet_equipped_clothing', equippedList);
+    
+    // Save inventory
+    final inventoryList = _foodInventory.entries.map((e) => '${e.key}:${e.value}').toList();
+    await prefs.setStringList('pet_food_inventory', inventoryList);
+    
     await prefs.setInt('pet_last_update', _lastUpdateTime.millisecondsSinceEpoch);
   }
 
@@ -274,6 +310,19 @@ class PetStats {
       }
     }
     
+    // Load inventory
+    final inventoryList = prefs.getStringList('pet_food_inventory') ?? [];
+    _foodInventory.clear();
+    for (final entry in inventoryList) {
+      final parts = entry.split(':');
+      if (parts.length == 2) {
+        final qty = int.tryParse(parts[1]);
+        if (qty != null && qty > 0) {
+          _foodInventory[parts[0]] = qty;
+        }
+      }
+    }
+    
     final lastUpdateMs = prefs.getInt('pet_last_update');
     
     if (lastUpdateMs != null) {
@@ -294,11 +343,12 @@ class PetStats {
     int? silverCoins,
     List<String>? unlockedClothingIds,
     Map<String, String>? equippedClothing,
+    Map<String, int>? foodInventory,
     double? hungerDecayRate,
     double? happinessGainRate,
     double? happinessDecayRate,
   }) {
-    return PetStats(
+    final copy = PetStats(
       hunger: hunger ?? _hunger,
       happiness: happiness ?? _happiness,
       happinessBuffer: happinessBuffer ?? _happinessBuffer,
@@ -310,6 +360,15 @@ class PetStats {
       happinessGainRate: happinessGainRate ?? this.happinessGainRate,
       happinessDecayRate: happinessDecayRate ?? this.happinessDecayRate,
     );
+    
+    // Copy inventory
+    if (foodInventory != null) {
+      copy._foodInventory = Map.from(foodInventory);
+    } else {
+      copy._foodInventory = Map.from(_foodInventory);
+    }
+    
+    return copy;
   }
 
   @override

@@ -130,4 +130,13 @@ class VirtualPetGame extends FlameGame {
 
   /// Get happiness buffer value for display
   double get happinessBuffer => currentPet.stats.happinessBuffer;
+  
+  /// Get food inventory safely (returns empty map if not initialized)
+  Map<String, int> getFoodInventory() {
+    if (_currentPet == null) return {};
+    return _currentPet!.stats.foodInventory;
+  }
+  
+  /// Check if game is ready (pet is initialized)
+  bool get isReady => _currentPet != null;
 }

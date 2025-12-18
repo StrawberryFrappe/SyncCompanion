@@ -10,8 +10,10 @@ import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
 import 'widgets/stat_indicator.dart';
 import 'widgets/currency_display.dart';
-import 'widgets/food_menu.dart';
+import '../game/items/food_item.dart';
+import 'widgets/food_menu.dart'; // Is now FoodStore inside
 import 'widgets/wardrobe_menu.dart';
+import 'widgets/fridge_widget.dart';
 
 /// GameScreen - The main screen of the app.
 /// Uses a Stack to layer the Flame game underneath a minimal HUD overlay.
@@ -185,8 +187,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     return Scaffold(
       body: Stack(
         children: [
-          // Layer 1: The Flame game (background)
-          GameWidget(game: _game),
+          // Layer 1: The Flame game (background) with DragTarget
+          Positioned.fill(
+            child: DragTarget<FoodItem>(
+              onWillAccept: (data) => true,
+              onAccept: (item) {
+                // Guard against accessing pet before initialized
+                if (!_game.isReady) return;
+                // Determine if successful
+                if (_game.currentPet.stats.removeFood(item.id)) {
+                  _game.currentPet.eat(item);
+                  _saveStats();
+                  setState(() {}); // Update Fridge UI
+                }
+              },
+              builder: (context, candidates, rejects) {
+                // Visual feedback when dragging food over the game area
+                if (candidates.isNotEmpty) {
+                  return Container(
+                    color: Colors.green.withOpacity(0.1),
+                    child: GameWidget(game: _game),
+                  );
+                }
+                return GameWidget(game: _game);
+              },
+            ),
+          ),
           
           // Layer 2: Main HUD (Top Center)
           SafeArea(
@@ -293,6 +319,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
+          // Layer 6: Fridge (Bottom Center)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 0, left: 100, right: 100),
+                child: FridgeWidget(
+                  inventory: _game.getFoodInventory(),
+                ),
+              ),
+            ),
+          ),
+
           // Layer 5: Food Shop Button (Bottom Right)
           SafeArea(
             child: Align(
@@ -306,8 +345,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     heroTag: 'food_btn',
                     backgroundColor: Colors.orange.shade300,
                     shape: CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
-                    onPressed: _openFoodMenu,
-                    child: const Icon(Icons.lunch_dining, color: Colors.black, size: 32),
+                    onPressed: _openFoodStore,
+                    child: const Icon(Icons.store, color: Colors.black, size: 32),
                   ),
                 ),
               ),
@@ -339,17 +378,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _openFoodMenu() {
+  void _openFoodStore() {
+    if (!_game.isReady) return;
     showDialog(
       context: context,
-      builder: (context) => FoodMenu(
+      builder: (context) => FoodStore(
         currentSilver: _game.currentPet.stats.silverCoins,
         onBuy: (item) {
-          // Check affordability again just in case
+          // Check affordability
           if (_game.currentPet.stats.spendSilver(item.cost)) {
-             _game.currentPet.eat(item);
+             // Add to inventory instead of feeding immediately
+             _game.currentPet.stats.addFood(item.id, 1);
              _saveStats(); // Save immediately
-             setState(() {}); // Update UI to show new silver/stats
+             setState(() {}); // Update UI to show new silver
           }
         },
       ),
@@ -357,6 +398,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _openWardrobeMenu() {
+    if (!_game.isReady) return;
     showDialog(
       context: context,
       builder: (context) => WardrobeMenuWidget(

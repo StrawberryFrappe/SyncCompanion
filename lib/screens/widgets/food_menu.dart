@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../game/items/food_item.dart';
 
-class FoodMenu extends StatelessWidget {
+class FoodStore extends StatelessWidget {
   final int currentSilver;
   final Function(FoodItem) onBuy;
 
-  const FoodMenu({
+  const FoodStore({
     super.key,
     required this.currentSilver,
     required this.onBuy,
@@ -15,7 +15,8 @@ class FoodMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(16),
+      // Increased insetPadding to make dialog smaller (popup style)
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -32,7 +33,7 @@ class FoodMenu extends StatelessWidget {
               children: [
                 const Expanded(
                   child: Text(
-                    'FOOD MENU',
+                    'FOOD STORE',
                     style: TextStyle(
                       fontFamily: 'Monocraft',
                       fontSize: 18,
@@ -70,7 +71,7 @@ class FoodMenu extends StatelessWidget {
                 shrinkWrap: true,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.9,
+                  childAspectRatio: 0.85,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
@@ -80,7 +81,7 @@ class FoodMenu extends StatelessWidget {
                   final canAfford = currentSilver >= item.cost;
                   
                   return Opacity(
-                    opacity: canAfford ? 1.0 : 0.5,
+                    opacity: canAfford ? 1.0 : 0.7,
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -108,14 +109,14 @@ class FoodMenu extends StatelessWidget {
                               backgroundColor: canAfford ? Colors.green.shade100 : Colors.grey.shade300,
                               foregroundColor: Colors.black,
                               side: const BorderSide(width: 1, color: Colors.black),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
                             ),
                             onPressed: canAfford 
                                 ? () {
                                     onBuy(item);
-                                    Navigator.of(context).pop();
                                   } 
                                 : null,
-                            child: Text('${item.cost} S'),
+                            child: Text('Buy ${item.cost} S'),
                           ),
                         ],
                       ),

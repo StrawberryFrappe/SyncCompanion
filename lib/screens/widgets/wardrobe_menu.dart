@@ -25,7 +25,8 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(16),
+      // Increased insetPadding to match FoodStore/Popup style
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -103,28 +104,29 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Item View
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Image.asset(
-                              item.assetPath,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.none,
-                              errorBuilder: (c, e, s) => Opacity(
-                                opacity: 0.5,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.checkroom, size: 32, color: Colors.grey),
-                                    const SizedBox(height: 4),
-                                    Text('Missing Asset', style: TextStyle(fontSize: 8, color: Colors.red)),
-                                  ],
-                                ),
+                        // Item View - Fixed Size 64x64
+                        SizedBox(
+                          width: 64,
+                          height: 64,
+                          child: Image.asset(
+                            item.assetPath,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.none,
+                            errorBuilder: (c, e, s) => Opacity(
+                              opacity: 0.5,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.checkroom, size: 32, color: Colors.grey),
+                                  const SizedBox(height: 4),
+                                  Text('Missing', style: TextStyle(fontSize: 8, color: Colors.red)),
+                                ],
                               ),
                             ),
                           ),
                         ),
+                        
+                        const SizedBox(height: 8),
                         
                         Text(
                           item.name,
@@ -138,7 +140,7 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
                         
                         // Action Button
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           child: SizedBox(
                             width: double.infinity,
                             height: 32,
