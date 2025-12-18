@@ -187,6 +187,48 @@ class MainActivity : FlutterActivity() {
 						result.error("pref_failed", e.toString(), null)
 					}
 				}
+				"showPetAlert" -> {
+					try {
+						val title = call.argument<String>("title") ?: "Pet Alert"
+						val message = call.argument<String>("message") ?: "Your pet needs attention!"
+						
+						// Create notification channel for pet alerts (Android 8+)
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+							val channelId = "pet_alerts"
+							val channelName = "Pet Alerts"
+							val importance = NotificationManager.IMPORTANCE_HIGH
+							val channel = NotificationChannel(channelId, channelName, importance).apply {
+								description = "Notifications about your pet's wellbeing"
+								enableVibration(true)
+							}
+							val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+							notificationManager.createNotificationChannel(channel)
+						}
+						
+						// Build and show the notification
+						val notification = NotificationCompat.Builder(this, "pet_alerts")
+							.setSmallIcon(android.R.drawable.ic_dialog_alert)
+							.setContentTitle(title)
+							.setContentText(message)
+							.setPriority(NotificationCompat.PRIORITY_HIGH)
+							.setAutoCancel(true)
+							.build()
+						
+						val notificationManager = NotificationManagerCompat.from(this)
+						// Check notification permission on Android 13+
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+							if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+								notificationManager.notify(3001, notification)
+							}
+						} else {
+							notificationManager.notify(3001, notification)
+						}
+						
+						result.success(true)
+					} catch (e: Exception) {
+						result.error("pet_alert_failed", e.toString(), null)
+					}
+				}
 				else -> result.notImplemented()
 			}
 		}
