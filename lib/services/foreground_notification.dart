@@ -92,7 +92,7 @@ class ForegroundNotificationUpdater {
 
     // Read user preference whether to show live data
     final prefs = await SharedPreferences.getInstance();
-    final showData = prefs.getBool('notif_show_data') ?? true;
+    final showData = prefs.getBool('notif_show_data') ?? false;
     final text = showData ? (_pending ?? '') : 'Your device is synced';
     _pending = null;
     _lastSent = text;

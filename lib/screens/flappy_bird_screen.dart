@@ -1,6 +1,7 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../game/minigames/flappy_bird/flappy_bird_game.dart';
 import '../../game/pets/pet_stats.dart';
@@ -33,6 +34,15 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    // Keep screen on while playing
+    WakelockPlus.enable();
+  }
+  
+  @override
+  void dispose() {
+    // Allow screen to turn off again
+    WakelockPlus.disable();
+    super.dispose();
   }
   
   Future<void> _loadSettings() async {

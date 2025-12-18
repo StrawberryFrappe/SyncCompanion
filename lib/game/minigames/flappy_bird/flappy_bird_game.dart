@@ -44,8 +44,8 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   // These getters compute values based on actual screen size
   double get gravity => size.y * 1.2; // Falls across screen in ~1.3s
   double get flapVelocity => size.y * -0.45; // Jumps about 45% of screen height
-  double get pipeSpeed => size.x * 0.15; // Crosses screen in ~6.5s
-  static const double pipeSpawnInterval = 3.0; // Seconds between pipes
+  double get pipeSpeed => size.x * 0.17; // Crosses screen in ~6s (slightly faster)
+  static const double pipeSpawnInterval = 3.5; // Seconds between pipes (more spread out)
   
   // Screen-relative layout
   double get groundHeight => size.y * 0.06; // 6% of screen height

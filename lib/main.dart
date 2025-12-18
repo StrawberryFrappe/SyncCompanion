@@ -15,7 +15,7 @@ Future<void> main() async {
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
       channelId: 'sync_companion_fg',
-      channelName: 'Sync Companion Service',
+      channelName: 'Therapets Service',
       channelDescription: 'Foreground service for keeping BLE active',
       onlyAlertOnce: true,
     ),
@@ -43,7 +43,7 @@ class SyncCompanionApp extends StatelessWidget {
     final base = ThemeData.light();
     final appTextTheme = base.textTheme.apply(fontFamily: 'Monocraft', bodyColor: Colors.black);
     return MaterialApp(
-      title: 'Sync Companion',
+      title: 'Therapets',
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
         textTheme: appTextTheme,

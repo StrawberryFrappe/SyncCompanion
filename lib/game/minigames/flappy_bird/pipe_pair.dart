@@ -103,7 +103,7 @@ class PipePair extends PositionComponent with HasGameReference {
       final bottomPipeTop = gapY + gapHeight / 2;
       
       // Check if circle overlaps with top pipe (extends from y=0 to topPipeBottom)
-      final nearestTopY = playerCenter.y.clamp(0, topPipeBottom);
+      final nearestTopY = playerCenter.y.clamp(0.0, topPipeBottom);
       final nearestTopX = playerCenter.x.clamp(position.x, position.x + pipeWidth);
       final distToTop = (playerCenter - Vector2(nearestTopX, nearestTopY)).length;
       

@@ -81,7 +81,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     final v = prefs.getBool('notif_show_data');
     setState(() {
-      _notifShowData = v == null ? true : v;
+      _notifShowData = v == null ? false : v;
       _loading = false;
     });
   }
