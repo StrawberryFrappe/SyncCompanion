@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'settings_page.dart';
 import '../game/virtual_pet_game.dart';
-import '../services/bluetooth_service.dart' as bt_service;
+import '../services/device_service.dart';
 import '../services/foreground_notification.dart';
 
 /// DevToolsSettings - Contains all Bluetooth pairing, telemetry, diagnostic
@@ -29,7 +29,7 @@ class DevToolsSettings extends StatefulWidget {
 }
 
 class _DevToolsSettingsState extends State<DevToolsSettings> {
-  final bt_service.BluetoothService _bt = bt_service.BluetoothService();
+  final DeviceService _device = DeviceService();
   BluetoothDevice? _connectedDevice;
   String _incoming = '';
   String _status = 'SEARCHING';
@@ -47,8 +47,8 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
 
   StreamSubscription<BluetoothDevice?>? _connSub;
   StreamSubscription<String>? _incomingSub;
-  StreamSubscription<bt_service.BluetoothUserAction>? _userActionSub;
-  StreamSubscription<bool>? _nativeConnSub;
+  StreamSubscription<BluetoothUserAction>? _userActionSub;
+  StreamSubscription<DeviceConnectionState>? _connStateSub;
 
   bool _isConnected = false;
   bool _nativeStatusReceived = false;
@@ -73,12 +73,12 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   void initState() {
     super.initState();
     _init();
-    _bt.init();
+    _device.init();
     _loadPersisted();
     _loadPersistedRates();
     _loadFakeSyncSettings();
-    _userActionSub = _bt.userAction$.listen((a) => _handleUserAction(a));
-    _connSub = _bt.connectedDevice$.listen((d) {
+    _userActionSub = _device.userAction$.listen((a) => _handleUserAction(a));
+    _connSub = _device.connectedDevice$.listen((d) {
       setState(() {
         _connectedDevice = d;
         if (d != null) {
@@ -97,7 +97,8 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
         _startBackgroundTask();
       }
     });
-    _nativeConnSub = _bt.nativeConnected$.listen((connected) {
+    _connStateSub = _device.connectionState$.listen((state) {
+      final connected = state == DeviceConnectionState.connected;
       _nativeStatusReceived = true;
       setState(() {
         _isConnected = connected;
@@ -110,7 +111,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
         _loadPersistedDeviceId();
       }
     });
-    _incomingSub = _bt.incomingData$.listen((s) {
+    _incomingSub = _device.incomingData$.listen((s) {
       setState(() => _incoming = s);
     });
 
@@ -128,7 +129,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     _incomingSub?.cancel();
     _userActionSub?.cancel();
     _userActionSub?.cancel();
-    _nativeConnSub?.cancel();
+    _connStateSub?.cancel();
     // _bt.dispose(); // Do not dispose the singleton service!
     super.dispose();
   }
@@ -144,7 +145,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
       final running = await _platform.invokeMethod('isNativeServiceRunning');
       setState(() => _bgServiceRunning = (running == true));
     } catch (_) {}
-    setState(() => _debugInfo = Map<String, String>.from(_bt.debugInfo));
+    setState(() => _debugInfo = Map<String, String>.from(_device.debugInfo));
   }
 
   Future<void> _loadPersisted() async {
@@ -208,9 +209,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     widget.onSyncStatusChanged?.call(effectiveStatus);
   }
 
-  Future<void> _handleUserAction(bt_service.BluetoothUserAction action) async {
+  Future<void> _handleUserAction(BluetoothUserAction action) async {
     try {
-      if (action.type == bt_service.BluetoothUserActionType.enableBluetooth) {
+      if (action.type == BluetoothUserActionType.enableBluetooth) {
         final pressed = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
@@ -223,10 +224,10 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           ),
         );
         if (pressed == true) {
-          final enabled = await _bt.performEnableBluetooth();
+          final enabled = await _device.performEnableBluetooth();
           setState(() => _adapterState = enabled ? 'ON' : 'OFF');
         }
-      } else if (action.type == bt_service.BluetoothUserActionType.requestPermissions) {
+      } else if (action.type == BluetoothUserActionType.requestPermissions) {
         final pressed = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
@@ -239,8 +240,8 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           ),
         );
         if (pressed == true) {
-          final ok = await _bt.performRequestPermissions();
-          setState(() => _permissionStatuses = _bt.permissionStatuses);
+          final ok = await _device.performRequestPermissions();
+          setState(() => _permissionStatuses = _device.permissionStatuses);
           if (!ok) {
             await showDialog<void>(context: context, builder: (c) => AlertDialog(
               title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
@@ -256,8 +257,8 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   }
 
   Future<void> _startBackgroundTask() async {
-    await _bt.performRequestPermissions();
-    setState(() => _permissionStatuses = _bt.permissionStatuses);
+    await _device.performRequestPermissions();
+    setState(() => _permissionStatuses = _device.permissionStatuses);
     final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
     final connectOk = _permissionStatuses['android.permission.BLUETOOTH_CONNECT'] == true || _permissionStatuses['BLUETOOTH_CONNECT'] == true;
     if (!scanOk || !connectOk) {
@@ -299,7 +300,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     if (_scanning) return;
     setState(() => _scanning = true);
     try {
-      await _bt.startScan(timeout: _scanTimeout);
+      await _device.startScan(timeout: _scanTimeout);
     } catch (e) {
       print('startScan error: $e');
     }
@@ -307,7 +308,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
 
   Future<void> _stopScan() async {
     try {
-      await _bt.stopScan();
+      await _device.stopScan();
     } catch (_) {}
     setState(() => _scanning = false);
   }
@@ -315,7 +316,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   Future<void> _connectTo(BluetoothDevice device, {bool save = true}) async {
     try {
       setState(() => _status = 'CONNECTING');
-      await _bt.connect(device, save: save);
+      await _device.connect(device);
     } catch (e) {
       setState(() => _status = 'SEARCHING');
     }
@@ -325,7 +326,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('saved_device_id');
     try {
-      await _bt.disconnect();
+      await _device.disconnect();
     } catch (_) {}
     setState(() {
       _incoming = '';
@@ -387,9 +388,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
               const SizedBox(height: 8),
               Expanded(
                 child: _connectedDevice != null
-                    ? ConnectedTerminal(bt: _bt, maxLines: 200)
+                    ? ConnectedTerminal(device: _device, maxLines: 200)
                     : StreamBuilder<List<ScanResult>>(
-                        stream: _bt.foundDevices$,
+                        stream: _device.foundDevices$,
                         builder: (ctx, snap) {
                           final found = snap.data ?? const [];
                           return ListView.separated(
@@ -714,7 +715,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                     side: const BorderSide(width: 2, color: Colors.black),
                   ),
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => SettingsPage(bt: _bt, game: widget.game)),
+                    MaterialPageRoute(builder: (_) => SettingsPage(device: _device, game: widget.game)),
                   ).then((_) {
                     // Reload fake sync settings after returning from Advanced Settings
                     _loadFakeSyncSettings().then((_) {
@@ -786,9 +787,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
 // A small terminal-like widget that subscribes to the BluetoothService
 // raw stream and shows a rolling buffer of recent packets in hex.
 class ConnectedTerminal extends StatefulWidget {
-  const ConnectedTerminal({super.key, required this.bt, this.maxLines = 100});
+  const ConnectedTerminal({super.key, required this.device, this.maxLines = 100});
 
-  final bt_service.BluetoothService bt;
+  final DeviceService device;
   final int maxLines;
 
   @override
@@ -805,7 +806,7 @@ class _ConnectedTerminalState extends State<ConnectedTerminal> {
   @override
   void initState() {
     super.initState();
-    _sub = widget.bt.incomingRaw$.listen((bytes) {
+    _sub = widget.device.incomingRaw$.listen((bytes) {
       final s = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
       setState(() {
         _lastPacketAt = DateTime.now();

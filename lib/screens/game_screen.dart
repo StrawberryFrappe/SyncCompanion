@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/virtual_pet_game.dart';
-import '../services/bluetooth_service.dart';
+import '../services/device_service.dart';
 import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
 import 'flappy_bird_screen.dart';
@@ -31,7 +31,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final VirtualPetGame _game;
-  late final BluetoothService _bluetoothService;
+  late final DeviceService _deviceService;
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   
   bool _isDeviceSynced = false;
@@ -49,8 +49,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _game = VirtualPetGame();
-    _bluetoothService = BluetoothService();
-    _bluetoothService.init();
+    _deviceService = DeviceService();
+    _deviceService.init();
     _initializeGame();
     _listenToSyncStatus();
     
@@ -502,7 +502,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => FlappyBirdScreen(
-                  bluetoothService: _bluetoothService,
+                  deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
                   isDeviceConnected: _isDeviceSynced,
                 ),
@@ -516,7 +516,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => OrchestraScreen(
-                  bluetoothService: _bluetoothService,
+                  deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
                   isDeviceConnected: _isDeviceSynced,
                 ),

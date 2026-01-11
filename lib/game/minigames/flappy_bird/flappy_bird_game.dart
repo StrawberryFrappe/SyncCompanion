@@ -6,7 +6,7 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 
-import '../../../services/bluetooth_service.dart';
+import '../../../services/device_service.dart';
 import '../../../services/telemetry_data.dart';
 import '../../pets/pet_stats.dart';
 import 'flappy_pet.dart';
@@ -16,7 +16,7 @@ import 'pipe_pair.dart';
 /// Flappy Bird-style minigame using motion input from IMU sensor.
 /// Falls back to tap-to-jump when no device connected (uses food sprite).
 class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection {
-  final BluetoothService bluetoothService;
+  final DeviceService deviceService;
   final PetStats petStats;
   final VoidCallback onGameOver;
   
@@ -37,7 +37,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   
   // Components
   late dynamic _player; // FlappyPet or FlappyFood
-  StreamSubscription<List<int>>? _telemetrySub;
+  StreamSubscription<TelemetryData>? _telemetrySub;
   Timer? _pipeSpawnTimer;
   
   // Screen-relative physics (values as % of screen height/width)
@@ -57,7 +57,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   static const Duration flapCooldown = Duration(milliseconds: 300);
 
   FlappyBirdGame({
-    required this.bluetoothService,
+    required this.deviceService,
     required this.petStats,
     required this.onGameOver,
     this.jumpThreshold = 1.5,
@@ -91,20 +91,15 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     
     // Subscribe to raw telemetry if connected
     if (isDeviceConnected) {
-      _telemetrySub = bluetoothService.incomingRaw$.listen(
-        (bytes) {
-          final data = TelemetryData.fromBytes(bytes);
-          if (data != null) {
-            _onTelemetry(data);
-          }
-        },
+      _telemetrySub = deviceService.telemetry$.listen(
+        _onTelemetry,
         onError: (e) => print('[FlappyBird] Telemetry stream error: $e'),
       );
       
       // Request native status to ensure telemetry stream receives fresh data.
       // This fixes motion controls not responding on first connect or reconnect
       // because broadcast streams don't replay past events to new subscribers.
-      bluetoothService.requestNativeStatus();
+      deviceService.requestNativeStatus();
     }
   }
 

@@ -4,17 +4,17 @@ import 'package:flutter/services.dart';
 
 import '../game/minigames/orchestra/orchestra_game.dart';
 import '../game/pets/pet_stats.dart';
-import '../services/bluetooth_service.dart';
+import '../../services/device_service.dart';
 
 /// Screen wrapper for the Orchestra minigame.
 class OrchestraScreen extends StatefulWidget {
-  final BluetoothService bluetoothService;
+  final DeviceService deviceService;
   final PetStats petStats;
   final bool isDeviceConnected;
 
   const OrchestraScreen({
     super.key,
-    required this.bluetoothService,
+    required this.deviceService,
     required this.petStats,
     this.isDeviceConnected = false,
   });
@@ -37,7 +37,7 @@ class _OrchestraScreenState extends State<OrchestraScreen> {
     ]);
     
     _game = OrchestraGame(
-      bluetoothService: widget.bluetoothService,
+      deviceService: widget.deviceService,
       petStats: widget.petStats,
       isDeviceConnected: widget.isDeviceConnected,
       onExit: () {

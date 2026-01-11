@@ -13,6 +13,9 @@ class TonePlayer {
   /// Duration of the generated audio buffer in seconds
   static const double bufferDuration = 2.0;
   
+  /// Base frequency for the generated sample (A4)
+  static const double baseFrequency = 440.0;
+
   TonePlayer();
   
   /// Start playing a tone at the specified frequency and volume.
@@ -20,37 +23,35 @@ class TonePlayer {
   /// [volume] from 0.0 to 1.0
   Future<void> startTone(double frequency, double volume) async {
     if (_isPlaying) {
-      // Just update volume if already playing
+      // Update volume and pitch if already playing
       await _player.setVolume(volume.clamp(0.0, 1.0));
+      await _player.setPlaybackRate(frequency / baseFrequency);
       return;
     }
     
-    // Generate WAV data for the tone
-    final wavBytes = _generateSineWave(frequency, bufferDuration);
+    // Generate WAV data for the base tone if needed (or just once)
+    // We generate it every start to be safe, but it's fast enough for "note on".
+    // For glides, we use setFrequency which uses playbackRate.
+    final wavBytes = _generateSineWave(baseFrequency, bufferDuration);
     
-    // Play from bytes
-    await _player.setVolume(volume.clamp(0.0, 1.0));
     await _player.setReleaseMode(ReleaseMode.loop);
-    await _player.play(BytesSource(wavBytes));
+    await _player.setSource(BytesSource(wavBytes));
+    await _player.setVolume(volume.clamp(0.0, 1.0));
+    await _player.setPlaybackRate(frequency / baseFrequency);
+    await _player.resume();
     _isPlaying = true;
   }
   
-  /// Change pitch (regenerate audio at new frequency)
+  /// Change pitch smoothly using playback rate
   Future<void> setFrequency(double frequency, double volume) async {
     if (!_isPlaying) {
       await startTone(frequency, volume);
       return;
     }
     
-    // Stop current and start new tone at target frequency
-    await _player.stop();
-    _isPlaying = false;
-    
-    final wavBytes = _generateSineWave(frequency, bufferDuration);
+    // Update pitch and volume
+    await _player.setPlaybackRate(frequency / baseFrequency);
     await _player.setVolume(volume.clamp(0.0, 1.0));
-    await _player.setReleaseMode(ReleaseMode.loop);
-    await _player.play(BytesSource(wavBytes));
-    _isPlaying = true;
   }
   
   /// Update volume while playing
@@ -61,6 +62,8 @@ class TonePlayer {
   /// Stop the currently playing tone
   Future<void> stopTone() async {
     if (_isPlaying) {
+      await _player.pause(); // Pause instead of stop to keep source ready?
+      // Actually stop is fine.
       await _player.stop();
       _isPlaying = false;
     }
@@ -84,14 +87,15 @@ class TonePlayer {
     // Generate sine wave samples
     for (int i = 0; i < numSamples; i++) {
       final t = i / sampleRate;
-      // Apply fade in/out at ends to avoid clicks
+      // Loop seamlessly: ensure end phase matches start phase
+      // This simple implementation might click if frequency * duration is not integer.
+      // But since we loop the base 440Hz tone, 440 * 2.0 = 880 cycles. Exact integer.
+      // So looping should be clean.
+      
       double amplitude = 0.8;
-      const fadeLength = 0.01; // 10ms fade
-      if (t < fadeLength) {
-        amplitude *= t / fadeLength;
-      } else if (t > duration - fadeLength) {
-        amplitude *= (duration - t) / fadeLength;
-      }
+      // No fade needed if we loop perfectly? 
+      // Fade in/out causes volume dip on loop. 
+      // Let's remove fade for the looper.
       
       samples[i] = (sin(2 * pi * frequency * t) * amplitude * 32767).toInt();
     }

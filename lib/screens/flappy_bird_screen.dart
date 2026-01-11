@@ -5,17 +5,17 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../game/minigames/flappy_bird/flappy_bird_game.dart';
 import '../../game/pets/pet_stats.dart';
-import '../../services/bluetooth_service.dart';
+import '../../services/device_service.dart';
 
 /// Screen that hosts the Flappy Bird game with title overlay and game over dialog.
 class FlappyBirdScreen extends StatefulWidget {
-  final BluetoothService bluetoothService;
+  final DeviceService deviceService;
   final PetStats petStats;
   final bool isDeviceConnected;
 
   const FlappyBirdScreen({
     super.key,
-    required this.bluetoothService,
+    required this.deviceService,
     required this.petStats,
     required this.isDeviceConnected,
   });
@@ -62,7 +62,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
     setState(() {
       _showTitleScreen = false;
       _game = FlappyBirdGame(
-        bluetoothService: widget.bluetoothService,
+        deviceService: widget.deviceService,
         petStats: widget.petStats,
         isDeviceConnected: widget.isDeviceConnected,
         jumpThreshold: _jumpThreshold,

@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../services/bluetooth_service.dart' as bt_service;
+import '../services/device_service.dart';
 import '../game/virtual_pet_game.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.bt, this.game});
+  const SettingsPage({super.key, required this.device, this.game});
 
-  final bt_service.BluetoothService bt;
+  final DeviceService device;
   final VirtualPetGame? game;
 
   @override
@@ -42,7 +42,7 @@ class _SettingsPageState extends State<SettingsPage> {
   
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   Timer? _statDisplayTimer;
-  StreamSubscription<bool>? _nativeConnSub;
+  StreamSubscription<DeviceConnectionState>? _nativeConnSub;
 
   @override
   void initState() {
@@ -53,8 +53,9 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadFakeSyncSettings();
     _loadDebugInfo();
     
-    _nativeConnSub = widget.bt.nativeConnected$.listen((connected) {
+    _nativeConnSub = widget.device.connectionState$.listen((state) {
       if (!mounted) return;
+      final connected = state == DeviceConnectionState.connected;
       setState(() {
         _isConnected = connected;
         _nativeStatusReceived = true;
@@ -163,7 +164,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.setBool('notif_show_data', v);
     setState(() => _notifShowData = v);
     try {
-      await widget.bt.setNotifShowData(v);
+      await widget.device.setNotifShowData(v);
     } catch (_) {}
   }
   
@@ -687,7 +688,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 4),
             SizedBox(
               height: 200,
-              child: ConnectedTerminal(bt: widget.bt, maxLines: 100),
+              child: ConnectedTerminal(device: widget.device, maxLines: 100),
             ),
           ],
           
@@ -710,9 +711,9 @@ class _SettingsPageState extends State<SettingsPage> {
 // A small terminal-like widget that subscribes to the BluetoothService
 // raw stream and shows a rolling buffer of recent packets in hex.
 class ConnectedTerminal extends StatefulWidget {
-  const ConnectedTerminal({super.key, required this.bt, this.maxLines = 100});
+  const ConnectedTerminal({super.key, required this.device, this.maxLines = 100});
 
-  final bt_service.BluetoothService bt;
+  final DeviceService device;
   final int maxLines;
 
   @override
@@ -728,7 +729,7 @@ class _ConnectedTerminalState extends State<ConnectedTerminal> {
   @override
   void initState() {
     super.initState();
-    _sub = widget.bt.incomingRaw$.listen((bytes) {
+    _sub = widget.device.incomingRaw$.listen((bytes) {
       final s = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
       setState(() {
         _lastPacketAt = DateTime.now();

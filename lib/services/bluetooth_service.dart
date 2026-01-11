@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'telemetry_data.dart';
+
 
 // Events that instruct the UI to show a dialog or request user input.
 enum BluetoothUserActionType { enableBluetooth, requestPermissions }
@@ -52,22 +52,7 @@ class BluetoothService {
   Stream<String> get incomingData$ => _incomingController.stream;
   Stream<List<int>> get incomingRaw$ => _incomingRawController.stream;
   
-  /// Decoded telemetry stream for game input and visualization.
-  /// Filters out invalid packets (non-12-byte payloads).
-  Stream<TelemetryData> get telemetryData$ => _incomingRawController.stream
-      .map((bytes) {
-        final data = TelemetryData.fromBytes(bytes);
-        if (BLE_DEBUG) {
-          if (data != null) {
-            print('BLE: Decoded telemetry: mag=${data.magnitude.toStringAsFixed(2)}g from ${bytes.length} bytes');
-          } else {
-            print('BLE: Failed to decode telemetry from ${bytes.length} bytes (need 12)');
-          }
-        }
-        return data;
-      })
-      .where((data) => data != null)
-      .cast<TelemetryData>();
+
 
   // Debug information mapping (rssi/adv payload) for UI diagnostics.
   final Map<String, String> _debugInfo = {};
