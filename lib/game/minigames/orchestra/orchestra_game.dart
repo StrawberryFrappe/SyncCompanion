@@ -7,7 +7,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 
 import '../../../services/device_service.dart';
-import '../../../services/telemetry_data.dart';
+
 import '../../pets/pet_stats.dart';
 import 'cursor.dart';
 import 'pet_musician.dart';

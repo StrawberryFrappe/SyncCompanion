@@ -7,7 +7,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 
 import '../../../services/device_service.dart';
-import '../../../services/telemetry_data.dart';
+
 import '../../pets/pet_stats.dart';
 import 'flappy_pet.dart';
 import 'flappy_food.dart';
@@ -20,7 +20,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   final PetStats petStats;
   final VoidCallback onGameOver;
   
-  /// Jump threshold in g (magnitude of acceleration vector)
+  /// Jump threshold - now handled in DeviceService, but we can set it
   double jumpThreshold;
   
   /// Coin divisor (silver coins = score / divisor)
@@ -37,7 +37,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   
   // Components
   late dynamic _player; // FlappyPet or FlappyFood
-  StreamSubscription<TelemetryData>? _telemetrySub;
+  StreamSubscription<DeviceEvent>? _eventSub;
   Timer? _pipeSpawnTimer;
   
   // Screen-relative physics (values as % of screen height/width)
@@ -89,11 +89,14 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     // Add score display
     add(ScoreDisplay(game: this));
     
-    // Subscribe to raw telemetry if connected
+    // Subscribe to events if connected
     if (isDeviceConnected) {
-      _telemetrySub = deviceService.telemetry$.listen(
-        _onTelemetry,
-        onError: (e) => print('[FlappyBird] Telemetry stream error: $e'),
+      // Set the threshold in service
+      deviceService.updateShakeThreshold(jumpThreshold);
+      
+      _eventSub = deviceService.events$.listen(
+        _onDeviceEvent,
+        onError: (e) => print('[FlappyBird] Event stream error: $e'),
       );
       
       // Request native status to ensure telemetry stream receives fresh data.
@@ -103,11 +106,10 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     }
   }
 
-  void _onTelemetry(TelemetryData data) {
+  void _onDeviceEvent(DeviceEvent event) {
     if (isGameOver || !hasStarted) return;
     
-    // Check if magnitude exceeds threshold
-    if (data.magnitude > jumpThreshold) {
+    if (event is ShakeEvent) {
       _tryFlap();
     }
   }
@@ -178,7 +180,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     if (isGameOver) return;
     isGameOver = true;
     _pipeSpawnTimer?.cancel();
-    _telemetrySub?.cancel();
+    _eventSub?.cancel();
     
     // Award silver coins
     final coins = score ~/ coinDivisor;
@@ -211,7 +213,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   @override
   void onRemove() {
     _pipeSpawnTimer?.cancel();
-    _telemetrySub?.cancel();
+    _eventSub?.cancel();
     super.onRemove();
   }
 }
