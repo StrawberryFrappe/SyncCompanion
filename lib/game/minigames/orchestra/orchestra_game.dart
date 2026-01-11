@@ -68,14 +68,40 @@ class OrchestraGame extends FlameGame with MultiTouchDragDetector, MultiTouchTap
   Future<void> onLoad() async {
     await super.onLoad();
     
-    // Calculate pet layout
-    final petWidth = size.x / (petCount + 1);
-    final petHeight = petWidth * 1.16; // Maintain aspect ratio
-    final baseY = size.y * 0.6; // Position pets at 60% down
+    // Calculate pet layout - constrain by both width and height
+    // to prevent overflow in landscape mode
+    const double aspectRatio = 25.0 / 29.0; // Pet sprite aspect ratio (width/height)
+    
+    // Maximum pet width based on horizontal space
+    final maxPetWidthFromScreen = size.x / (petCount + 1);
+    
+    // Maximum pet height based on vertical space (reserve top 30% for title/controls, bottom 10% margin)
+    final availableHeight = size.y * 0.6;
+    final maxPetHeightFromScreen = availableHeight * 0.7;
+    
+    // Determine actual size: use the constraint that is more limiting
+    double petHeight;
+    double petWidth;
+    
+    // Calculate height if width is the limiting factor
+    final heightFromWidth = maxPetWidthFromScreen / aspectRatio;
+    
+    if (heightFromWidth <= maxPetHeightFromScreen) {
+      // Width is the limiting factor
+      petWidth = maxPetWidthFromScreen;
+      petHeight = heightFromWidth;
+    } else {
+      // Height is the limiting factor
+      petHeight = maxPetHeightFromScreen;
+      petWidth = petHeight * aspectRatio;
+    }
+    
+    final baseY = size.y * 0.5 + petHeight * 0.3; // Center pets vertically in play area
+    final petSpacing = size.x / (petCount + 1);
     
     // Create musicians (visual only - no audio attached)
     for (int i = 0; i < petCount; i++) {
-      final xPos = petWidth * (i + 1);
+      final xPos = petSpacing * (i + 1);
       
       final musician = PetMusician(
         petStats: petStats,

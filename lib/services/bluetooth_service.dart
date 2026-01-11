@@ -167,8 +167,17 @@ class BluetoothService {
       // flows will start it deliberately to avoid scanning/running BLE when
       // the user hasn't requested it.
     } catch (_) {}
-  }  void _attachNativeEventStream() {
-    if (_nativeEventsAttached) return;
+  }
+
+  void _attachNativeEventStream() {
+    // If already attached, cancel and re-attach to ensure fresh connection
+    // This fixes issues where the native side might have dropped the receiver but we still think we are attached.
+    if (_nativeEventsAttached) {
+       _nativeEventsSub?.cancel();
+       _nativeEventsSub = null;
+       _nativeEventsAttached = false;
+    }
+
     try {
       final ev = EventChannel('sync_companion/ble_events');
       _nativeEventsSub = ev.receiveBroadcastStream().listen((dynamic event) {
@@ -211,6 +220,14 @@ class BluetoothService {
         } catch (_) {}
       }, onError: (e) {
         if (BLE_DEBUG) print('BLE: native event stream error: $e');
+        _nativeEventsAttached = false;
+        _nativeEventsSub?.cancel();
+        _nativeEventsSub = null;
+      }, onDone: () {
+        if (BLE_DEBUG) print('BLE: native event stream done');
+        _nativeEventsAttached = false;
+        _nativeEventsSub?.cancel();
+        _nativeEventsSub = null;
       });
       _nativeEventsAttached = true;
     } catch (e) {

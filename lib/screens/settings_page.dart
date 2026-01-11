@@ -42,6 +42,7 @@ class _SettingsPageState extends State<SettingsPage> {
   
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   Timer? _statDisplayTimer;
+  StreamSubscription<bool>? _nativeConnSub;
 
   @override
   void initState() {
@@ -52,7 +53,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadFakeSyncSettings();
     _loadDebugInfo();
     
-    widget.bt.nativeConnected$.listen((connected) {
+    _nativeConnSub = widget.bt.nativeConnected$.listen((connected) {
+      if (!mounted) return;
       setState(() {
         _isConnected = connected;
         _nativeStatusReceived = true;
@@ -74,6 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     _statDisplayTimer?.cancel();
+    _nativeConnSub?.cancel();
     super.dispose();
   }
 

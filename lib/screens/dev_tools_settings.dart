@@ -48,6 +48,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   StreamSubscription<BluetoothDevice?>? _connSub;
   StreamSubscription<String>? _incomingSub;
   StreamSubscription<bt_service.BluetoothUserAction>? _userActionSub;
+  StreamSubscription<bool>? _nativeConnSub;
 
   bool _isConnected = false;
   bool _nativeStatusReceived = false;
@@ -96,7 +97,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
         _startBackgroundTask();
       }
     });
-    _bt.nativeConnected$.listen((connected) {
+    _nativeConnSub = _bt.nativeConnected$.listen((connected) {
       _nativeStatusReceived = true;
       setState(() {
         _isConnected = connected;
@@ -126,7 +127,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     _connSub?.cancel();
     _incomingSub?.cancel();
     _userActionSub?.cancel();
-    _bt.dispose();
+    _userActionSub?.cancel();
+    _nativeConnSub?.cancel();
+    // _bt.dispose(); // Do not dispose the singleton service!
     super.dispose();
   }
 
