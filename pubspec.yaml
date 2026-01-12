@@ -17,6 +17,10 @@ dependencies:
   audioplayers: ^6.0.0
   wakelock_plus: ^1.2.8
   flutter_cube: ^0.1.1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  http: ^1.1.0
+  connectivity_plus: ^5.0.2
   # permission_handler removed due to Android embedding compatibility; runtime
   # permissions are requested via platform prompts where possible.
   # google_fonts removed in favor of bundled Monocraft.ttf

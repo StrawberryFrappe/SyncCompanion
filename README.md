@@ -136,14 +136,8 @@ flutter run -d <device-id>
 
 ## Development Status
 
-### Current Stage: Stage 3 — Telemetry Minigames (Accomplished)
-- [x] Game Framework (modular minigame screens)
-- [x] Input Hook (low-latency sensor data binding)
-- [x] Flappy Bird (shake to jump)
-- [x] Pet Orchestra (Theremin-style, tilt to conduct)
-- [x] Donut 3D Viewer (telemetry rotation, pinch-to-zoom)
-- [ ] Additional minigames (ongoing)
-- [ ] Polish and bug fixes (ongoing)
+### Current Stage: Stage 4 — Cloud Connectivity
+*Goals TBD — see `artifacts/DEVELOPMENT_STATUS.md` for details*
 
 ### Stage History
 | Stage | Focus | Status |
@@ -151,3 +145,4 @@ flutter run -d <device-id>
 | 1 | **Connectivity** — Background BLE stability | ✅ Complete |
 | 2 | **Virtual Pet Base** — Hunger, Happiness, Currency | ✅ Complete |
 | 3 | **Telemetry Minigames** — Motion-controlled games | ✅ Accomplished |
+| 4 | **Cloud Connectivity** — Mission system + cloud sync | 🚧 In Progress |

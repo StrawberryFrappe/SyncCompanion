@@ -34,13 +34,14 @@
     *   [ ] Additional minigames
     *   [ ] Bug fixes and polish
 
-### Phase 4: Cloud Connectivity
-*   **Goal**: Sync data to the cloud for deeper analysis/monitoring.
-*   [ ] Connect to Thingsboard via MQTT.
-*   [ ] Securely upload telemetry data.
-*   [ ] **Queueing**: Offline data queueing and background retry logic.
-*   [ ] **Security**: Secure storage for cloud credentials/tokens.
-*   [ ] **Background**: Handle permissions/entitlements for robust background execution (Android/iOS).
+### Phase 4: Cloud Connectivity (CURRENT)
+*   **Goal**: Report user engagement and mission completions to the cloud.
+*   [ ] **Mission System**: Generic framework for trackable tasks (e.g., "Walked 10 min", "Played minigame").
+*   [ ] **HTTP to Thingsboard**: Send batched events via HTTPS (not MQTT).
+*   [ ] **Event Payload**: Timestamped records of sync sessions and mission completions.
+*   [ ] **Persistent Queue**: SQLite/Hive queue that survives app restarts and prolonged offline periods.
+*   [ ] **Background Sync**: Retry uploads when connectivity returns.
+*   [ ] **Credentials**: Pre-provisioned device-to-cloud pairing (no user login).
 
 ### Phase 5: Evolution & Cleanup
 *   **Goal**: Long-term health of the codebase.

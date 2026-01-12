@@ -8,6 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../game/virtual_pet_game.dart';
 import '../services/device_service.dart';
 import '../services/pet_notification_service.dart';
+import '../services/mission_service.dart';
+import '../game/missions/mission.dart';
+import 'widgets/mission_overlay.dart';
 import 'dev_tools_settings.dart';
 import 'flappy_bird_screen.dart';
 import 'orchestra_screen.dart';
@@ -60,9 +63,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _saveStats();
     });
 
-    // Update UI every second to reflect stat changes
+    // Update UI every second to reflect stat changes and mission progress
     _uiUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        MissionService().update(MissionContext(
+          dt: 1.0,
+          isDeviceSynced: _isDeviceSynced,
+        ));
+        setState(() {});
+      }
     });
   }
 
@@ -106,6 +115,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     await _loadSyncStatus();
     await _loadPersistedRates();
     await _restoreStats();
+
+    // Initialize mission service once pet stats are ready
+    await _game.initialized;
+    await MissionService().init(_game.currentPet.stats);
   }
 
   Future<void> _loadSyncStatus() async {
@@ -215,6 +228,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // Determine if successful
                 if (_game.currentPet.stats.removeFood(item.id)) {
                   _game.currentPet.eat(item);
+                  MissionService().update(MissionContext(foodId: item.id));
                   _saveStats();
                   setState(() {}); // Update Fridge UI
                 }
@@ -297,7 +311,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
           
 
-          // Layer 4: Sync status indicator (top-left)
+          // Layer 3.5: Mission Overlay
+          const SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.only(top: 110, right: 12),
+                child: MissionOverlay(),
+              ),
+            ),
+          ),
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
@@ -509,6 +532,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ).then((_) {
+              MissionService().update(MissionContext(minigameId: 'flappy_bird'));
               // Refresh stats after returning from game
               _saveStats();
               setState(() {});
@@ -523,6 +547,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ).then((_) {
+              MissionService().update(MissionContext(minigameId: 'orchestra'));
               setState(() {});
             });
           } else if (gameId == 'donut') {
@@ -532,7 +557,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   deviceService: _deviceService,
                 ),
               ),
-            );
+            ).then((_) {
+              MissionService().update(MissionContext(minigameId: 'donut'));
+            });
           }
         },
       ),

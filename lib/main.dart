@@ -2,12 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 // Note: using bundled `Monocraft` font; removed runtime google_fonts usage.
 
 import 'screens/game_screen.dart';
+import 'services/cloud_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive for persistent storage
+  await Hive.initFlutter();
+  
+  // Initialize cloud service (event queue + connectivity listener)
+  await CloudService().init();
+  
   // Initialize communication port between task isolate and main isolate.
   FlutterForegroundTask.initCommunicationPort();
 

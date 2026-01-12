@@ -236,6 +236,14 @@ class PetStats {
     _equippedClothing.remove(slotName);
   }
 
+
+  /// Apply rewards from a completed mission
+  void applyMissionReward(int gold, double happiness) {
+    addGold(gold);
+    _happiness = (_happiness + happiness).clamp(0.0, 1.0);
+    saveToPrefs();
+  }
+
   // ============ INVENTORY METHODS ============
 
   /// Map of food item ID to quantity owned

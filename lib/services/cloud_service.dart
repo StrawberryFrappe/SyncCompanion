@@ -1,0 +1,180 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
+import 'cloud_event.dart';
+import 'event_queue.dart';
+
+/// Service for sending events to ThingsBoard cloud.
+/// Events are queued locally and flushed when connectivity is available.
+class CloudService {
+  static final CloudService _instance = CloudService._internal();
+  factory CloudService() => _instance;
+  CloudService._internal();
+
+  final EventQueue _queue = EventQueue();
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+
+  // TODO: Replace with actual ThingsBoard configuration
+  static const String _baseUrl = 'https://your-thingsboard-instance.com';
+  static const String _deviceToken = 'YOUR_DEVICE_ACCESS_TOKEN';
+
+  bool _isInitialized = false;
+  bool _isFlushing = false;
+
+  /// Initialize the cloud service
+  Future<void> init() async {
+    if (_isInitialized) return;
+
+    await _queue.init();
+
+    // Listen for connectivity changes to auto-flush
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+      _onConnectivityChanged,
+    );
+
+    // Attempt initial flush
+    await flushQueue();
+
+    _isInitialized = true;
+  }
+
+  /// Handle connectivity changes
+  void _onConnectivityChanged(ConnectivityResult result) {
+    final hasConnection = result != ConnectivityResult.none;
+    if (hasConnection && !_queue.isEmpty) {
+      flushQueue();
+    }
+  }
+
+  /// Log an event to be sent to the cloud
+  Future<void> logEvent(String eventType, Map<String, dynamic> payload) async {
+    final event = CloudEvent(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      timestamp: DateTime.now(),
+      eventType: eventType,
+      payload: payload,
+    );
+
+    await _queue.enqueue(event);
+
+    // Try to flush immediately if we have connectivity
+    final connectivity = await _connectivity.checkConnectivity();
+    final hasConnection = connectivity != ConnectivityResult.none;
+    if (hasConnection) {
+      flushQueue();
+    }
+  }
+
+  /// Convenience methods for common event types
+  Future<void> logSyncSession({
+    required Duration duration,
+    required DateTime startTime,
+  }) async {
+    await logEvent('sync_session', {
+      'duration_seconds': duration.inSeconds,
+      'start_time': startTime.toIso8601String(),
+    });
+  }
+
+  Future<void> logMissionCompleted({
+    required String missionId,
+    required String missionTitle,
+  }) async {
+    await logEvent('mission_completed', {
+      'mission_id': missionId,
+      'mission_title': missionTitle,
+    });
+  }
+
+  Future<void> logMinigamePlayed({
+    required String gameId,
+    required int score,
+    required Duration playTime,
+  }) async {
+    await logEvent('minigame_played', {
+      'game_id': gameId,
+      'score': score,
+      'play_time_seconds': playTime.inSeconds,
+    });
+  }
+
+  /// Flush all queued events to the cloud
+  Future<void> flushQueue() async {
+    if (_isFlushing || _queue.isEmpty) return;
+    _isFlushing = true;
+
+    try {
+      final events = _queue.getAll();
+      final keysToRemove = <dynamic>[];
+
+      for (final event in events) {
+        final success = await _sendEvent(event);
+        if (success) {
+          keysToRemove.add(event.key);
+        } else {
+          // Increment retry count
+          event.retryCount++;
+          if (event.retryCount >= 5) {
+            // Drop after 5 failed attempts
+            keysToRemove.add(event.key);
+            print('CloudService: Dropping event ${event.id} after 5 retries');
+          } else {
+            await event.save();
+          }
+          // Stop on first failure to preserve order
+          break;
+        }
+      }
+
+      if (keysToRemove.isNotEmpty) {
+        await _queue.removeAll(keysToRemove);
+      }
+    } finally {
+      _isFlushing = false;
+    }
+  }
+
+  /// Send a single event to ThingsBoard
+  Future<bool> _sendEvent(CloudEvent event) async {
+    try {
+      // ThingsBoard telemetry API format
+      final url = Uri.parse('$_baseUrl/api/v1/$_deviceToken/telemetry');
+      final body = jsonEncode({
+        'ts': event.timestamp.millisecondsSinceEpoch,
+        'values': {
+          'event_type': event.eventType,
+          ...event.payload,
+        },
+      });
+
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('CloudService: Sent event ${event.eventType}');
+        return true;
+      } else {
+        print('CloudService: Failed to send event: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('CloudService: Error sending event: $e');
+      return false;
+    }
+  }
+
+  /// Get current queue size (for debugging/UI)
+  int get pendingEventCount => _queue.count;
+
+  /// Dispose resources
+  void dispose() {
+    _connectivitySubscription?.cancel();
+  }
+}
