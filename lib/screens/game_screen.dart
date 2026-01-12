@@ -11,6 +11,7 @@ import '../services/pet_notification_service.dart';
 import 'dev_tools_settings.dart';
 import 'flappy_bird_screen.dart';
 import 'orchestra_screen.dart';
+import '../game/minigames/donut/donut.dart';
 import 'widgets/stat_indicator.dart';
 import 'widgets/currency_display.dart';
 import '../game/items/food_item.dart';
@@ -524,6 +525,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ).then((_) {
               setState(() {});
             });
+          } else if (gameId == 'donut') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => DonutGame(
+                  deviceService: _deviceService,
+                ),
+              ),
+            );
           }
         },
       ),

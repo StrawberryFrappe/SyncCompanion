@@ -43,6 +43,13 @@ class GameMenu extends StatelessWidget {
       icon: Icons.music_note,
       color: Color(0xFF9C27B0),
     ),
+    GameMenuItem(
+      id: 'donut',
+      name: 'donut.dart',
+      description: 'Zero gravity pastry',
+      icon: Icons.donut_large,
+      color: Color(0xFFE91E63),
+    ),
   ];
 
   @override

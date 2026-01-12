@@ -16,6 +16,7 @@ dependencies:
   flame: ^1.21.0
   audioplayers: ^6.0.0
   wakelock_plus: ^1.2.8
+  flutter_cube: ^0.1.1
   # permission_handler removed due to Android embedding compatibility; runtime
   # permissions are requested via platform prompts where possible.
   # google_fonts removed in favor of bundled Monocraft.ttf
@@ -41,3 +42,5 @@ flutter:
   assets:
     - placeholder.png
     - assets/images/
+    - assets/models/
+
