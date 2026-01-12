@@ -24,12 +24,15 @@
 *   [X] **Basic Stats**: Implement 1-2 core stats (e.g., Hunger, Happiness).
 *   [X] **Interaction**: Basic interactions (Feeding) to affect stats.
 
-### Phase 3: Telemetry Minigames (NEXT UP)
+### Phase 3: Telemetry Minigames (ACCOMPLISHED)
 *   **Goal**: Fun activities that strictly use device input (IMU/Sensor data).
-*   [ ] **Game Framework**: Independent game screens.
-*   [ ] **Input Hook**: Low-latency sensor data for game control (like Pou games).
-*   [ ] **Game 1**: TBD (Movement based?)
-*   [ ] **Game 2**: TBD
+*   [X] **Game Framework**: Independent game screens.
+*   [X] **Input Hook**: Low-latency sensor data for game control (like Pou games).
+*   [X] **Game 1**: Flappy Bird (shake to jump) + Donut 3D viewer (tilt to rotate)
+*   [X] **Game 2**: Pet Orchestra (Theremin-style, tilt to conduct)
+*   **Polish/Expansion** (ongoing):
+    *   [ ] Additional minigames
+    *   [ ] Bug fixes and polish
 
 ### Phase 4: Cloud Connectivity
 *   **Goal**: Sync data to the cloud for deeper analysis/monitoring.

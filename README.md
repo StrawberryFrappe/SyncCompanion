@@ -136,15 +136,18 @@ flutter run -d <device-id>
 
 ## Development Status
 
-### Current Stage: Stage 3 — Telemetry Minigames
+### Current Stage: Stage 3 — Telemetry Minigames (Accomplished)
 - [x] Game Framework (modular minigame screens)
 - [x] Input Hook (low-latency sensor data binding)
 - [x] Flappy Bird (shake to jump)
-- [x] Pet Orchestra (tilt to conduct)
+- [x] Pet Orchestra (Theremin-style, tilt to conduct)
+- [x] Donut 3D Viewer (telemetry rotation, pinch-to-zoom)
+- [ ] Additional minigames (ongoing)
+- [ ] Polish and bug fixes (ongoing)
 
 ### Stage History
 | Stage | Focus | Status |
 |-------|-------|--------|
 | 1 | **Connectivity** — Background BLE stability | ✅ Complete |
 | 2 | **Virtual Pet Base** — Hunger, Happiness, Currency | ✅ Complete |
-| 3 | **Telemetry Minigames** — Motion-controlled games | 🚧 In Progress |
+| 3 | **Telemetry Minigames** — Motion-controlled games | ✅ Accomplished |
