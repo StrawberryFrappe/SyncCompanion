@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import '../game/missions/mission.dart';
-import '../game/pets/pet_stats.dart';
-import 'cloud_service.dart';
+import 'mission.dart';
+import 'daily_missions.dart';
+import '../pets/pet_stats.dart';
+import '../../services/cloud/cloud_service.dart';
 
 /// Service to manage daily missions.
 class MissionService {

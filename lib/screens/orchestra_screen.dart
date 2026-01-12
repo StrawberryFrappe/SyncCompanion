@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../game/minigames/orchestra/orchestra_game.dart';
 import '../game/pets/pet_stats.dart';
-import '../../services/device_service.dart';
+import '../services/device/device_service.dart';
 
 /// Screen wrapper for the Orchestra minigame.
 class OrchestraScreen extends StatefulWidget {

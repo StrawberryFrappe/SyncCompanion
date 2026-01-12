@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_cube/flutter_cube.dart';
 
-import '../../../services/device_service.dart';
+import '../../../services/device/device_service.dart';
 
 
 class DonutGame extends StatefulWidget {

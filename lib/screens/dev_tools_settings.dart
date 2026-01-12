@@ -9,8 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'settings_page.dart';
 import '../game/virtual_pet_game.dart';
-import '../services/device_service.dart';
-import '../services/foreground_notification.dart';
+import '../services/device/device_service.dart';
+import '../services/notifications/foreground_notification.dart';
 
 /// DevToolsSettings - Contains all Bluetooth pairing, telemetry, diagnostic
 /// functionality, and pet stat controls.

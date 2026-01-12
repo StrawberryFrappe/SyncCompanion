@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../services/device_service.dart';
+import '../services/device/device_service.dart';
 import '../game/virtual_pet_game.dart';
 
 class SettingsPage extends StatefulWidget {

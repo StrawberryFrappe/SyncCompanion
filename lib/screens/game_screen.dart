@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/virtual_pet_game.dart';
-import '../services/device_service.dart';
-import '../services/pet_notification_service.dart';
-import '../services/mission_service.dart';
+import '../services/device/device_service.dart';
+import '../services/notifications/pet_notification_service.dart';
+import '../game/missions/mission_service.dart';
 import '../game/missions/mission.dart';
 import 'widgets/mission_overlay.dart';
 import 'dev_tools_settings.dart';
@@ -298,7 +298,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         tooltip: 'Dev Tools',
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
+                    const MissionOverlay(),
+                    const SizedBox(height: 12),
                     CurrencyDisplay(
                       gold: stats['gold']?.toInt() ?? 0,
                       silver: stats['silver']?.toInt() ?? 0,
@@ -311,16 +313,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
           
 
-          // Layer 3.5: Mission Overlay
-          const SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: EdgeInsets.only(top: 110, right: 12),
-                child: MissionOverlay(),
-              ),
-            ),
-          ),
+
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,

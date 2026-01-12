@@ -36,11 +36,12 @@
 
 ### Phase 4: Cloud Connectivity (CURRENT)
 *   **Goal**: Report user engagement and mission completions to the cloud.
-*   [ ] **Mission System**: Generic framework for trackable tasks (e.g., "Walked 10 min", "Played minigame").
-*   [ ] **HTTP to Thingsboard**: Send batched events via HTTPS (not MQTT).
-*   [ ] **Event Payload**: Timestamped records of sync sessions and mission completions.
-*   [ ] **Persistent Queue**: SQLite/Hive queue that survives app restarts and prolonged offline periods.
-*   [ ] **Background Sync**: Retry uploads when connectivity returns.
+*   [x] **Mission System**: Generic framework for trackable tasks (e.g., "Walked 10 min", "Played minigame").
+*   [x] **HTTP to Thingsboard**: Send batched events via HTTPS (not MQTT).
+*   [x] **Event Payload**: Timestamped records of sync sessions and mission completions.
+*   [x] **Persistent Queue**: SQLite/Hive queue that survives app restarts and prolonged offline periods.
+*   [x] **Background Sync**: Retry uploads when connectivity returns.
+*   [x] **Directory Refactoring**: Reorganized services into `device/`, `cloud/`, `notifications/` subdirectories.
 *   [ ] **Credentials**: Pre-provisioned device-to-cloud pairing (no user login).
 
 ### Phase 5: Evolution & Cleanup

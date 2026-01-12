@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../../game/minigames/flappy_bird/flappy_bird_game.dart';
-import '../../game/pets/pet_stats.dart';
-import '../../services/device_service.dart';
+import '../game/minigames/flappy_bird/flappy_bird_game.dart';
+import '../game/pets/pet_stats.dart';
+import '../services/device/device_service.dart';
 
 /// Screen that hosts the Flappy Bird game with title overlay and game over dialog.
 class FlappyBirdScreen extends StatefulWidget {

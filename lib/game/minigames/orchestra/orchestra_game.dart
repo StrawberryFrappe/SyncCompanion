@@ -6,7 +6,7 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 
-import '../../../services/device_service.dart';
+import '../../../services/device/device_service.dart';
 
 import '../../pets/pet_stats.dart';
 import 'cursor.dart';

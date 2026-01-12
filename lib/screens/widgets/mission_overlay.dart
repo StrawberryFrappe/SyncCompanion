@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import '../../game/missions/mission.dart';
-import '../../services/mission_service.dart';
+import '../../game/missions/mission_service.dart';
 
 class MissionOverlay extends StatefulWidget {
   const MissionOverlay({super.key});

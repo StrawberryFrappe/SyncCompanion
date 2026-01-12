@@ -6,7 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 // Note: using bundled `Monocraft` font; removed runtime google_fonts usage.
 
 import 'screens/game_screen.dart';
-import 'services/cloud_service.dart';
+import 'services/cloud/cloud_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

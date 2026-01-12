@@ -4,8 +4,8 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'device_service.dart';
-import 'bluetooth_service.dart'; // For BLE_DEBUG constant
+import '../device/device_service.dart';
+import '../device/bluetooth_service.dart'; // For BLE_DEBUG constant
 
 /// Subscribes to BluetoothService.incomingRaw$ and updates the
 /// foreground notification text with formatted hex of the raw bytes.
