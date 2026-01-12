@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud_event.dart';
 import 'event_queue.dart';
 
@@ -16,17 +17,31 @@ class CloudService {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
-  // TODO: Replace with actual ThingsBoard configuration
-  static const String _baseUrl = 'https://your-thingsboard-instance.com';
-  static const String _deviceToken = 'YOUR_DEVICE_ACCESS_TOKEN';
+  // Configurable cloud settings (can be changed in Advanced Settings)
+  String _baseUrl = 'http://192.168.1.100:8080';
+  String _deviceToken = 'YOUR_DEVICE_ACCESS_TOKEN';
+  
+  // Preference keys
+  static const String _prefKeyBaseUrl = 'cloud_base_url';
+  static const String _prefKeyDeviceToken = 'cloud_device_token';
 
   bool _isInitialized = false;
   bool _isFlushing = false;
+
+  /// Get current base URL
+  String get baseUrl => _baseUrl;
+
+  /// Get current device token
+  String get deviceToken => _deviceToken;
+
+  /// Get current endpoint URL (full URL for display)
+  String get endpointUrl => '$_baseUrl/api/v1/$_deviceToken/telemetry';
 
   /// Initialize the cloud service
   Future<void> init() async {
     if (_isInitialized) return;
 
+    await _loadConfig();
     await _queue.init();
 
     // Listen for connectivity changes to auto-flush
@@ -38,6 +53,26 @@ class CloudService {
     await flushQueue();
 
     _isInitialized = true;
+  }
+
+  /// Load configuration from shared preferences
+  Future<void> _loadConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? 'http://192.168.1.100:8080';
+    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? 'YOUR_DEVICE_ACCESS_TOKEN';
+  }
+
+  /// Update cloud configuration
+  Future<void> updateConfig({String? baseUrl, String? deviceToken}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (baseUrl != null) {
+      _baseUrl = baseUrl;
+      await prefs.setString(_prefKeyBaseUrl, baseUrl);
+    }
+    if (deviceToken != null) {
+      _deviceToken = deviceToken;
+      await prefs.setString(_prefKeyDeviceToken, deviceToken);
+    }
   }
 
   /// Handle connectivity changes

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/device/device_service.dart';
+import '../services/cloud/cloud_service.dart';
 import '../game/virtual_pet_game.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -40,6 +41,11 @@ class _SettingsPageState extends State<SettingsPage> {
   String _status = 'SEARCHING';
   bool _nativeStatusReceived = false;
   
+  // Cloud configuration
+  final CloudService _cloud = CloudService();
+  String _cloudBaseUrl = '';
+  String _cloudDeviceToken = '';
+  
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   Timer? _statDisplayTimer;
   StreamSubscription<DeviceConnectionState>? _nativeConnSub;
@@ -51,6 +57,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadPersisted();
     _loadPersistedRates();
     _loadFakeSyncSettings();
+    _loadCloudConfig();
     _loadDebugInfo();
     
     _nativeConnSub = widget.device.connectionState$.listen((state) {
@@ -133,6 +140,83 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('debug_fake_sync_enabled', _fakeSyncEnabled);
     await prefs.setBool('debug_fake_sync_value', _fakeSyncValue);
+  }
+  
+  void _loadCloudConfig() {
+    setState(() {
+      _cloudBaseUrl = _cloud.baseUrl;
+      _cloudDeviceToken = _cloud.deviceToken;
+    });
+  }
+  
+  Future<void> _saveCloudConfig(String baseUrl, String deviceToken) async {
+    await _cloud.updateConfig(baseUrl: baseUrl, deviceToken: deviceToken);
+    setState(() {
+      _cloudBaseUrl = baseUrl;
+      _cloudDeviceToken = deviceToken;
+    });
+  }
+  
+  Future<void> _showCloudConfigDialog() async {
+    final urlController = TextEditingController(text: _cloudBaseUrl);
+    final tokenController = TextEditingController(text: _cloudDeviceToken);
+    
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cloud Configuration', style: TextStyle(fontSize: 14)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Configure the endpoint URL and device token for cloud sync.',
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Base URL',
+                  hintText: 'http://192.168.1.100:8080',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: tokenController,
+                decoration: const InputDecoration(
+                  labelText: 'Device Token',
+                  hintText: 'YOUR_DEVICE_ACCESS_TOKEN',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Full endpoint: ${urlController.text}/api/v1/${tokenController.text}/telemetry',
+                style: const TextStyle(fontSize: 9, color: Colors.grey, fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _saveCloudConfig(urlController.text, tokenController.text);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
   }
   
   Future<void> _loadDebugInfo() async {
@@ -554,6 +638,88 @@ class _SettingsPageState extends State<SettingsPage> {
                 Text(
                   'Score 10 = ${10 ~/ _flappyCoinDivisor} silver coins',
                   style: const TextStyle(fontSize: 9, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Cloud Configuration
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              border: Border.all(width: 2, color: Colors.purple),
+              color: Colors.purple.shade50,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('CLOUD SYNC', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text('${_cloud.pendingEventCount} pending', 
+                      style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 1, color: Colors.black26),
+                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.white,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Base URL:', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                      Text(_cloudBaseUrl.isEmpty ? '(not set)' : _cloudBaseUrl,
+                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('Device Token:', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                      Text(_cloudDeviceToken.isEmpty ? '(not set)' : _cloudDeviceToken,
+                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple.shade100,
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(width: 1, color: Colors.black),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                        ),
+                        onPressed: _showCloudConfigDialog,
+                        child: const Text('CONFIGURE', style: TextStyle(fontSize: 9)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade100,
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(width: 1, color: Colors.black),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                        ),
+                        onPressed: () async {
+                          await _cloud.flushQueue();
+                          setState(() {}); // Refresh pending count
+                        },
+                        child: const Text('FLUSH QUEUE', style: TextStyle(fontSize: 9)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
