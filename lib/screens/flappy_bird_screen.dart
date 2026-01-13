@@ -28,7 +28,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
   FlappyBirdGame? _game;
   bool _showTitleScreen = true;
   double _jumpThreshold = 1.5;
-  int _coinDivisor = 1;
+  double _coinMultiplier = 1.0;
   
   @override
   void initState() {
@@ -49,7 +49,9 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _jumpThreshold = prefs.getDouble('flappy_jump_threshold') ?? 1.5;
-      _coinDivisor = prefs.getInt('flappy_coin_divisor') ?? 1;
+      // Default to 1.0 if not set, or if migrating from old version, maybe we should check divisor?
+      // For now, simple default 1.0
+      _coinMultiplier = prefs.getDouble('flappy_coin_multiplier') ?? 1.0;
     });
   }
   
@@ -66,7 +68,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
         petStats: widget.petStats,
         isDeviceConnected: widget.isDeviceConnected,
         jumpThreshold: _jumpThreshold,
-        coinDivisor: _coinDivisor,
+        coinRewardMultiplier: _coinMultiplier,
         onGameOver: _onGameOver,
       );
     });
@@ -74,7 +76,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
   
   void _onGameOver() {
     final score = _game?.score ?? 0;
-    final coins = score ~/ _coinDivisor;
+    final coins = (score * _coinMultiplier).toInt();
     
     showDialog(
       context: context,

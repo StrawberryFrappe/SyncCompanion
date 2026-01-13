@@ -23,8 +23,8 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   /// Jump threshold - now handled in DeviceService, but we can set it
   double jumpThreshold;
   
-  /// Coin divisor (silver coins = score / divisor)
-  final int coinDivisor;
+  /// Coin multiplier (silver coins = score * multiplier)
+  final double coinRewardMultiplier;
   
   /// Whether device is connected (determines pet vs food sprite)
   bool isDeviceConnected;
@@ -34,6 +34,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   bool isGameOver = false;
   bool hasStarted = false;
   int _scoreMultiplier = 1; // Progressive scoring for motion controls
+  double currentSpeedMultiplier = 1.0; // Progressive speed
   
   // Components
   late dynamic _player; // FlappyPet or FlappyFood
@@ -44,7 +45,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   // These getters compute values based on actual screen size
   double get gravity => size.y * 1.2; // Falls across screen in ~1.3s
   double get flapVelocity => size.y * -0.45; // Jumps about 45% of screen height
-  double get pipeSpeed => size.x * 0.17; // Crosses screen in ~6s (slightly faster)
+  double get pipeSpeed => (size.x * 0.17) * currentSpeedMultiplier; // Crosses screen in ~6s (starts normal, gets faster)
   static const double pipeSpawnInterval = 3.5; // Seconds between pipes (more spread out)
   
   // Screen-relative layout
@@ -61,7 +62,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     required this.petStats,
     required this.onGameOver,
     this.jumpThreshold = 1.5,
-    this.coinDivisor = 1,
+    this.coinRewardMultiplier = 1.0,
     this.isDeviceConnected = false,
   });
 
@@ -139,6 +140,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   void startGame() {
     hasStarted = true;
     _player.velocity = 0.0;
+    currentSpeedMultiplier = 1.0; // Reset speed
     
     // Start spawning pipes
     _spawnPipe();
@@ -159,10 +161,12 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     add(PipePair(
       gapY: gapY,
       gapHeight: pipeGap,
-      speed: pipeSpeed,
       groundHeight: groundHeight,
       onScore: () {
         if (!isGameOver) {
+          // Increase speed by 5%
+          currentSpeedMultiplier *= 1.05;
+          
           // Progressive scoring for motion controls
           if (isDeviceConnected) {
             score += _scoreMultiplier;
@@ -183,7 +187,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     _eventSub?.cancel();
     
     // Award silver coins
-    final coins = score ~/ coinDivisor;
+    final coins = (score * coinRewardMultiplier).toInt();
     if (coins > 0) {
       petStats.addSilver(coins);
     }
@@ -232,11 +236,10 @@ class Ground extends PositionComponent {
   }
 }
 
-/// Score display component
 class ScoreDisplay extends PositionComponent {
   final FlappyBirdGame game;
   
-  ScoreDisplay({required this.game}) : super(position: Vector2(20, 20));
+  ScoreDisplay({required this.game}) : super(position: Vector2(20, 20), priority: 100);
 
   @override
   void render(Canvas canvas) {

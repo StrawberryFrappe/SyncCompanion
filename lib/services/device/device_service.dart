@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' hide BluetoothService;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'bluetooth_service.dart';
 export 'bluetooth_service.dart' show BluetoothUserAction, BluetoothUserActionType;

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/device/device_service.dart';
 import '../services/cloud/cloud_service.dart';
 import '../game/virtual_pet_game.dart';
@@ -29,7 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
   double _happinessGainRate = 0.02;
   double _happinessDecayRate = 0.01;
   double _lowWellbeingThreshold = 0.25;
-  int _flappyCoinDivisor = 1;
+  double _flappyCoinMultiplier = 1.0;
   
   // Debug: Fake sync
   bool _fakeSyncEnabled = false;
@@ -116,7 +115,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _happinessGainRate = prefs.getDouble('happiness_gain_rate') ?? 0.02;
       _happinessDecayRate = prefs.getDouble('happiness_decay_rate') ?? 0.01;
       _lowWellbeingThreshold = prefs.getDouble('low_wellbeing_threshold') ?? 0.25;
-      _flappyCoinDivisor = prefs.getInt('flappy_coin_divisor') ?? 1;
+      _flappyCoinMultiplier = prefs.getDouble('flappy_coin_multiplier') ?? 1.0;
     });
   }
   
@@ -126,7 +125,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.setDouble('happiness_gain_rate', _happinessGainRate);
     await prefs.setDouble('happiness_decay_rate', _happinessDecayRate);
     await prefs.setDouble('low_wellbeing_threshold', _lowWellbeingThreshold);
-    await prefs.setInt('flappy_coin_divisor', _flappyCoinDivisor);
+    await prefs.setDouble('flappy_coin_multiplier', _flappyCoinMultiplier);
   }
   
   Future<void> _loadFakeSyncSettings() async {
@@ -472,6 +471,54 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _showFloatEditDialog(String label, double currentValue, ValueChanged<double> onApply) async {
+    final controller = TextEditingController(text: currentValue.toString());
+    
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(label, style: const TextStyle(fontSize: 14)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+             TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Value',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              try {
+                final val = double.parse(controller.text);
+                if (val >= 0) {
+                  Navigator.of(ctx).pop(val);
+                }
+              } catch (e) {
+                // Invalid input
+              }
+            },
+            child: const Text('APPLY'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null) {
+      onApply(result);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -598,38 +645,30 @@ class _SettingsPageState extends State<SettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Coin Divisor', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
-                          Text('Silver = Score / Divisor', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                          Text('Coin Multiplier', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                          Text('Silver = Score * Multiplier', style: TextStyle(fontSize: 9, color: Colors.grey)),
                         ],
                       ),
                     ),
                     Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove, size: 16),
-                          onPressed: _flappyCoinDivisor > 1 ? () {
-                            setState(() => _flappyCoinDivisor--);
-                            _saveRates();
-                          } : null,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.black),
-                            borderRadius: BorderRadius.circular(4),
+                        Text(_flappyCoinMultiplier.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 28,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.cyan.shade100,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: Size.zero,
+                            ),
+                            onPressed: () => _showFloatEditDialog('Coin Multiplier', _flappyCoinMultiplier, (val) {
+                              setState(() => _flappyCoinMultiplier = val);
+                              _saveRates();
+                            }),
+                            child: const Text('EDIT', style: TextStyle(fontSize: 9)),
                           ),
-                          child: Text('$_flappyCoinDivisor', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add, size: 16),
-                          onPressed: _flappyCoinDivisor < 20 ? () {
-                            setState(() => _flappyCoinDivisor++);
-                            _saveRates();
-                          } : null,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         ),
                       ],
                     ),
@@ -637,7 +676,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Score 10 = ${10 ~/ _flappyCoinDivisor} silver coins',
+                  'Score 10 = ${(10 * _flappyCoinMultiplier).toInt()} silver coins',
                   style: const TextStyle(fontSize: 9, color: Colors.grey),
                 ),
               ],
@@ -794,31 +833,30 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 if (_fakeSyncEnabled) ...[
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const SizedBox(width: 16),
-                      Radio<bool>(
-                        value: true,
-                        groupValue: _fakeSyncValue,
-                        onChanged: (val) {
-                          setState(() => _fakeSyncValue = val ?? true);
-                          _saveFakeSyncSettings();
-                        },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      const Text('SYNCED', style: TextStyle(fontSize: 10, color: Colors.green)),
-                      const SizedBox(width: 16),
-                      Radio<bool>(
-                        value: false,
-                        groupValue: _fakeSyncValue,
-                        onChanged: (val) {
-                          setState(() => _fakeSyncValue = val ?? false);
-                          _saveFakeSyncSettings();
-                        },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      const Text('NOT SYNCED', style: TextStyle(fontSize: 10, color: Colors.red)),
-                    ],
+                  RadioGroup<bool>(
+                    groupValue: _fakeSyncValue,
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _fakeSyncValue = val);
+                        _saveFakeSyncSettings();
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 16),
+                        Radio<bool>(
+                          value: true,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        const Text('SYNCED', style: TextStyle(fontSize: 10, color: Colors.green)),
+                        const SizedBox(width: 16),
+                        Radio<bool>(
+                          value: false,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        const Text('NOT SYNCED', style: TextStyle(fontSize: 10, color: Colors.red)),
+                      ],
+                    ),
                   ),
                 ],
               ],

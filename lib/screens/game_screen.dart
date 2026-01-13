@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/virtual_pet_game.dart';
@@ -36,7 +35,6 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final VirtualPetGame _game;
   late final DeviceService _deviceService;
-  static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   
   DeviceDisplayStatus _connectionStatus = DeviceDisplayStatus.searching;
   StreamSubscription<dynamic>? _syncSub;
@@ -375,16 +373,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (!_game.isReady) return;
     showDialog(
       context: context,
-      builder: (context) => FoodStore(
-        currentSilver: _game.currentPet.stats.silverCoins,
-        onBuy: (item) {
-          // Check affordability
-          if (_game.currentPet.stats.spendSilver(item.cost)) {
-             // Add to inventory instead of feeding immediately
-             _game.currentPet.stats.addFood(item.id, 1);
-             _saveStats(); // Save immediately
-             setState(() {}); // Update UI to show new silver
-          }
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return FoodStore(
+            // Since we're inside StatefulBuilder, accessing stats here ensures we get the *current* value on rebuild
+            currentSilver: _game.currentPet.stats.silverCoins,
+            onBuy: (item) {
+              // Check affordability
+              if (_game.currentPet.stats.spendSilver(item.cost)) {
+                 // Add to inventory instead of feeding immediately
+                 _game.currentPet.stats.addFood(item.id, 1);
+                 _saveStats(); // Save immediately
+                 setState(() {}); // Update GameScreen UI (background)
+                 setDialogState(() {}); // Update visual silver count in dialog
+              }
+            },
+          );
         },
       ),
     ).then((_) => setState(() {})); // Refresh when closing loop

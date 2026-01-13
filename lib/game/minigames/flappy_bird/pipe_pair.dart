@@ -3,11 +3,12 @@ import 'dart:ui';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 
+import 'flappy_bird_game.dart';
+
 /// A pair of pipes (top and bottom) with a gap for the player to pass through.
-class PipePair extends PositionComponent with HasGameReference {
+class PipePair extends PositionComponent with HasGameReference<FlappyBirdGame> {
   final double gapY;
   final double gapHeight;
-  final double speed;
   final double groundHeight;
   final VoidCallback onScore;
   final VoidCallback onCollision;
@@ -19,7 +20,6 @@ class PipePair extends PositionComponent with HasGameReference {
   PipePair({
     required this.gapY,
     required this.gapHeight,
-    required this.speed,
     required this.groundHeight,
     required this.onScore,
     required this.onCollision,
@@ -74,7 +74,7 @@ class PipePair extends PositionComponent with HasGameReference {
     super.update(dt);
     
     // Move left
-    position.x -= speed * dt;
+    position.x -= game.pipeSpeed * dt;
     
     // Check if passed (player is at x=25% of screen width)
     final playerX = game.size.x * 0.25;

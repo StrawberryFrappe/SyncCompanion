@@ -1,4 +1,4 @@
-import 'dart:math';
+// dart:math is unused
 
 import 'package:flutter/material.dart';
 import '../../game/missions/mission.dart';
@@ -138,7 +138,7 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
                         border: Border.all(width: 2, color: Colors.black),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -197,10 +197,10 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: mission.isCompleted ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.05),
+        color: mission.isCompleted ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: mission.isCompleted ? Colors.green : Colors.grey.withOpacity(0.3),
+          color: mission.isCompleted ? Colors.green : Colors.grey.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -228,7 +228,7 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.2),
+                    color: Colors.amber.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(

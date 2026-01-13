@@ -25,9 +25,8 @@ class StatIndicator extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(totalIcons, (index) {
-        // Value for this specific icon slot (e.g. 0.2, 0.4, 0.6...)
-        final slotThreshold = (index + 1) / totalIcons;
-        final isActive = value >= slotThreshold - (0.5 / totalIcons); 
+        // Each icon represents 1/totalIcons of the bar.
+        // If current value covers this icon's portion, it's full.
         // Logic: if value is 0.9, and we have 5 icons:
         // 1: 0.2 (active)
         // 2: 0.4 (active)

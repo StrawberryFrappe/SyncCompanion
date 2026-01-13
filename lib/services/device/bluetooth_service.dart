@@ -80,7 +80,7 @@ class BluetoothService {
     String name = '';
     try {
       final platformName = r.device.platformName;
-      final advName = r.advertisementData.localName;
+      final advName = r.advertisementData.advName;
       if (platformName.isNotEmpty) {
         name = platformName;
       } else if (advName.isNotEmpty) {
@@ -88,7 +88,7 @@ class BluetoothService {
       }
     } catch (_) {
       try {
-        final advName = r.advertisementData.localName;
+        final advName = r.advertisementData.advName;
         if (advName.isNotEmpty) name = advName;
       } catch (_) {}
     }
@@ -294,7 +294,7 @@ class BluetoothService {
         String name = '';
         try {
           final platformName = r.device.platformName;
-          final advName = r.advertisementData.localName;
+          final advName = r.advertisementData.advName;
           if (platformName.isNotEmpty) {
             name = platformName;
           } else if (advName.isNotEmpty) {
@@ -302,7 +302,7 @@ class BluetoothService {
           }
         } catch (_) {
           try {
-            final advName = r.advertisementData.localName;
+            final advName = r.advertisementData.advName;
             if (advName.isNotEmpty) name = advName;
           } catch (_) {}
         }

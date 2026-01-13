@@ -176,7 +176,7 @@ class BobTheBlob extends Pet {
     final equipped = stats.equippedClothing;
     
     for (final entry in equipped.entries) {
-      final slot = entry.key; // e.g. "head"
+      // entry.key is the slot e.g. "head", entry.value is the item id
       final id = entry.value;
       
       // Skip items that are baked into the base sprite

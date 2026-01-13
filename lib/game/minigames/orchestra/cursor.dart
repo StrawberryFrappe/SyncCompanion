@@ -1,4 +1,4 @@
-import 'dart:ui';
+// dart:ui elements provided via flutter/material.dart
 import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
@@ -34,7 +34,7 @@ class MotionCursor extends PositionComponent {
     final pulseScale = 1.0 + 0.2 * (0.5 + 0.5 * (math.sin(_pulsePhase)));
     
     final glowPaint = Paint()
-      ..color = color.withOpacity(0.3)
+      ..color = color.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
       
     canvas.drawCircle(
@@ -56,7 +56,7 @@ class MotionCursor extends PositionComponent {
     
     // Center bright spot
     final centerPaint = Paint()
-      ..color = Colors.white.withOpacity(0.8)
+      ..color = Colors.white.withValues(alpha: 0.8)
       ..style = PaintingStyle.fill;
       
     canvas.drawCircle(
