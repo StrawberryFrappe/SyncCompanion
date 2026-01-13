@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../game/items/food_item.dart';
+import '../../../game/items/food_item.dart';
 
 class FoodStore extends StatelessWidget {
   final int currentSilver;

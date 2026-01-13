@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/flame.dart';
 
-import '../../../screens/widgets/food_menu.dart';
+import '../../../screens/widgets/menus/food_menu.dart';
 
 /// Food sprite for Flappy Bird game (fallback when device not connected).
 /// Uses a random food asset for the silly penalty effect.

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/device/device_service.dart';
+import '../../../services/device/device_service.dart';
 import 'currency_display.dart';
 import 'mission_overlay.dart';
 import 'stat_indicator.dart';

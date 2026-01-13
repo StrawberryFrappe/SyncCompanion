@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../game/items/clothing_item.dart';
-import '../../game/pets/pet_stats.dart';
+import '../../../game/items/clothing_item.dart';
+import '../../../game/pets/pet_stats.dart';
 
 class WardrobeMenuWidget extends StatefulWidget {
   final PetStats stats;

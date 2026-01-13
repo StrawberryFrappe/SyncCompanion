@@ -12,15 +12,15 @@ import '../game/missions/mission.dart';
 
 import 'dev_tools_settings.dart';
 import 'flappy_bird_screen.dart';
-import 'widgets/game_hud.dart';
+import 'widgets/hud/game_hud.dart';
 import 'orchestra_screen.dart';
 import '../game/minigames/donut/donut.dart';
 
 import '../game/items/food_item.dart';
-import 'widgets/food_menu.dart'; // Is now FoodStore inside
-import 'widgets/game_menu.dart';
-import 'widgets/wardrobe_menu.dart';
-import 'widgets/fridge_widget.dart';
+import 'widgets/menus/food_menu.dart'; // Is now FoodStore inside
+import 'widgets/menus/game_menu.dart';
+import 'widgets/menus/wardrobe_menu.dart';
+import 'widgets/menus/fridge_widget.dart';
 
 /// GameScreen - The main screen of the app.
 /// Uses a Stack to layer the Flame game underneath a minimal HUD overlay.

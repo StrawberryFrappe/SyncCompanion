@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../game/items/food_item.dart';
+import '../../../game/items/food_item.dart';
 import 'food_menu.dart'; // For FoodMenuData
 
 class FridgeWidget extends StatelessWidget {
