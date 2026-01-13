@@ -1,53 +1,72 @@
-.dart_tool/
-.packages
-.pub/
-build/
-.idea/
-*.iml
-.android/
-.ios/
-.flutter-plugins
-.flutter-plugins-dependencies
-.flutter-plugins
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
 .DS_Store
-pubspec.lock
+.atom/
+.buildlog/
+.history
+.svn/
 
 # IntelliJ / Android Studio
-.idea/
 *.iml
+*.ipr
+*.iws
+.idea/
 
-# Gradle
-.gradle/
-android/.gradle/
+# Visual Studio Code
+.vscode/
 
-# Flutter / Dart
+# Flutter/Dart/Pub
 .dart_tool/
-build/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
+.pub-cache/
 .pub/
+build/
 
-# OS files
-.vscode/
-Thumbs.db
+# Pubspec.lock should be committed for apps, but gitignored for packages.
+# Since this is an app, we DO NOT ignore it.
+# pubspec.lock
 
-# Generated binaries and packages
-*.apk
-*.aab
-*.so
-*.jar
-
-# Logs
-*.log
-
-# Local config
-local.properties
-
-# Keystore
+# Android
+android/local.properties
+android/gradle/wrapper/gradle-wrapper.jar
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+# key.properties and keystores should not be committed
+android/key.properties
 *.jks
 *.keystore
 
-# Xcode
-ios/Pods/
+# iOS
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/ServiceDefinitions.json
 ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS
+macos/Flutter/ephemeral/
+
+# Windows
+windows/flutter/ephemeral/
+
+# Linux
+linux/flutter/ephemeral/
+
+# Coverage
+coverage/
+
+# Documentation
+doc/api/
+
+# Crashlytics
+com_crashlytics_export_strings.xml
