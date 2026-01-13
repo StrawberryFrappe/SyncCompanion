@@ -1,28 +1,148 @@
-# Sync Companion — Virtual Pet Base (Stage 2)
+# Therapets (Sync Companion)
 
-This project is in **Stage 2** of development. The connectivity foundation (Phase 1) is complete. We are now building the **Virtual Pet** features that will visualize the user's therapy adherence.
+A Flutter-based virtual pet app that uses a custom BLE hardware companion (M5-IMU-Sensor) to bring your pet to life through motion controls and real-time telemetry.
 
-## Current Focus: Virtual Pet
-The app currently connects to the device and maintains a stable stream of sensor data. The immediate goal is to implement:
-1.  **Pet Rendering**: Display a 2D/3D pet character.
-2.  **Basic Stats**: Implement `Hunger` and `Happiness` stats tracked in a local state.
-3.  **Interaction**: Allow feeding/petting to influence stats.
+## Architecture
 
-## Completion Criteria for Stage 2
-- [ ] App displays a "Pet" (placeholder or asset) on the main screen.
-- [ ] Pet state (Hunger/Happiness) decays over time or based on logic.
-- [ ] User interactions (buttons/gestures) update the pet's state.
-- [ ] State is persisted between app restarts.
+```mermaid
+classDiagram
+    %% Core Services
+    class BluetoothService {
+        +init()
+        +connect(device)
+        +startScan()
+        +incomingRaw$ : Stream
+        -_platform : MethodChannel
+    }
 
-## Where to look
-- **Pet State & Logic**: `lib/features/pet/` (New directory to be created)
-- **Main Connection Logic**: `lib/services/bluetooth_service.dart` (Stable)
+    class DeviceService {
+        +init()
+        +events$ : Stream<DeviceEvent>
+        +telemetry$ : Stream<TelemetryData>
+        +updateShakeThreshold(val)
+        -_checkForHighLevelEvents(data)
+    }
 
-## Quick Run
+    class DeviceEvent
+    class ShakeEvent
+    DeviceEvent <|-- ShakeEvent
+
+    class TelemetryData {
+        +double ax, ay, az
+        +double gx, gy, gz
+        +double magnitude
+        +fromBytes(List<int>)
+    }
+
+    %% Service Relationships
+    DeviceService --> BluetoothService : consumes
+    DeviceService ..> DeviceEvent : emits
+    DeviceService ..> TelemetryData : emits
+
+    %% Game Layer
+    class FlameGame
+    
+    class VirtualPetGame {
+        +Pet currentPet
+        +setSyncStatus(bool)
+        +feedPet()
+    }
+    
+    class Pet {
+        <<Abstract>>
+        +PetStats stats
+        +BodyType bodyType
+        +eat(food)
+        +update(dt)
+    }
+    
+    class BobTheBlob
+    
+    class PetStats {
+        +double hunger
+        +double happiness
+        +double wellbeing
+        +int gold
+        +int silver
+        +update(dt)
+        +saveToPrefs()
+    }
+
+    class FlappyBirdGame {
+        +DeviceService deviceService
+        +PetStats petStats
+        -onDeviceEvent(event)
+    }
+
+    class OrchestraGame {
+        +DeviceService deviceService
+        +List~PetMusician~ musicians
+        +TonePlayer audio
+        -onTelemetry(data)
+    }
+
+    %% Game Relationships
+    VirtualPetGame --|> FlameGame
+    FlappyBirdGame --|> FlameGame
+    OrchestraGame --|> FlameGame
+
+    VirtualPetGame --> Pet : manages
+    Pet <|-- BobTheBlob
+    Pet --> PetStats : has state
+    
+    FlappyBirdGame --> DeviceService : listens to (events$)
+    FlappyBirdGame --> PetStats : awards coins to
+
+    OrchestraGame --> DeviceService : listens to (telemetry$)
+    OrchestraGame --> PetStats : references
+```
+
+### Service Layer
+| Service | Role | Output |
+|---------|------|--------|
+| `BluetoothService` | Low-level BLE manager (scan, connect, foreground service) | `incomingRaw$` (bytes) |
+| `DeviceService` | High-level abstraction (parses bytes, detects gestures) | `telemetry$` (sensor data), `events$` (ShakeEvent, etc.) |
+
+### Game Layer (Flame Engine)
+| Component | Description |
+|-----------|-------------|
+| `VirtualPetGame` | Main screen. Renders the pet (`BobTheBlob`) and manages sync status. |
+| `Pet` / `PetStats` | Tamagotchi-style logic: hunger, happiness, currency, persistence. |
+| `FlappyBirdGame` | Action game. Listens to **discrete events** (`ShakeEvent`) to jump. Awards Silver coins. |
+| `OrchestraGame` | Creative tool. Listens to **continuous telemetry** to map tilt to pitch/volume. |
+
+## Project Structure
+```
+lib/
+├── main.dart               # App entry point
+├── services/
+│   ├── bluetooth_service.dart   # Low-level BLE
+│   └── device_service.dart      # High-level device abstraction
+├── game/
+│   ├── virtual_pet_game.dart    # Main pet game
+│   ├── bob_the_blob.dart        # Pet implementation
+│   ├── pets/                    # Pet base classes & stats
+│   └── minigames/
+│       ├── flappy_bird/         # Flappy Bird minigame
+│       └── orchestra/           # Pet Orchestra minigame
+└── screens/                     # Flutter UI screens
+```
+
+## Quick Start
 ```powershell
 flutter pub get
 flutter run -d <device-id>
 ```
 
-## Stage History
-- **Stage 1 (Connectivity)**: Completed. Verified background BLE stability and ThingsBoard telemetry relay.
+## Development Status
+
+### Current Stage: Stage 4 — Cloud Connectivity
+*Goals TBD — see `artifacts/DEVELOPMENT_STATUS.md` for details*
+
+### Stage History
+| Stage | Focus | Status |
+|-------|-------|--------|
+| 1 | **Connectivity** — Background BLE stability | ✅ Complete |
+| 2 | **Virtual Pet Base** — Hunger, Happiness, Currency | ✅ Complete |
+| 3 | **Telemetry Minigames** — Motion-controlled games | ✅ Accomplished |
+| 4 | **Cloud Connectivity** — Mission system + cloud sync | 🚧 In Progress |

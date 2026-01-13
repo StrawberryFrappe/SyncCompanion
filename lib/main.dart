@@ -2,12 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 // Note: using bundled `Monocraft` font; removed runtime google_fonts usage.
 
 import 'screens/game_screen.dart';
+import 'services/cloud/cloud_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive for persistent storage
+  await Hive.initFlutter();
+  
+  // Initialize cloud service (event queue + connectivity listener)
+  await CloudService().init();
+  
   // Initialize communication port between task isolate and main isolate.
   FlutterForegroundTask.initCommunicationPort();
 
@@ -15,7 +24,7 @@ Future<void> main() async {
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
       channelId: 'sync_companion_fg',
-      channelName: 'Sync Companion Service',
+      channelName: 'Therapets Service',
       channelDescription: 'Foreground service for keeping BLE active',
       onlyAlertOnce: true,
     ),
@@ -43,7 +52,7 @@ class SyncCompanionApp extends StatelessWidget {
     final base = ThemeData.light();
     final appTextTheme = base.textTheme.apply(fontFamily: 'Monocraft', bodyColor: Colors.black);
     return MaterialApp(
-      title: 'Sync Companion',
+      title: 'Therapets',
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
         textTheme: appTextTheme,

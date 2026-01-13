@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+
+
 // Events that instruct the UI to show a dialog or request user input.
 enum BluetoothUserActionType { enableBluetooth, requestPermissions }
 
@@ -15,10 +17,15 @@ class BluetoothUserAction {
 
 // TODO: add more robust error reporting and expose status events if needed.
 class BluetoothService {
-  BluetoothService();
+  // Singleton instance
+  static final BluetoothService _instance = BluetoothService._internal();
+  
+  factory BluetoothService() => _instance;
+  
+  BluetoothService._internal();
 
   // Toggle detailed BLE debug logs (set false to silence)
-  static const bool BLE_DEBUG = true;
+  static const bool BLE_DEBUG = false;
 
   // Events that require a UI interaction (dialogs). The UI should listen
   // to `userAction$` and show the appropriate prompt. After the user acts,
@@ -44,6 +51,8 @@ class BluetoothService {
   Stream<bool> get nativeConnected$ => _nativeConnectedController.stream;
   Stream<String> get incomingData$ => _incomingController.stream;
   Stream<List<int>> get incomingRaw$ => _incomingRawController.stream;
+  
+
 
   // Debug information mapping (rssi/adv payload) for UI diagnostics.
   final Map<String, String> _debugInfo = {};
@@ -71,7 +80,7 @@ class BluetoothService {
     String name = '';
     try {
       final platformName = r.device.platformName;
-      final advName = r.advertisementData.localName;
+      final advName = r.advertisementData.advName;
       if (platformName.isNotEmpty) {
         name = platformName;
       } else if (advName.isNotEmpty) {
@@ -79,7 +88,7 @@ class BluetoothService {
       }
     } catch (_) {
       try {
-        final advName = r.advertisementData.localName;
+        final advName = r.advertisementData.advName;
         if (advName.isNotEmpty) name = advName;
       } catch (_) {}
     }
@@ -143,8 +152,17 @@ class BluetoothService {
       // flows will start it deliberately to avoid scanning/running BLE when
       // the user hasn't requested it.
     } catch (_) {}
-  }  void _attachNativeEventStream() {
-    if (_nativeEventsAttached) return;
+  }
+
+  void _attachNativeEventStream() {
+    // If already attached, cancel and re-attach to ensure fresh connection
+    // This fixes issues where the native side might have dropped the receiver but we still think we are attached.
+    if (_nativeEventsAttached) {
+       _nativeEventsSub?.cancel();
+       _nativeEventsSub = null;
+       _nativeEventsAttached = false;
+    }
+
     try {
       final ev = EventChannel('sync_companion/ble_events');
       _nativeEventsSub = ev.receiveBroadcastStream().listen((dynamic event) {
@@ -171,7 +189,7 @@ class BluetoothService {
                   if (lb is List) {
                     final bytes = List<int>.from(lb.map((e) => (e as int)));
                     if (bytes.isNotEmpty) {
-                      if (BLE_DEBUG) print('BLE: live lastBytes len=${bytes.length}');
+                      if (BLE_DEBUG) print('BLE: live lastBytes len=${bytes.length}, rawListeners=${_incomingRawController.hasListener}');
                       _incomingRawController.add(bytes);
                       _incomingController.add(_decode(bytes));
                     }
@@ -187,6 +205,14 @@ class BluetoothService {
         } catch (_) {}
       }, onError: (e) {
         if (BLE_DEBUG) print('BLE: native event stream error: $e');
+        _nativeEventsAttached = false;
+        _nativeEventsSub?.cancel();
+        _nativeEventsSub = null;
+      }, onDone: () {
+        if (BLE_DEBUG) print('BLE: native event stream done');
+        _nativeEventsAttached = false;
+        _nativeEventsSub?.cancel();
+        _nativeEventsSub = null;
       });
       _nativeEventsAttached = true;
     } catch (e) {
@@ -268,7 +294,7 @@ class BluetoothService {
         String name = '';
         try {
           final platformName = r.device.platformName;
-          final advName = r.advertisementData.localName;
+          final advName = r.advertisementData.advName;
           if (platformName.isNotEmpty) {
             name = platformName;
           } else if (advName.isNotEmpty) {
@@ -276,7 +302,7 @@ class BluetoothService {
           }
         } catch (_) {
           try {
-            final advName = r.advertisementData.localName;
+            final advName = r.advertisementData.advName;
             if (advName.isNotEmpty) name = advName;
           } catch (_) {}
         }
@@ -544,6 +570,19 @@ class BluetoothService {
       if (res is Map) return Map<String, dynamic>.from(res);
     } catch (_) {}
     return null;
+  }
+
+  /// Request native service to emit current status and telemetry data.
+  /// This ensures the broadcast streams receive fresh data for new subscribers
+  /// (e.g., minigames that need telemetry input).
+  Future<void> requestNativeStatus() async {
+    try {
+      final res = await _platform.invokeMethod('requestNativeStatus');
+      if (res is Map) {
+        final m = Map<String, dynamic>.from(res);
+        _handleNativeStatusMap(m);
+      }
+    } catch (_) {}
   }
 
   void dispose() {

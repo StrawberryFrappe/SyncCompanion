@@ -17,29 +17,34 @@
 *   [X] Crash-free operation and background stability.
 *   [X] Receive raw data from device.
 
-### Phase 2: Virtual Pet Base (NEXT UP)
+### Phase 2: Virtual Pet Base (DONE)
 *   **Goal**: A simple, engaging pet to visualize the user's status.
-*   [ ] **Pet Model**: Render a basic 2D/3D pet character.
-*   [ ] **Customization**: Minimum viable "Clothes" system (e.g., hats/colors).
-*   [ ] **Basic Stats**: Implement 1-2 core stats (e.g., Hunger, Happiness).
-*   [ ] **Interaction**: Basic interactions (Feeding) to affect stats.
+*   [X] **Pet Model**: Render a basic 2D/3D pet character.
+*   [X] **Customization**: Minimum viable "Clothes" system (e.g., hats/colors).
+*   [X] **Basic Stats**: Implement 1-2 core stats (e.g., Hunger, Happiness).
+*   [X] **Interaction**: Basic interactions (Feeding) to affect stats.
 
-### Phase 3: Telemetry Minigames
+### Phase 3: Telemetry Minigames (ACCOMPLISHED)
 *   **Goal**: Fun activities that strictly use device input (IMU/Sensor data).
-*   [ ] **Game Framework**: Independent game screens.
-*   [ ] **Input Hook**: Low-latency sensor data for game control (like Pou games).
-*   [ ] **Game 1**: TBD (Movement based?)
-*   [ ] **Game 2**: TBD
+*   [X] **Game Framework**: Independent game screens.
+*   [X] **Input Hook**: Low-latency sensor data for game control (like Pou games).
+*   [X] **Game 1**: Flappy Bird (shake to jump) + Donut 3D viewer (tilt to rotate)
+*   [X] **Game 2**: Pet Orchestra (Theremin-style, tilt to conduct)
+*   **Polish/Expansion** (ongoing):
+    *   [ ] Additional minigames
+    *   [ ] Bug fixes and polish
 
-### Phase 4: Cloud Connectivity
-*   **Goal**: Sync data to the cloud for deeper analysis/monitoring.
-*   [ ] Connect to Thingsboard via MQTT.
-*   [ ] Securely upload telemetry data.
-*   [ ] **Queueing**: Offline data queueing and background retry logic.
-*   [ ] **Security**: Secure storage for cloud credentials/tokens.
-*   [ ] **Background**: Handle permissions/entitlements for robust background execution (Android/iOS).
+### Phase 4: Cloud Connectivity (DONE)
+*   **Goal**: Report user engagement and mission completions to the cloud.
+*   [x] **Mission System**: Generic framework for trackable tasks (e.g., "Walked 10 min", "Played minigame").
+*   [x] **HTTP to Thingsboard**: Send batched events via HTTPS (not MQTT).
+*   [x] **Event Payload**: Timestamped records of sync sessions and mission completions.
+*   [x] **Persistent Queue**: SQLite/Hive queue that survives app restarts and prolonged offline periods.
+*   [x] **Background Sync**: Retry uploads when connectivity returns.
+*   [x] **Directory Refactoring**: Reorganized services into `device/`, `cloud/`, `notifications/` subdirectories.
+*   [x] **Credentials**: Pre-provisioned device-to-cloud pairing (no user login).
 
-### Phase 5: Evolution & Cleanup
+### Phase 5: Evolution & Cleanup (CURRENT)
 *   **Goal**: Long-term health of the codebase.
 *   [ ] Code hardening and optimization.
 *   [ ] E2E testing (Discovery -> Connect -> Telemetry).

@@ -140,13 +140,13 @@ class BleForegroundService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
-            val ch = NotificationChannel(CHANNEL_ID, "Sync Companion (native)", NotificationManager.IMPORTANCE_LOW)
+            val ch = NotificationChannel(CHANNEL_ID, "Therapets", NotificationManager.IMPORTANCE_LOW)
             nm.createNotificationChannel(ch)
         }
     }
 
     private fun buildNotification(text: String) = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle("Sync Companion")
+        .setContentTitle("Therapets")
         .setContentText(text)
         .setSmallIcon(android.R.drawable.ic_dialog_info)
         .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -156,7 +156,7 @@ class BleForegroundService : Service() {
 
     private fun updateNotificationForData() {
         try {
-            val showLive = prefs?.getBoolean("notif_show_data", true) ?: true
+            val showLive = prefs?.getBoolean("notif_show_data", false) ?: false
             // debug: log prefs read for tests
             try {
                 if (DATA_LOG) {

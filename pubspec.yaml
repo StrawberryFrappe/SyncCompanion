@@ -1,7 +1,7 @@
 name: sync_companion
 description: A minimal Flutter starter app.
 publish_to: 'none'
-version: 0.0.1
+version: 1.0.0+1
 
 environment:
   sdk: ">=2.17.0 <3.0.0"
@@ -14,6 +14,13 @@ dependencies:
   shared_preferences: ^2.1.0
   flutter_foreground_task: ^9.1.0
   flame: ^1.21.0
+  audioplayers: ^6.0.0
+  wakelock_plus: ^1.2.8
+  flutter_cube: ^0.1.1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  http: ^1.1.0
+  connectivity_plus: ^5.0.2
   # permission_handler removed due to Android embedding compatibility; runtime
   # permissions are requested via platform prompts where possible.
   # google_fonts removed in favor of bundled Monocraft.ttf
@@ -21,6 +28,14 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/food_sushi.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/food_sushi.png"
 
 flutter:
   uses-material-design: true
@@ -30,3 +45,6 @@ flutter:
         - asset: Monocraft.ttf
   assets:
     - placeholder.png
+    - assets/images/
+    - assets/models/
+

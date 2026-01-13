@@ -4,13 +4,14 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'bluetooth_service.dart';
+import '../device/device_service.dart';
+import '../device/bluetooth_service.dart'; // For BLE_DEBUG constant
 
 /// Subscribes to BluetoothService.incomingRaw$ and updates the
 /// foreground notification text with formatted hex of the raw bytes.
 class ForegroundNotificationUpdater {
   ForegroundNotificationUpdater(
-    this._bt, {
+    this._device, {
     this.throttleMs = 500,
     this.maxChars = 128,
     this.hexUppercase = false,
@@ -18,7 +19,7 @@ class ForegroundNotificationUpdater {
     this.connectedOnly = true,
   });
 
-  final BluetoothService _bt;
+  final DeviceService _device;
   final int throttleMs;
   final int maxChars;
   final bool hexUppercase;
@@ -37,12 +38,12 @@ class ForegroundNotificationUpdater {
   void start() {
     if (_running) return;
     _running = true;
-    _connSub = _bt.connectedDevice$.listen((d) {
+    _connSub = _device.connectedDevice$.listen((d) {
       _isConnected = d != null;
       // If disconnected, ensure notification/service is removed
       if (!_isConnected) _removeNotificationIfNeeded();
     });
-    _sub = _bt.incomingRaw$.listen(_onData, onError: (_) {});
+    _sub = _device.incomingRaw$.listen(_onData, onError: (_) {});
   }
 
   void stop() {
@@ -92,7 +93,7 @@ class ForegroundNotificationUpdater {
 
     // Read user preference whether to show live data
     final prefs = await SharedPreferences.getInstance();
-    final showData = prefs.getBool('notif_show_data') ?? true;
+    final showData = prefs.getBool('notif_show_data') ?? false;
     final text = showData ? (_pending ?? '') : 'Your device is synced';
     _pending = null;
     _lastSent = text;
