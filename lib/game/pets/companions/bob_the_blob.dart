@@ -5,9 +5,9 @@ import 'package:flame/effects.dart';
 import 'package:flame/flame.dart';
 import 'package:flutter/animation.dart';
 
-import 'pets/pet.dart';
-import 'pets/body_type.dart';
-import 'pets/pet_stats.dart';
+import '../pet.dart';
+import '../body_type.dart';
+import '../pet_stats.dart';
 
 /// BobTheBlob - A friendly blob pet with sprite-based rendering.
 /// Uses a 2x2 sprite sheet with 4 frames based on wellbeing levels:
@@ -225,4 +225,3 @@ class BobTheBlob extends Pet {
     canvas.drawImageRect(_spriteImage!, srcRect, dstRect, Paint());
   }
 }
-

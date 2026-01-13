@@ -7,12 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'settings/settings_page.dart';
-import 'settings/sections/pet_stats_section.dart';
-import 'settings/widgets/bluetooth_scanner_dialog.dart';
-import '../game/virtual_pet_game.dart';
-import '../services/device/device_service.dart';
-import '../services/notifications/foreground_notification.dart';
+import 'settings_page.dart';
+import 'sections/pet_stats_section.dart';
+import 'widgets/bluetooth_scanner_dialog.dart';
+import '../../game/virtual_pet_game.dart';
+import '../../services/device/device_service.dart';
+import '../../services/notifications/foreground_notification.dart';
 
 /// DevToolsSettings - Contains all Bluetooth pairing, telemetry, diagnostic
 /// functionality, and pet stat controls.

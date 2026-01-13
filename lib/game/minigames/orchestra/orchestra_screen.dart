@@ -2,9 +2,10 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../game/minigames/orchestra/orchestra_game.dart';
-import '../game/pets/pet_stats.dart';
-import '../services/device/device_service.dart';
+import '../../../screens/minigame_screen.dart';
+import '../../../services/device/device_service.dart';
+import '../../pets/pet_stats.dart';
+import 'orchestra_game.dart';
 
 /// Screen wrapper for the Orchestra minigame.
 class OrchestraScreen extends StatefulWidget {
@@ -30,12 +31,6 @@ class _OrchestraScreenState extends State<OrchestraScreen> {
   void initState() {
     super.initState();
     
-    // Force landscape orientation for the orchestra game
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    
     _game = OrchestraGame(
       deviceService: widget.deviceService,
       petStats: widget.petStats,
@@ -47,24 +42,21 @@ class _OrchestraScreenState extends State<OrchestraScreen> {
   }
 
   @override
-  void dispose() {
-    // Force cleanup of game audio before disposing
-    _game.cleanup();
-    
-    // Restore all orientations when leaving the orchestra screen
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: GameWidget(game: _game),
+    return MinigameScreen(
+      config: const MinigameConfig(
+        title: 'Pet Orchestra',
+        keepScreenOn: true,
+        forcedOrientations: [
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ],
+      ),
+      gameWidget: GameWidget(game: _game),
+      onDispose: () {
+        // Force cleanup of game audio before disposing
+        _game.cleanup();
+      },
     );
   }
 }

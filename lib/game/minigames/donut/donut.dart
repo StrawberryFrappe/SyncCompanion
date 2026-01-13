@@ -123,29 +123,19 @@ class _DonutGameState extends State<DonutGame> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF222222), 
-      appBar: AppBar(
-        title: const Text('Spinning Donut', style: TextStyle(fontFamily: 'Monocraft')),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.white,
-      ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onScaleStart: _onScaleStart,
-        onScaleUpdate: _onScaleUpdate,
-        onScaleEnd: _onScaleEnd,
-        child: Stack(
-          children: [
-            IgnorePointer(
-              child: Cube(
-                onSceneCreated: _onSceneCreated,
-              ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onScaleStart: _onScaleStart,
+      onScaleUpdate: _onScaleUpdate,
+      onScaleEnd: _onScaleEnd,
+      child: Stack(
+        children: [
+          IgnorePointer(
+            child: Cube(
+              onSceneCreated: _onSceneCreated,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

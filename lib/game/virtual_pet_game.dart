@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
 
-import 'bob_the_blob.dart';
+import 'pets/companions/bob_the_blob.dart';
 import 'pets/pet.dart';
 
 /// VirtualPetGame - The main Flame game instance.

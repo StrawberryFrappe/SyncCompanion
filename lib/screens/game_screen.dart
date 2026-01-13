@@ -10,11 +10,11 @@ import '../services/notifications/pet_notification_service.dart';
 import '../game/missions/mission_service.dart';
 import '../game/missions/mission.dart';
 
-import 'dev_tools_settings.dart';
-import 'flappy_bird_screen.dart';
+import 'settings/dev_tools_settings.dart';
 import 'widgets/hud/game_hud.dart';
-import 'orchestra_screen.dart';
-import '../game/minigames/donut/donut.dart';
+import '../game/minigames/flappy_bird/flappy_bird_screen.dart';
+import '../game/minigames/orchestra/orchestra_screen.dart';
+import '../game/minigames/donut/donut_screen.dart';
 
 import '../game/items/food_item.dart';
 import 'widgets/menus/food_menu.dart'; // Is now FoodStore inside
@@ -464,7 +464,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           } else if (gameId == 'donut') {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => DonutGame(
+                builder: (_) => DonutScreen(
                   deviceService: _deviceService,
                 ),
               ),

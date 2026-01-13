@@ -1,11 +1,11 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../game/minigames/flappy_bird/flappy_bird_game.dart';
-import '../game/pets/pet_stats.dart';
-import '../services/device/device_service.dart';
+import '../../../screens/minigame_screen.dart';
+import '../../../services/device/device_service.dart';
+import '../../pets/pet_stats.dart';
+import 'flappy_bird_game.dart';
 
 /// Screen that hosts the Flappy Bird game with title overlay and game over dialog.
 class FlappyBirdScreen extends StatefulWidget {
@@ -34,23 +34,12 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
   void initState() {
     super.initState();
     _loadSettings();
-    // Keep screen on while playing
-    WakelockPlus.enable();
-  }
-  
-  @override
-  void dispose() {
-    // Allow screen to turn off again
-    WakelockPlus.disable();
-    super.dispose();
   }
   
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _jumpThreshold = prefs.getDouble('flappy_jump_threshold') ?? 1.5;
-      // Default to 1.0 if not set, or if migrating from old version, maybe we should check divisor?
-      // For now, simple default 1.0
       _coinMultiplier = prefs.getDouble('flappy_coin_multiplier') ?? 1.0;
     });
   }
@@ -140,20 +129,15 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Game or placeholder
-          if (_game != null)
-            GameWidget(game: _game!)
-          else
-            Container(color: const Color(0xFF87CEEB)),
-          
-          // Title screen overlay
-          if (_showTitleScreen)
-            _buildTitleScreen(),
-        ],
+    return MinigameScreen(
+      config: const MinigameConfig(
+        title: 'Flappy Bob',
+        keepScreenOn: true,
       ),
+      gameWidget: _game != null
+          ? GameWidget(game: _game!)
+          : Container(color: const Color(0xFF87CEEB)),
+      overlay: _showTitleScreen ? _buildTitleScreen() : null,
     );
   }
   
