@@ -144,9 +144,19 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     
     // Start spawning pipes
     _spawnPipe();
-    _pipeSpawnTimer = Timer.periodic(
-      Duration(milliseconds: (pipeSpawnInterval * 1000).toInt()),
-      (_) => _spawnPipe(),
+  }
+
+  void _scheduleNextPipe() {
+    if (isGameOver) return;
+
+    // Calculate dynamic interval
+    // Reduce interval slightly as speed increases to make game harder
+    // factor 0.25 ensures we "undercompensate" the speed increase (so gaps still grow, but slower)
+    final adjustedInterval = pipeSpawnInterval / pow(currentSpeedMultiplier, 0.25);
+    
+    _pipeSpawnTimer = Timer(
+      Duration(milliseconds: (adjustedInterval * 1000).toInt()),
+      () => _spawnPipe(),
     );
   }
   
@@ -178,6 +188,8 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
       },
       onCollision: endGame,
     )..position = Vector2(size.x + size.x * 0.05, 0)); // 5% offset
+    
+    _scheduleNextPipe();
   }
 
   void endGame() {
