@@ -10,13 +10,13 @@ import '../services/device/device_service.dart';
 import '../services/notifications/pet_notification_service.dart';
 import '../game/missions/mission_service.dart';
 import '../game/missions/mission.dart';
-import 'widgets/mission_overlay.dart';
+
 import 'dev_tools_settings.dart';
 import 'flappy_bird_screen.dart';
+import 'widgets/game_hud.dart';
 import 'orchestra_screen.dart';
 import '../game/minigames/donut/donut.dart';
-import 'widgets/stat_indicator.dart';
-import 'widgets/currency_display.dart';
+
 import '../game/items/food_item.dart';
 import 'widgets/food_menu.dart'; // Is now FoodStore inside
 import 'widgets/game_menu.dart';
@@ -38,7 +38,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final DeviceService _deviceService;
   static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   
-  bool _isDeviceSynced = false;
+  DeviceDisplayStatus _connectionStatus = DeviceDisplayStatus.searching;
   StreamSubscription<dynamic>? _syncSub;
   
   bool _showFridge = false; // Toggle for fridge visibility
@@ -47,6 +47,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Timer? _autoSaveTimer;
   // For UI updates
   Timer? _uiUpdateTimer;
+  
+  // Group ID for Fridge TapRegion to allow button clicks to be ignored
+  final _fridgeGroupId = Object();
 
   @override
   void initState() {
@@ -68,7 +71,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (mounted) {
         MissionService().update(MissionContext(
           dt: 1.0,
-          isDeviceSynced: _isDeviceSynced,
+          isDeviceSynced: _connectionStatus == DeviceDisplayStatus.synced,
         ));
         setState(() {});
       }
@@ -122,13 +125,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadSyncStatus() async {
-    // Check if we have a persisted device (means we're synced)
-    final prefs = await SharedPreferences.getInstance();
-    final deviceId = prefs.getString('saved_device_id');
+    // Initial status load
     setState(() {
-      _isDeviceSynced = deviceId != null;
+      _connectionStatus = _deviceService.currentDisplayStatus;
     });
-    _game.setSyncStatus(_isDeviceSynced);
+    _game.setSyncStatus(_connectionStatus == DeviceDisplayStatus.synced);
   }
 
   Future<void> _loadPersistedRates() async {
@@ -162,22 +163,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _restoreStats() async {
     try {
-      await _game.loadPetStats(isDeviceSynced: _isDeviceSynced);
+      await _game.loadPetStats(isDeviceSynced: _connectionStatus == DeviceDisplayStatus.synced);
     } catch (e) {
       print('Error restoring pet stats: $e');
     }
   }
 
   void _listenToSyncStatus() {
-    // Listen for native connection status updates
-    _platform.setMethodCallHandler((call) async {
-      if (call.method == 'onConnectionStatusChanged') {
-        final connected = call.arguments as bool? ?? false;
-        setState(() {
-          _isDeviceSynced = connected;
-        });
-        _game.setSyncStatus(_isDeviceSynced);
-      }
+    // Listen for high-level display status updates from DeviceService
+    _syncSub = _deviceService.displayStatus$.listen((status) {
+      setState(() {
+        _connectionStatus = status;
+      });
+      _game.setSyncStatus(status == DeviceDisplayStatus.synced);
     });
   }
 
@@ -191,7 +189,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           game: _game,
           onSyncStatusChanged: (synced) {
             setState(() {
-              _isDeviceSynced = synced;
+              _connectionStatus = synced ? DeviceDisplayStatus.synced : DeviceDisplayStatus.searching;
             });
             _game.setSyncStatus(synced);
           },
@@ -246,111 +244,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
           
-          // Layer 2: Main HUD (Top Center)
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Happiness (Hearts)
-                    StatIndicator(
-                      value: happiness,
-                      assetPath: 'assets/images/ui_heart.png',
-                      totalIcons: 5,
-                      iconSize: 28,
-                    ),
-                    const SizedBox(height: 4),
-                    // Hunger (Drumsticks)
-                    StatIndicator(
-                      value: hunger,
-                      assetPath: 'assets/images/ui_hunger.png',
-                      totalIcons: 5,
-                      iconSize: 28,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Layer 3: HUD overlay (foreground) - Settings & Currency
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xE6FFFFFF),
-                        shape: BoxShape.circle,
-                        border: Border.all(width: 2, color: Colors.black),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.settings, color: Colors.black),
-                        onPressed: _openDevTools,
-                        tooltip: 'Dev Tools',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const MissionOverlay(),
-                    const SizedBox(height: 12),
-                    CurrencyDisplay(
-                      gold: stats['gold']?.toInt() ?? 0,
-                      silver: stats['silver']?.toInt() ?? 0,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          
-
-
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xE6FFFFFF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(width: 2, color: Colors.black),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _isDeviceSynced ? Colors.green : Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _isDeviceSynced ? 'SYNCED' : 'NOT SYNCED',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontFamily: 'Monocraft',
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          // Layer 2: Main HUD
+          GameHud(
+            hunger: hunger,
+            happiness: happiness,
+            gold: stats['gold']?.toInt() ?? 0,
+            silver: stats['silver']?.toInt() ?? 0,
+            connectionStatus: _connectionStatus,
+            onSettingsPressed: _openDevTools,
           ),
 
           // Layer 6: Fridge (Animated Sidebar Right)
@@ -362,8 +263,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             bottom: 100,
             child: SafeArea( 
               child: Center(
-                child: FridgeWidget(
-                  inventory: _game.getFoodInventory(),
+                child: TapRegion(
+                  groupId: _fridgeGroupId,
+                  onTapOutside: (_) {
+                    if (_showFridge) {
+                      setState(() {
+                        _showFridge = false;
+                      });
+                    }
+                  },
+                  child: FridgeWidget(
+                    inventory: _game.getFoodInventory(),
+                  ),
                 ),
               ),
             ),
@@ -382,16 +293,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     SizedBox(
                       width: buttonSize,
                       height: buttonSize,
-                      child: FloatingActionButton(
-                        heroTag: 'fridge_btn',
-                        backgroundColor: Colors.blue.shade200,
-                        shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
-                        onPressed: () {
-                          setState(() {
-                            _showFridge = !_showFridge;
-                          });
-                        },
-                        child: Icon(Icons.kitchen, color: Colors.black, size: iconSize),
+                      child: TapRegion(
+                        groupId: _fridgeGroupId,
+                        child: FloatingActionButton(
+                          heroTag: 'fridge_btn',
+                          backgroundColor: Colors.blue.shade200,
+                          shape: const CircleBorder(side: BorderSide(width: 2, color: Colors.black)),
+                          onPressed: () {
+                            setState(() {
+                              _showFridge = !_showFridge;
+                            });
+                          },
+                          child: Icon(Icons.kitchen, color: Colors.black, size: iconSize),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -521,7 +435,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (_) => FlappyBirdScreen(
                   deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
-                  isDeviceConnected: _isDeviceSynced,
+                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced,
                 ),
               ),
             ).then((_) {
@@ -536,7 +450,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (_) => OrchestraScreen(
                   deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
-                  isDeviceConnected: _isDeviceSynced,
+                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced,
                 ),
               ),
             ).then((_) {

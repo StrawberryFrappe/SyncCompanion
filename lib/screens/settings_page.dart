@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/device/device_service.dart';
 import '../services/cloud/cloud_service.dart';
 import '../game/virtual_pet_game.dart';
+import '../game/missions/mission_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.device, this.game});
@@ -820,6 +821,43 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ],
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Debug: Reset Missions
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              border: Border.all(width: 2, color: Colors.orange),
+              color: Colors.orange.shade50,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('DEBUG: MISSIONS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade100,
+                    foregroundColor: Colors.black,
+                    side: const BorderSide(width: 1, color: Colors.black),
+                  ),
+                  onPressed: () async {
+                    await MissionService().forceResetMissions();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Daily missions reset!'), duration: Duration(seconds: 2)),
+                      );
+                    }
+                  },
+                  child: const Text('RESET DAILY MISSIONS', style: TextStyle(fontSize: 10)),
+                ),
+                const SizedBox(height: 4),
+                const Text('Force regenerate all daily missions (clears progress)', 
+                  style: TextStyle(fontSize: 9, color: Colors.grey)),
               ],
             ),
           ),

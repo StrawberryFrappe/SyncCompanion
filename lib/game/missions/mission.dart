@@ -50,6 +50,15 @@ abstract class Mission {
     _progress = 0.0;
     _isClaimed = false;
   }
+
+  /// Serialize mission state to JSON
+  Map<String, dynamic> toJson();
+
+  /// Restore progress and claimed state from saved data
+  void restoreState(double savedProgress, bool claimed) {
+    _progress = savedProgress;
+    _isClaimed = claimed;
+  }
 }
 
 

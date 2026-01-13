@@ -17,6 +17,13 @@ enum DeviceConnectionState {
   connected,
 }
 
+/// UI-facing display status.
+enum DeviceDisplayStatus {
+  synced,    // Connected
+  waiting,   // Disconnected but has saved ID
+  searching, // Disconnected and no saved ID
+}
+
 abstract class DeviceEvent {}
 
 class ShakeEvent extends DeviceEvent {}
@@ -42,6 +49,11 @@ class DeviceService {
   Stream<DeviceConnectionState> get connectionState$ =>
       _connectionStateController.stream;
 
+  final StreamController<DeviceDisplayStatus> _displayStatusController =
+      StreamController.broadcast();
+  Stream<DeviceDisplayStatus> get displayStatus$ =>
+      _displayStatusController.stream;
+
   final StreamController<TelemetryData> _telemetryController =
       StreamController.broadcast();
   Stream<TelemetryData> get telemetry$ => _telemetryController.stream;
@@ -52,6 +64,15 @@ class DeviceService {
 
   DeviceConnectionState _currentState = DeviceConnectionState.disconnected;
   DeviceConnectionState get currentState => _currentState;
+  
+  DeviceDisplayStatus get currentDisplayStatus {
+    if (_currentState == DeviceConnectionState.connected) {
+      return DeviceDisplayStatus.synced;
+    }
+    // If not connected, check if we are "waiting" (saved ID exists) or "searching"
+    final hasSaved = _bluetooth.getSavedDeviceId() != null;
+    return hasSaved ? DeviceDisplayStatus.waiting : DeviceDisplayStatus.searching;
+  }
 
   StreamSubscription? _rawSub;
   StreamSubscription? _bleConnectionSub;
@@ -91,12 +112,17 @@ class DeviceService {
         _checkForHighLevelEvents(data);
       }
     });
+    
+    // Initial emission
+    _displayStatusController.add(currentDisplayStatus);
   }
 
   void _updateState(DeviceConnectionState newState) {
     if (_currentState != newState) {
       _currentState = newState;
       _connectionStateController.add(newState);
+      // Also update display status
+      _displayStatusController.add(currentDisplayStatus);
     }
   }
 

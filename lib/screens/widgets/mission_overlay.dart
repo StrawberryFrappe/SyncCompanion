@@ -87,90 +87,106 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
         final totalCount = missions.length;
         final allDone = totalCount > 0 && completedCount == totalCount;
 
-        return Stack(
-          alignment: Alignment.topRight,
-          children: [
-             // The toggle button
-            GestureDetector(
-              onTap: _toggleExpanded,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: allDone ? Colors.green : const Color(0xE6FFFFFF),
-                  shape: BoxShape.circle,
-                  border: Border.all(width: 2, color: Colors.black),
-                ),
-                child: Icon(
-                  allDone ? Icons.star : Icons.assignment,
-                  color: allDone ? Colors.white : Colors.black,
-                  size: 24,
-                ),
-              ),
-            ),
-            
-            // Expanded card list
-            if (_isExpanded)
-              Padding(
-                padding: const EdgeInsets.only(top: 50),
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  alignment: Alignment.topRight,
-                  child: Container(
-                    width: 280,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(width: 2, color: Colors.black),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Daily Missions', 
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                            Text('$completedCount/$totalCount',
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                        const Divider(thickness: 2),
-                        const SizedBox(height: 8),
-                        if (missions.isEmpty)
-                          const Text('No missions available today.'),
-                        ...missions.map((mission) => _buildMissionItem(mission)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            
-            // Notification badge if tasks pending
-            if (!allDone && !_isExpanded && totalCount > 0)
-              Positioned(
-                right: 0,
-                top: 0,
+        return TapRegion(
+          onTapOutside: (_) {
+            if (_isExpanded) {
+              _toggleExpanded();
+            }
+          },
+          child: Stack(
+            alignment: Alignment.topRight,
+            children: [
+               // The toggle button
+              GestureDetector(
+                onTap: _toggleExpanded,
                 child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: allDone ? Colors.green : const Color(0xE6FFFFFF),
                     shape: BoxShape.circle,
+                    border: Border.all(width: 2, color: Colors.black),
+                  ),
+                  child: Icon(
+                    allDone ? Icons.star : Icons.assignment,
+                    color: allDone ? Colors.white : Colors.black,
+                    size: 24,
                   ),
                 ),
               ),
-          ],
+              
+              // Expanded card list
+              // Expanded card list
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return Visibility(
+                    visible: _controller.status != AnimationStatus.dismissed,
+                    child: child!,
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 50),
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    alignment: Alignment.topRight,
+                    child: Container(
+                      width: 280,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(width: 2, color: Colors.black),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Daily Missions', 
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              Text('$completedCount/$totalCount',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                          const Divider(thickness: 2),
+                          const SizedBox(height: 8),
+                          if (missions.isEmpty)
+                            const Text('No missions available today.'),
+                          ...missions.map((mission) => _buildMissionItem(mission)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Notification badge if tasks pending
+              if (!allDone && !_isExpanded && totalCount > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );

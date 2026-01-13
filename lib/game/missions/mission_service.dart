@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'mission.dart';
@@ -12,6 +12,9 @@ class MissionService {
   static final MissionService _instance = MissionService._internal();
   factory MissionService() => _instance;
   MissionService._internal();
+
+  static const String _missionDataKey = 'daily_missions_data';
+  static const String _lastResetKey = 'last_mission_reset';
 
   List<Mission> _activeMissions = [];
   List<Mission> get activeMissions => List.unmodifiable(_activeMissions);
@@ -32,7 +35,7 @@ class MissionService {
   Future<void> init(PetStats stats) async {
     _petStats = stats;
     await _loadMissions();
-    _checkDailyReset();
+    await _checkDailyReset();
   }
 
   /// Update all active missions with new context
@@ -54,6 +57,7 @@ class MissionService {
     }
 
     if (stateChanged) {
+      _saveProgress();
       _notifyListeners();
     }
   }
@@ -89,7 +93,7 @@ class MissionService {
     // Generate 3 random missions for the day
     // In a real app, use a seed based on the date so it's deterministic
     final missions = <Mission>[
-      SyncDurationMission(targetDuration: 30 * 60, rewardGold: 50), // 30 mins
+      SyncDurationMission(targetDuration: 10 * 60, rewardGold: 50), // 10 mins
       MinigamePlayMission(targetPlays: 3, rewardGold: 30),
       FeedPetMission(targetFeeds: 3, rewardGold: 20),
     ];
@@ -100,18 +104,67 @@ class MissionService {
     _notifyListeners();
   }
 
+  /// Force reset daily missions (for debug/testing)
+  Future<void> forceResetMissions() async {
+    await _generateDailyMissions();
+  }
+
   Future<void> _loadMissions() async {
-    // TODO: persist mission state to prefs so progress survives app restart
-    // For now, just generate if empty
-    if (_activeMissions.isEmpty) {
-      await _generateDailyMissions();
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Load last reset date
+    final lastResetMs = prefs.getInt(_lastResetKey);
+    if (lastResetMs != null) {
+      _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+    }
+    
+    // Load serialized missions
+    final missionJson = prefs.getString(_missionDataKey);
+    if (missionJson != null) {
+      try {
+        final List<dynamic> missionList = jsonDecode(missionJson);
+        _activeMissions = missionList
+            .map((json) => _missionFromJson(json as Map<String, dynamic>))
+            .whereType<Mission>()
+            .toList();
+        
+        if (_activeMissions.isNotEmpty) {
+          _notifyListeners();
+          return;
+        }
+      } catch (e) {
+        print('[MissionService] Error loading missions: $e');
+      }
+    }
+    
+    // If we couldn't load, generate new missions
+    await _generateDailyMissions();
+  }
+
+  Mission? _missionFromJson(Map<String, dynamic> json) {
+    final type = json['type'] as String?;
+    switch (type) {
+      case 'sync_duration':
+        return SyncDurationMission.fromJson(json);
+      case 'minigame_play':
+        return MinigamePlayMission.fromJson(json);
+      case 'feed_pet':
+        return FeedPetMission.fromJson(json);
+      default:
+        print('[MissionService] Unknown mission type: $type');
+        return null;
     }
   }
 
   Future<void> _saveProgress() async {
-    // TODO: serialized mission state to prefs
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('last_mission_reset', _lastResetDate.millisecondsSinceEpoch);
+    
+    // Save last reset date
+    await prefs.setInt(_lastResetKey, _lastResetDate.millisecondsSinceEpoch);
+    
+    // Serialize and save all missions
+    final missionList = _activeMissions.map((m) => m.toJson()).toList();
+    await prefs.setString(_missionDataKey, jsonEncode(missionList));
   }
 
   void _notifyListeners() {

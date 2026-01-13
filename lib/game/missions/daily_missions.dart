@@ -37,6 +37,31 @@ class SyncDurationMission extends Mission {
     progress = (_currentDuration / targetDuration).clamp(0.0, 1.0);
     return isCompleted;
   }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'sync_duration',
+    'targetDuration': targetDuration,
+    'currentDuration': _currentDuration,
+    'rewardGold': _goldReward,
+    'rewardHappiness': _happinessReward,
+    'progress': progress,
+    'claimed': isClaimed,
+  };
+
+  factory SyncDurationMission.fromJson(Map<String, dynamic> json) {
+    final mission = SyncDurationMission(
+      targetDuration: (json['targetDuration'] as num).toDouble(),
+      rewardGold: json['rewardGold'] as int,
+      rewardHappiness: (json['rewardHappiness'] as num?)?.toDouble() ?? 0.05,
+    );
+    mission._currentDuration = (json['currentDuration'] as num?)?.toDouble() ?? 0.0;
+    mission.restoreState(
+      (json['progress'] as num?)?.toDouble() ?? 0.0,
+      json['claimed'] as bool? ?? false,
+    );
+    return mission;
+  }
 }
 
 /// Mission: Play any minigame.
@@ -80,6 +105,29 @@ class MinigamePlayMission extends Mission {
     super.reset();
     _currentPlays = 0;
   }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'minigame_play',
+    'targetPlays': targetPlays,
+    'currentPlays': _currentPlays,
+    'rewardGold': _goldReward,
+    'progress': progress,
+    'claimed': isClaimed,
+  };
+
+  factory MinigamePlayMission.fromJson(Map<String, dynamic> json) {
+    final mission = MinigamePlayMission(
+      targetPlays: json['targetPlays'] as int,
+      rewardGold: json['rewardGold'] as int,
+    );
+    mission._currentPlays = json['currentPlays'] as int? ?? 0;
+    mission.restoreState(
+      (json['progress'] as num?)?.toDouble() ?? 0.0,
+      json['claimed'] as bool? ?? false,
+    );
+    return mission;
+  }
 }
 
 /// Mission: Feed the pet.
@@ -122,5 +170,28 @@ class FeedPetMission extends Mission {
   void reset() {
     super.reset();
     _currentFeeds = 0;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'feed_pet',
+    'targetFeeds': targetFeeds,
+    'currentFeeds': _currentFeeds,
+    'rewardGold': _goldReward,
+    'progress': progress,
+    'claimed': isClaimed,
+  };
+
+  factory FeedPetMission.fromJson(Map<String, dynamic> json) {
+    final mission = FeedPetMission(
+      targetFeeds: json['targetFeeds'] as int,
+      rewardGold: json['rewardGold'] as int,
+    );
+    mission._currentFeeds = json['currentFeeds'] as int? ?? 0;
+    mission.restoreState(
+      (json['progress'] as num?)?.toDouble() ?? 0.0,
+      json['claimed'] as bool? ?? false,
+    );
+    return mission;
   }
 }
