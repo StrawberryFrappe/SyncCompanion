@@ -25,7 +25,7 @@ class BluetoothService {
   BluetoothService._internal();
 
   // Toggle detailed BLE debug logs (set false to silence)
-  static const bool BLE_DEBUG = true;
+  static const bool BLE_DEBUG = false;
 
   // Events that require a UI interaction (dialogs). The UI should listen
   // to `userAction$` and show the appropriate prompt. After the user acts,

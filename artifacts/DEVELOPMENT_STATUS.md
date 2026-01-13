@@ -34,7 +34,7 @@
     *   [ ] Additional minigames
     *   [ ] Bug fixes and polish
 
-### Phase 4: Cloud Connectivity (CURRENT)
+### Phase 4: Cloud Connectivity (DONE)
 *   **Goal**: Report user engagement and mission completions to the cloud.
 *   [x] **Mission System**: Generic framework for trackable tasks (e.g., "Walked 10 min", "Played minigame").
 *   [x] **HTTP to Thingsboard**: Send batched events via HTTPS (not MQTT).
@@ -42,9 +42,9 @@
 *   [x] **Persistent Queue**: SQLite/Hive queue that survives app restarts and prolonged offline periods.
 *   [x] **Background Sync**: Retry uploads when connectivity returns.
 *   [x] **Directory Refactoring**: Reorganized services into `device/`, `cloud/`, `notifications/` subdirectories.
-*   [ ] **Credentials**: Pre-provisioned device-to-cloud pairing (no user login).
+*   [x] **Credentials**: Pre-provisioned device-to-cloud pairing (no user login).
 
-### Phase 5: Evolution & Cleanup
+### Phase 5: Evolution & Cleanup (CURRENT)
 *   **Goal**: Long-term health of the codebase.
 *   [ ] Code hardening and optimization.
 *   [ ] E2E testing (Discovery -> Connect -> Telemetry).
