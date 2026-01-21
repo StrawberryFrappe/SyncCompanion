@@ -22,6 +22,9 @@ class BioData {
   /// Whether the sensor is connected and working
   final bool sensorConnected;
   
+  /// Whether finger/wrist is detected on sensor (based on signal magnitude)
+  final bool fingerDetected;
+  
   /// Whether a human is detected (valid BPM and SpO2)
   final bool humanDetected;
   
@@ -32,11 +35,12 @@ class BioData {
     this.bpm = 0,
     this.spo2 = 0,
     this.sensorConnected = false,
+    this.fingerDetected = false,
     this.humanDetected = false,
   });
   
   @override
-  String toString() => 'BioData(bpm: $bpm, spo2: $spo2%, ir: $rawIr, red: $rawRed)';
+  String toString() => 'BioData(bpm: $bpm, spo2: $spo2%, ir: $rawIr, red: $rawRed, finger: $fingerDetected)';
 }
 
 /// Beat detector states (based on MAX30100 reference implementation)
@@ -83,6 +87,21 @@ class BioSignalProcessor {
   static const int _maxBpmForHuman = 180;
   static const int _minSpo2ForHuman = 85;
   
+  // Finger/wrist presence detection
+  // When no finger, DC values are low (close to 0). With finger/wrist, DC magnitude is high.
+  // Values can go negative on wrist - check absolute magnitude.
+  static const double _minDcMagnitudeForFinger = 500.0;
+  
+  // Signal amplitude validation - minimum peak-to-peak amplitude to consider valid
+  static const double _minPeakToPeakAmplitude = 30.0;
+  
+  // Beat stability - max variation between consecutive beat intervals
+  static const double _maxBeatVariabilityRatio = 0.5; // 50%
+  
+  // SpO2 physiological range (wrist readings stay >90%)
+  static const int _minPhysiologicalSpO2 = 70;
+  static const int _maxPhysiologicalSpO2 = 100;
+  
   // DC removal state
   double _dcIr = 0.0;
   double _dcRed = 0.0;
@@ -96,11 +115,18 @@ class BioSignalProcessor {
   double _lastMaxValue = 0;
   int _tsLastBeat = 0; // In sample counts
   int _sampleCount = 0;
+  double _lastBeatIntervalMs = 0; // For beat stability check
   int _initStartSample = 0;
   
   // Waveform buffer
   final Queue<double> _irBuffer = Queue<double>();
   static const int _bufferSeconds = 5;
+  
+  // Amplitude tracking for finger detection
+  double _recentMinIr = 0;
+  double _recentMaxIr = 0;
+  int _amplitudeSampleCount = 0;
+  static const int _amplitudeWindowSamples = 60; // 1 second at 60Hz
   
   // SpO2 calculator state
   double _irAcSqSum = 0;
@@ -141,6 +167,7 @@ class BioSignalProcessor {
         rawIr: 0,
         rawRed: 0,
         sensorConnected: true,
+        fingerDetected: false,
         humanDetected: false,
       );
       _bioDataController.add(_latestBioData);
@@ -163,6 +190,34 @@ class BioSignalProcessor {
     final filteredIr = rawIr - _dcIr;
     final filteredRed = rawRed - _dcRed;
     
+    // === Finger/Wrist Presence Detection ===
+    // Check DC magnitude - with no finger, values are low (close to 0)
+    // With finger/wrist, DC magnitude is high (can go negative on wrist)
+    final dcMagnitude = _dcIr.abs();
+    final fingerDetected = _dcInitialized && dcMagnitude >= _minDcMagnitudeForFinger;
+    
+    // Track amplitude for additional validation
+    _updateAmplitudeTracking(filteredIr);
+    final amplitude = _recentMaxIr - _recentMinIr;
+    final signalStrong = amplitude >= _minPeakToPeakAmplitude;
+    
+    // If no finger detected, reset state and return zeros
+    if (!fingerDetected) {
+      _resetOnNoFinger();
+      _latestBioData = BioData(
+        rawIr: rawIr,
+        rawRed: rawRed,
+        filteredIr: filteredIr,
+        bpm: 0,
+        spo2: 0,
+        sensorConnected: true,
+        fingerDetected: false,
+        humanDetected: false,
+      );
+      _bioDataController.add(_latestBioData);
+      return;
+    }
+    
     // === Store for waveform display ===
     final maxBufferSize = (_sampleRate * _bufferSeconds).toInt();
     _irBuffer.addLast(filteredIr);
@@ -179,30 +234,37 @@ class BioSignalProcessor {
     
     // === Calculate BPM from beat period ===
     int bpm = 0;
-    if (_beatPeriod > 0) {
+    if (_beatPeriod > 0 && signalStrong) {
       // beatPeriod is in ms
       bpm = (60000.0 / _beatPeriod).round().clamp(30, 220);
     }
     
-    // Update history for valid values
-    if (bpm >= _minBpmForHuman && bpm <= _maxBpmForHuman) {
+    // Update history for valid values (only if signal is strong)
+    if (signalStrong && bpm >= _minBpmForHuman && bpm <= _maxBpmForHuman) {
       _lastValidBpm = bpm;
       _bpmHistory.addLast(bpm);
       while (_bpmHistory.length > 30) _bpmHistory.removeFirst();
     }
     
-    if (_currentSpO2 >= _minSpo2ForHuman) {
-      _lastValidSpO2 = _currentSpO2;
-      _spo2History.addLast(_currentSpO2);
+    // SpO2 sanity check - must be in physiological range
+    int validSpO2 = _currentSpO2;
+    if (validSpO2 < _minPhysiologicalSpO2 || validSpO2 > _maxPhysiologicalSpO2) {
+      validSpO2 = 0; // Invalid reading
+    }
+    
+    if (signalStrong && validSpO2 >= _minSpo2ForHuman) {
+      _lastValidSpO2 = validSpO2;
+      _spo2History.addLast(validSpO2);
       while (_spo2History.length > 10) _spo2History.removeFirst();
     }
     
-    // Display last valid values (persistence)
-    final displayBpm = bpm > 0 ? bpm : _lastValidBpm;
-    final displaySpO2 = _currentSpO2 > 0 ? _currentSpO2 : _lastValidSpO2;
+    // Display last valid values (persistence) - only if signal still strong
+    final displayBpm = (signalStrong && bpm > 0) ? bpm : (signalStrong ? _lastValidBpm : 0);
+    final displaySpO2 = (signalStrong && validSpO2 > 0) ? validSpO2 : (signalStrong ? _lastValidSpO2 : 0);
     
-    // Human detection
-    final humanDetected = _bpmHistory.length >= 3 && 
+    // Human detection - need consistent history and valid readings
+    final humanDetected = signalStrong &&
+                          _bpmHistory.length >= 3 && 
                           _spo2History.isNotEmpty &&
                           displayBpm >= _minBpmForHuman && 
                           displayBpm <= _maxBpmForHuman;
@@ -214,6 +276,7 @@ class BioSignalProcessor {
       bpm: displayBpm,
       spo2: displaySpO2,
       sensorConnected: true,
+      fingerDetected: fingerDetected,
       humanDetected: humanDetected,
     );
     
@@ -260,19 +323,31 @@ class BioSignalProcessor {
       case _BeatState.maybeDetected:
         if (sample + _stepResiliency < _threshold) {
           // Found a beat!
-          beatDetected = true;
           _lastMaxValue = sample;
           _state = _BeatState.masking;
           
           if (_tsLastBeat > 0) {
             final deltaMs = timeSinceLastBeatMs;
             if (deltaMs > 0) {
-              // Low-pass filter the beat period
-              if (_beatPeriod == 0) {
-                _beatPeriod = deltaMs;
-              } else {
-                _beatPeriod = _bpFilterAlpha * deltaMs + 
-                             (1 - _bpFilterAlpha) * _beatPeriod;
+              // Beat stability check - reject if variation is too high
+              bool beatStable = true;
+              if (_lastBeatIntervalMs > 0 && _beatPeriod > 0) {
+                final avgInterval = _beatPeriod;
+                final variation = (deltaMs - avgInterval).abs() / avgInterval;
+                beatStable = variation <= _maxBeatVariabilityRatio;
+              }
+              
+              if (beatStable) {
+                beatDetected = true;
+                _lastBeatIntervalMs = deltaMs;
+                
+                // Low-pass filter the beat period
+                if (_beatPeriod == 0) {
+                  _beatPeriod = deltaMs;
+                } else {
+                  _beatPeriod = _bpFilterAlpha * deltaMs + 
+                               (1 - _bpFilterAlpha) * _beatPeriod;
+                }
               }
             }
           }
@@ -348,7 +423,38 @@ class BioSignalProcessor {
     _beatPeriod = 0;
     _lastMaxValue = 0;
     _tsLastBeat = 0;
+    _lastBeatIntervalMs = 0;
     _initStartSample = _sampleCount;
+  }
+  
+  /// Update amplitude tracking for signal strength validation.
+  void _updateAmplitudeTracking(double sample) {
+    if (_amplitudeSampleCount == 0) {
+      _recentMinIr = sample;
+      _recentMaxIr = sample;
+    } else {
+      if (sample < _recentMinIr) _recentMinIr = sample;
+      if (sample > _recentMaxIr) _recentMaxIr = sample;
+    }
+    _amplitudeSampleCount++;
+    
+    // Reset window periodically
+    if (_amplitudeSampleCount >= _amplitudeWindowSamples) {
+      _amplitudeSampleCount = 0;
+    }
+  }
+  
+  /// Reset state when finger is removed from sensor.
+  void _resetOnNoFinger() {
+    _resetBeatDetector();
+    _resetSpO2Calculator();
+    _bpmHistory.clear();
+    _spo2History.clear();
+    _lastValidBpm = 0;
+    _lastValidSpO2 = 0;
+    _recentMinIr = 0;
+    _recentMaxIr = 0;
+    _amplitudeSampleCount = 0;
   }
   
   void _resetSpO2Calculator() {
@@ -377,6 +483,9 @@ class BioSignalProcessor {
     _spo2History.clear();
     _lastValidBpm = 0;
     _lastValidSpO2 = 0;
+    _recentMinIr = 0;
+    _recentMaxIr = 0;
+    _amplitudeSampleCount = 0;
     _latestBioData = const BioData();
   }
   

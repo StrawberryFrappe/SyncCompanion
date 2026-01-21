@@ -174,13 +174,17 @@ class _PulseOximeterScreenState extends State<PulseOximeterScreen> {
       statusColor = const Color(0xFF888888);
       statusText = 'INITIALIZING...';
       statusIcon = Icons.hourglass_empty;
+    } else if (!_latestData.fingerDetected) {
+      statusColor = const Color(0xFFFFAA00);
+      statusText = 'PLACE FINGER ON SENSOR';
+      statusIcon = Icons.touch_app;
     } else if (_latestData.humanDetected) {
       statusColor = const Color(0xFF00FF00);
       statusText = 'SIGNAL GOOD';
       statusIcon = Icons.check_circle;
     } else {
       statusColor = const Color(0xFFFFAA00);
-      statusText = 'DETECTING...';
+      statusText = 'DETECTING HEARTBEAT...';
       statusIcon = Icons.sensors;
     }
     
@@ -207,12 +211,15 @@ class _PulseOximeterScreenState extends State<PulseOximeterScreen> {
           ),
           if (_latestData.sensorConnected) ...[
             const Spacer(),
-            Text(
-              'IR: ${_latestData.rawIr ?? 0}  RED: ${_latestData.rawRed ?? 0}',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 10,
-                fontFamily: 'monospace',
+            Flexible(
+              child: Text(
+                'IR: ${_latestData.rawIr ?? 0}  RED: ${_latestData.rawRed ?? 0}',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
           ],
