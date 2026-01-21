@@ -5,7 +5,9 @@ import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' hide BluetoothService;
 
 import 'bluetooth_service.dart';
+import 'bio_signal_processor.dart';
 export 'bluetooth_service.dart' show BluetoothUserAction, BluetoothUserActionType;
+export 'bio_signal_processor.dart' show BioData;
 
 
 /// High-level device state.
@@ -18,9 +20,10 @@ enum DeviceConnectionState {
 
 /// UI-facing display status.
 enum DeviceDisplayStatus {
-  synced,    // Connected
-  waiting,   // Disconnected but has saved ID
-  searching, // Disconnected and no saved ID
+  synced,     // Connected AND human detected
+  connected,  // Connected but no human detected
+  waiting,    // Disconnected but has saved ID
+  searching,  // Disconnected and no saved ID
 }
 
 abstract class DeviceEvent {}
@@ -66,7 +69,11 @@ class DeviceService {
   
   DeviceDisplayStatus get currentDisplayStatus {
     if (_currentState == DeviceConnectionState.connected) {
-      return DeviceDisplayStatus.synced;
+      // Check if human is detected via bio sensor
+      if (_bioProcessor.latestBioData.humanDetected) {
+        return DeviceDisplayStatus.synced;
+      }
+      return DeviceDisplayStatus.connected;
     }
     // If not connected, check if we are "waiting" (saved ID exists) or "searching"
     final hasSaved = _bluetooth.getSavedDeviceId() != null;
@@ -76,6 +83,13 @@ class DeviceService {
   StreamSubscription? _rawSub;
   StreamSubscription? _bleConnectionSub;
   StreamSubscription? _nativeConnectionSub;
+  StreamSubscription? _bioSub;
+
+  // Bio signal processing
+  final BioSignalProcessor _bioProcessor = BioSignalProcessor();
+  Stream<BioData> get bioData$ => _bioProcessor.bioData$;
+  BioData get latestBioData => _bioProcessor.latestBioData;
+  List<double> get waveformData => _bioProcessor.getWaveformData();
 
   // Configuration
   double _shakeThreshold = 2.5;
@@ -109,7 +123,18 @@ class DeviceService {
       if (data != null) {
         _telemetryController.add(data);
         _checkForHighLevelEvents(data);
+        
+        // Process bio sensor data if present
+        if (data.rawIr != null && data.rawRed != null) {
+          _bioProcessor.process(data.rawIr!, data.rawRed!);
+        }
       }
+    });
+    
+    // Listen to bio data changes to update display status
+    _bioSub = _bioProcessor.bioData$.listen((_) {
+      // Re-emit display status when human detection changes
+      _displayStatusController.add(currentDisplayStatus);
     });
     
     // Initial emission
@@ -186,7 +211,10 @@ class DeviceService {
     _rawSub?.cancel();
     _bleConnectionSub?.cancel();
     _nativeConnectionSub?.cancel();
+    _bioSub?.cancel();
+    _bioProcessor.dispose();
     _connectionStateController.close();
+    _displayStatusController.close();
     _telemetryController.close();
     _eventsController.close();
   }
@@ -194,9 +222,17 @@ class DeviceService {
 
 /// Decoded IMU telemetry data from the M5-IMU-Sensor device.
 /// 
-/// The device sends 12 bytes: 6 × int16 little-endian values.
-/// - Accelerometer (ax, ay, az): raw value ÷ 100 = g
+/// The device sends 12 or 16 bytes:
+/// - 12 bytes: 6 × int16 little-endian (IMU only)
+/// - 16 bytes: 8 × int16 little-endian (IMU + Bio sensor)
+/// 
+/// IMU Data:
+/// - Accelerometer (ax, ay, az): raw value ÷ 1000 = g
 /// - Gyroscope (gx, gy, gz): raw value ÷ 10 = deg/s
+/// 
+/// Bio Sensor Data:
+/// - rawIr: Raw infrared light intensity (or null if not present)
+/// - rawRed: Raw red LED light intensity (or null if not present)
 class TelemetryData {
   /// Accelerometer X-axis in g
   final double ax;
@@ -210,6 +246,10 @@ class TelemetryData {
   final double gy;
   /// Gyroscope Z-axis in deg/s
   final double gz;
+  /// Raw IR value from bio sensor (null if not present, -1 if sensor error)
+  final int? rawIr;
+  /// Raw RED value from bio sensor (null if not present, -1 if sensor error)
+  final int? rawRed;
 
   const TelemetryData({
     required this.ax,
@@ -218,6 +258,8 @@ class TelemetryData {
     required this.gx,
     required this.gy,
     required this.gz,
+    this.rawIr,
+    this.rawRed,
   });
 
   /// Magnitude of the acceleration vector.
@@ -225,16 +267,17 @@ class TelemetryData {
   /// At rest, this should be ~1.0g (gravity).
   double get magnitude => sqrt(ax * ax + ay * ay + az * az);
 
-  /// Factory to decode 12-byte IMU payload.
+  /// Factory to decode 12 or 16-byte payload.
   /// Returns null if bytes are invalid.
   static TelemetryData? fromBytes(List<int> bytes) {
-    if (bytes.length != 12) return null;
+    // Support both 12-byte (IMU only) and 16-byte (IMU + Bio) payloads
+    if (bytes.length != 12 && bytes.length != 16) return null;
     
     try {
       final data = Uint8List.fromList(bytes);
       final byteData = ByteData.sublistView(data);
       
-      // Read 6 × int16 little-endian
+      // Read 6 × int16 little-endian for IMU
       final rawAx = byteData.getInt16(0, Endian.little);
       final rawAy = byteData.getInt16(2, Endian.little);
       final rawAz = byteData.getInt16(4, Endian.little);
@@ -242,13 +285,25 @@ class TelemetryData {
       final rawGy = byteData.getInt16(8, Endian.little);
       final rawGz = byteData.getInt16(10, Endian.little);
       
+      // Read bio sensor data if present (16-byte payload)
+      int? rawIr;
+      int? rawRed;
+      if (bytes.length == 16) {
+        // Bio values are transmitted as int16 but represent uint16
+        // -1 (0xFFFF) indicates sensor error
+        rawIr = byteData.getInt16(12, Endian.little);
+        rawRed = byteData.getInt16(14, Endian.little);
+      }
+      
       return TelemetryData(
-        ax: rawAx / 100.0,
-        ay: rawAy / 100.0,
-        az: rawAz / 100.0,
+        ax: rawAx / 1000.0,
+        ay: rawAy / 1000.0,
+        az: rawAz / 1000.0,
         gx: rawGx / 10.0,
         gy: rawGy / 10.0,
         gz: rawGz / 10.0,
+        rawIr: rawIr,
+        rawRed: rawRed,
       );
     } catch (_) {
       return null;
@@ -256,8 +311,11 @@ class TelemetryData {
   }
 
   @override
-  String toString() => 
-      'A:(${ax.toStringAsFixed(2)}, ${ay.toStringAsFixed(2)}, ${az.toStringAsFixed(2)}) '
-      'G:(${gx.toStringAsFixed(1)}, ${gy.toStringAsFixed(1)}, ${gz.toStringAsFixed(1)})';
+  String toString() {
+    final bio = rawIr != null ? ' IR:$rawIr RED:$rawRed' : '';
+    return 'A:(${ax.toStringAsFixed(2)}, ${ay.toStringAsFixed(2)}, ${az.toStringAsFixed(2)}) '
+           'G:(${gx.toStringAsFixed(1)}, ${gy.toStringAsFixed(1)}, ${gz.toStringAsFixed(1)})$bio';
+  }
 }
+
 

@@ -33,6 +33,10 @@ class GameHud extends StatelessWidget {
         statusColor = Colors.green;
         statusText = 'SYNCED';
         break;
+      case DeviceDisplayStatus.connected:
+        statusColor = Colors.blue;
+        statusText = 'CONNECTED';
+        break;
       case DeviceDisplayStatus.waiting:
         statusColor = Colors.amber;
         statusText = 'WAITING';

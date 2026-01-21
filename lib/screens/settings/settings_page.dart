@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/device/device_service.dart';
 import '../../services/cloud/cloud_service.dart';
 import '../../game/virtual_pet_game.dart';
+import '../pulse_oximeter/pulse_oximeter_screen.dart';
 
 import 'sections/stat_rates_section.dart';
 import 'sections/notifications_section.dart';
@@ -337,7 +338,6 @@ class _SettingsPageState extends State<SettingsPage> {
               setState(() {}); // Refresh pending count
             },
           ),
-          
           const SizedBox(height: 12),
           
           // Connection Status
@@ -346,6 +346,26 @@ class _SettingsPageState extends State<SettingsPage> {
             nativeStatusReceived: _nativeStatusReceived,
             deviceId: _deviceId,
           ),
+          
+          // Pulse Oximeter Button (only when connected)
+          if (_isConnected) ...[
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A3A1A),
+                foregroundColor: const Color(0xFF00FF00),
+                side: const BorderSide(width: 2, color: Color(0xFF00AA00)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PulseOximeterScreen(device: widget.device),
+                ),
+              ),
+              icon: const Icon(Icons.monitor_heart),
+              label: const Text('PULSE OXIMETER', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
+            ),
+          ],
           
           const SizedBox(height: 12),
           
