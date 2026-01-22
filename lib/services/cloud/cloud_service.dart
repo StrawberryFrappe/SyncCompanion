@@ -191,16 +191,19 @@ class CloudService {
   Future<bool> _sendEvent(CloudEvent event) async {
     try {
       // ThingsBoard telemetry API format
-      // Encapsulate payload in a single JSON field for cleaner terminal output
       final url = Uri.parse('$_baseUrl/api/v1/$_deviceToken/telemetry');
-      final telemetryData = {
+      final eventData = {
         'event_type': event.eventType,
         ...event.payload,
       };
+      
+      // Use 'mission' key for mission events, 'telemetry' for others
+      final key = event.eventType == 'mission_completed' ? 'mission' : 'telemetry';
+      
       final body = jsonEncode({
         'ts': event.timestamp.millisecondsSinceEpoch,
         'values': {
-          'telemetry': jsonEncode(telemetryData),
+          key: jsonEncode(eventData),
         },
       });
 
