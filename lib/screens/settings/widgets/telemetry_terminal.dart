@@ -49,20 +49,36 @@ class _TelemetryTerminalState extends State<TelemetryTerminal> {
     final hasRecent = _lastPacketAt != null && DateTime.now().difference(_lastPacketAt!).inMilliseconds < 2000;
     return Container(
       padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(width: 2, color: const Color(0xFF00FF00)),
+        borderRadius: BorderRadius.circular(4),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (!hasRecent)
-            const Text('— no recent packets —', style: TextStyle(fontSize: 10, fontFamily: 'monospace')),
+            const Text(
+              '— no recent packets —',
+              style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF00FF00)),
+            ),
           Expanded(
             child: Scrollbar(
+              thumbVisibility: true,
               child: ListView.builder(
                 controller: _scroll,
                 itemCount: _lines.isEmpty ? 1 : _lines.length,
                 itemBuilder: (ctx, i) {
-                  if (_lines.isEmpty) return const Text('— no incoming packets yet —', style: TextStyle(fontSize: 10, fontFamily: 'monospace'));
-                  return Text(_lines[i], style: const TextStyle(fontSize: 10, fontFamily: 'monospace'));
+                  if (_lines.isEmpty) {
+                    return const Text(
+                      '— no incoming packets yet —',
+                      style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF00FF00)),
+                    );
+                  }
+                  return Text(
+                    _lines[i],
+                    style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF00FF00)),
+                  );
                 },
               ),
             ),

@@ -7,21 +7,12 @@ class DebugSection extends StatelessWidget {
   final bool fakeSyncValue;
   final ValueChanged<bool?> onFakeSyncEnabledChanged;
   final ValueChanged<bool?> onFakeSyncValueChanged;
-  final String adapterState;
-  final bool bgServiceRunning;
-  final String status;
-  final Map<String, bool> permissionStatuses;
-
   const DebugSection({
     super.key,
     required this.fakeSyncEnabled,
     required this.fakeSyncValue,
     required this.onFakeSyncEnabledChanged,
     required this.onFakeSyncValueChanged,
-    required this.adapterState,
-    required this.bgServiceRunning,
-    required this.status,
-    required this.permissionStatuses,
   });
 
   @override
@@ -116,29 +107,6 @@ class DebugSection extends StatelessWidget {
               const SizedBox(height: 4),
               const Text('Force regenerate all daily missions (clears progress)', 
                 style: TextStyle(fontSize: 9, color: Colors.grey)),
-            ],
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Debug Info
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(border: Border.all(width: 1, color: Colors.grey)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Debug Info:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('Adapter: $adapterState', style: const TextStyle(fontSize: 8)),
-              Text('BG Service: ${bgServiceRunning ? "Running" : "Stopped"}', style: const TextStyle(fontSize: 8)),
-              Text('Status: $status', style: const TextStyle(fontSize: 8)),
-              if (permissionStatuses.isNotEmpty)
-                Text(
-                  'Perms: ${permissionStatuses.entries.map((e) => '${e.key.split('.').last}:${e.value?"Y":"N"}').join(', ')}',
-                  style: const TextStyle(fontSize: 8),
-                ),
             ],
           ),
         ),

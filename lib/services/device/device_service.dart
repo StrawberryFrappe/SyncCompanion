@@ -67,10 +67,16 @@ class DeviceService {
   DeviceConnectionState _currentState = DeviceConnectionState.disconnected;
   DeviceConnectionState get currentState => _currentState;
   
+  // Grace period for sync status (2 seconds)
+  static const Duration _syncGracePeriod = Duration(seconds: 2);
+  Timer? _syncGraceTimer;
+  bool _inSyncGracePeriod = false;
+  bool _wasHumanDetected = false;
+  
   DeviceDisplayStatus get currentDisplayStatus {
     if (_currentState == DeviceConnectionState.connected) {
-      // Check if human is detected via bio sensor
-      if (_bioProcessor.latestBioData.humanDetected) {
+      // Check if human is detected via bio sensor OR in grace period
+      if (_bioProcessor.latestBioData.humanDetected || _inSyncGracePeriod) {
         return DeviceDisplayStatus.synced;
       }
       return DeviceDisplayStatus.connected;
@@ -131,14 +137,38 @@ class DeviceService {
       }
     });
     
-    // Listen to bio data changes to update display status
-    _bioSub = _bioProcessor.bioData$.listen((_) {
-      // Re-emit display status when human detection changes
-      _displayStatusController.add(currentDisplayStatus);
+    // Listen to bio data changes to update display status with grace period
+    _bioSub = _bioProcessor.bioData$.listen((bioData) {
+      _handleHumanDetectionChange(bioData.humanDetected);
     });
     
     // Initial emission
     _displayStatusController.add(currentDisplayStatus);
+  }
+  
+  /// Handle human detection changes with grace period.
+  void _handleHumanDetectionChange(bool humanDetected) {
+    if (humanDetected) {
+      // Human detected - cancel any pending grace timer and update
+      _syncGraceTimer?.cancel();
+      _inSyncGracePeriod = false;
+      _wasHumanDetected = true;
+      _displayStatusController.add(currentDisplayStatus);
+    } else if (_wasHumanDetected && !_inSyncGracePeriod) {
+      // Human just lost - start grace period
+      _inSyncGracePeriod = true;
+      _syncGraceTimer?.cancel();
+      _syncGraceTimer = Timer(_syncGracePeriod, () {
+        // Grace period expired
+        _inSyncGracePeriod = false;
+        _wasHumanDetected = false;
+        _displayStatusController.add(currentDisplayStatus);
+      });
+      // Don't emit yet - still in grace period, status unchanged
+    } else if (!_wasHumanDetected) {
+      // Never was synced, just emit current status
+      _displayStatusController.add(currentDisplayStatus);
+    }
   }
 
   void _updateState(DeviceConnectionState newState) {
@@ -205,13 +235,14 @@ class DeviceService {
   Future<bool> performEnableBluetooth() => _bluetooth.performEnableBluetooth();
   Future<bool> performRequestPermissions() => _bluetooth.performRequestPermissions();
   Map<String, bool> get permissionStatuses => _bluetooth.permissionStatuses;
-  Future<void> setNotifShowData(bool value) => _bluetooth.setNotifShowData(value);
+
 
   void dispose() {
     _rawSub?.cancel();
     _bleConnectionSub?.cancel();
     _nativeConnectionSub?.cancel();
     _bioSub?.cancel();
+    _syncGraceTimer?.cancel();
     _bioProcessor.dispose();
     _connectionStateController.close();
     _displayStatusController.close();

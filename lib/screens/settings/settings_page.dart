@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/device/device_service.dart';
 import '../../services/cloud/cloud_service.dart';
@@ -11,7 +11,6 @@ import 'sections/stat_rates_section.dart';
 import 'sections/notifications_section.dart';
 import 'sections/flappy_game_section.dart';
 import 'sections/cloud_sync_section.dart';
-import 'sections/connection_status_section.dart';
 import 'sections/debug_section.dart';
 import 'widgets/telemetry_terminal.dart';
 
@@ -26,10 +25,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _notifShowData = true;
   bool _loading = true;
   bool _isConnected = false;
-  String? _deviceId;
   
   // Stat rates
   double _hungerDecayRate = 0.01;
@@ -42,44 +39,30 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _fakeSyncEnabled = false;
   bool _fakeSyncValue = false;
   
-  // Debug info
-  String _adapterState = 'unknown';
-  Map<String, bool> _permissionStatuses = {};
-  bool _bgServiceRunning = false;
-  String _status = 'SEARCHING';
-  bool _nativeStatusReceived = false;
-  
   // Cloud configuration
   final CloudService _cloud = CloudService();
   String _cloudBaseUrl = '';
   String _cloudDeviceToken = '';
   
-  static const MethodChannel _platform = MethodChannel('sync_companion/bluetooth');
   Timer? _statDisplayTimer;
   StreamSubscription<DeviceConnectionState>? _nativeConnSub;
 
   @override
   void initState() {
     super.initState();
-    _loadPrefs();
     _loadPersisted();
     _loadPersistedRates();
     _loadFakeSyncSettings();
     _loadCloudConfig();
-    _loadDebugInfo();
     
     _nativeConnSub = widget.device.connectionState$.listen((state) {
       if (!mounted) return;
       final connected = state == DeviceConnectionState.connected;
       setState(() {
         _isConnected = connected;
-        _nativeStatusReceived = true;
-        _status = connected ? 'SYNCED' : 'SEARCHING';
       });
       if (connected) {
         _loadPersistedDeviceId();
-      } else {
-        setState(() => _deviceId = null);
       }
     });
     
@@ -96,24 +79,15 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final v = prefs.getBool('notif_show_data');
-    setState(() {
-      _notifShowData = v == null ? false : v;
-      _loading = false;
-    });
-  }
-
   Future<void> _loadPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getString('saved_device_id');
-    if (id != null) {
-      setState(() {
+    setState(() {
+      if (id != null) {
         _isConnected = true;
-        _deviceId = id;
-      });
-    }
+      }
+      _loading = false;
+    });
   }
   
   Future<void> _loadPersistedRates() async {
@@ -227,37 +201,10 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
   
-  Future<void> _loadDebugInfo() async {
-    try {
-      final result = await _platform.invokeMethod<Map>('getDebugInfo');
-      if (result != null) {
-        setState(() {
-          _adapterState = result['adapterState'] ?? 'unknown';
-          _bgServiceRunning = result['serviceRunning'] ?? false;
-          final perms = result['permissions'];
-          if (perms is Map) {
-            _permissionStatuses = perms.map((k, v) => MapEntry(k.toString(), v == true));
-          }
-        });
-      }
-    } catch (_) {}
-  }
+
 
   Future<void> _loadPersistedDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final id = prefs.getString('saved_device_id');
-    if (id != null) {
-      setState(() => _deviceId = id);
-    }
-  }
-
-  Future<void> _setShowData(bool v) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notif_show_data', v);
-    setState(() => _notifShowData = v);
-    try {
-      await widget.device.setNotifShowData(v);
-    } catch (_) {}
+    // No-op: device ID loading is now handled elsewhere
   }
 
   @override
@@ -340,16 +287,26 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           
-          // Connection Status
-          ConnectionStatusSection(
-            isConnected: _isConnected,
-            nativeStatusReceived: _nativeStatusReceived,
-            deviceId: _deviceId,
+          // Debug Section
+          DebugSection(
+            fakeSyncEnabled: _fakeSyncEnabled,
+            fakeSyncValue: _fakeSyncValue,
+            onFakeSyncEnabledChanged: (val) {
+              setState(() => _fakeSyncEnabled = val ?? false);
+              _saveFakeSyncSettings();
+            },
+            onFakeSyncValueChanged: (val) {
+              if (val != null) {
+                setState(() => _fakeSyncValue = val);
+                _saveFakeSyncSettings();
+              }
+            },
           ),
           
-          // Pulse Oximeter Button (only when connected)
+          // Device-specific buttons (only when connected)
           if (_isConnected) ...[
             const SizedBox(height: 12),
+            // Pulse Oximeter Button
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A3A1A),
@@ -365,52 +322,48 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: const Icon(Icons.monitor_heart),
               label: const Text('PULSE OXIMETER', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
             ),
-          ],
-          
-          const SizedBox(height: 12),
-          
-          // Debug Section
-          DebugSection(
-            fakeSyncEnabled: _fakeSyncEnabled,
-            fakeSyncValue: _fakeSyncValue,
-            onFakeSyncEnabledChanged: (val) {
-              setState(() => _fakeSyncEnabled = val ?? false);
-              _saveFakeSyncSettings();
-            },
-            onFakeSyncValueChanged: (val) {
-              if (val != null) {
-                setState(() => _fakeSyncValue = val);
-                _saveFakeSyncSettings();
-              }
-            },
-            adapterState: _adapterState,
-            bgServiceRunning: _bgServiceRunning,
-            status: _status,
-            permissionStatuses: _permissionStatuses,
-          ),
-          
-          // Telemetry Terminal (if connected)
-          if (_isConnected) ...[
-            const SizedBox(height: 12),
-            const Text('Incoming Data:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 200,
-              child: TelemetryTerminal(device: widget.device, maxLines: 100),
+            const SizedBox(height: 8),
+            // Raw Data Terminal Button
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[900],
+                foregroundColor: Colors.white,
+                side: const BorderSide(width: 2, color: Colors.black),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _RawDataTerminalScreen(device: widget.device),
+                ),
+              ),
+              icon: const Icon(Icons.terminal),
+              label: const Text('RAW DATA TERMINAL', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
             ),
           ],
-          
-          const SizedBox(height: 12),
-          
-          // Notification Settings
-          SwitchListTile(
-            title: const Text('Notification: show live data', style: TextStyle(fontSize: 12)),
-            subtitle: const Text('When off, notification shows "Your device is synced"', style: TextStyle(fontSize: 10)),
-            value: _notifShowData,
-            onChanged: (v) => _setShowData(v),
-            contentPadding: EdgeInsets.zero,
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full-screen raw data terminal view.
+class _RawDataTerminalScreen extends StatelessWidget {
+  final DeviceService device;
+  
+  const _RawDataTerminalScreen({required this.device});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Raw Data Terminal', style: TextStyle(fontSize: 14)),
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
+      ),
+      backgroundColor: Colors.black,
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: TelemetryTerminal(device: device, maxLines: 500),
       ),
     );
   }

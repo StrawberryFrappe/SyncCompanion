@@ -67,10 +67,10 @@ class MissionService {
       _petStats!.applyMissionReward(mission.goldReward, mission.happinessReward);
     }
     
-    // Log to cloud
-    CloudService().logMissionCompleted(
-      missionId: mission.id, 
-      missionTitle: mission.title
+    // Log to cloud with new telemetry format
+    CloudService().logMissionCompletedV2(
+      timestamp: DateTime.now(),
+      missionId: mission.id,
     );
     
     // Notify UI for banner

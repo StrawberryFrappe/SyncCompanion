@@ -224,7 +224,7 @@ void setup() {
     }
 
     // 4. BLE Setup
-    BLEDevice::init("Jun's Magical Watch of Measurement");
+    BLEDevice::init("Magical Watch of Measurement");
     BLEServer *pServer = BLEDevice::createServer();
     pServer->setCallbacks(new ServerCallback());
     BLEService *pService = pServer->createService(SERVICE_UUID);

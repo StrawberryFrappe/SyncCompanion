@@ -18,8 +18,8 @@ class CloudService {
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   // Configurable cloud settings (can be changed in Advanced Settings)
-  String _baseUrl = 'http://192.168.1.100:8080';
-  String _deviceToken = 'YOUR_DEVICE_ACCESS_TOKEN';
+  String _baseUrl = 'http://200.13.5.20:8080';
+  String _deviceToken = 'uwautRSJ5BVg1ZbdsZLC';
   
   // Preference keys
   static const String _prefKeyBaseUrl = 'cloud_base_url';
@@ -58,8 +58,8 @@ class CloudService {
   /// Load configuration from shared preferences
   Future<void> _loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? 'http://192.168.1.100:8080';
-    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? 'YOUR_DEVICE_ACCESS_TOKEN';
+    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? 'http://200.13.5.20:8080';
+    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? 'uwautRSJ5BVg1ZbdsZLC';
   }
 
   /// Update cloud configuration
@@ -123,6 +123,32 @@ class CloudService {
     });
   }
 
+  /// Report sync status at minute boundary (new telemetry format)
+  Future<void> logSyncStatus({
+    required DateTime timestamp,
+    required bool synced,
+    required int avgBpm,
+    required int avgSpo2,
+  }) async {
+    await logEvent('sync_status', {
+      'timestamp': timestamp.toIso8601String(),
+      'synced': synced,
+      'avg_bpm': avgBpm,
+      'avg_spo2': avgSpo2,
+    });
+  }
+
+  /// Report mission completion with timestamp (new telemetry format)
+  Future<void> logMissionCompletedV2({
+    required DateTime timestamp,
+    required String missionId,
+  }) async {
+    await logEvent('mission_completed', {
+      'timestamp': timestamp.toIso8601String(),
+      'mission_id': missionId,
+    });
+  }
+
   Future<void> logMinigamePlayed({
     required String gameId,
     required int score,
@@ -175,12 +201,16 @@ class CloudService {
   Future<bool> _sendEvent(CloudEvent event) async {
     try {
       // ThingsBoard telemetry API format
+      // Encapsulate payload in a single JSON field for cleaner terminal output
       final url = Uri.parse('$_baseUrl/api/v1/$_deviceToken/telemetry');
+      final telemetryData = {
+        'event_type': event.eventType,
+        ...event.payload,
+      };
       final body = jsonEncode({
         'ts': event.timestamp.millisecondsSinceEpoch,
         'values': {
-          'event_type': event.eventType,
-          ...event.payload,
+          'telemetry': jsonEncode(telemetryData),
         },
       });
 
