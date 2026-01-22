@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 /// Processed bio-sensor data with calculated vitals.
 class BioData {
@@ -98,12 +99,17 @@ class FilterBuLp1 {
 /// Based on the reference implementation from Arduino-MAX30100 library.
 /// Uses state machine for beat detection and log-ratio for SpO2.
 class BioSignalProcessor {
+  // Debug mode - set to true to enable console logging
+  static const bool _debugMode = true;
+  int _debugLogCounter = 0;
+  static const int _debugLogInterval = 50; // Log every N samples (0.5s at 100Hz)
+  
   // Timing configuration (updated for 100Hz)
   static const double _sampleRate = 100.0;
   static const double _samplePeriodMs = 1000.0 / _sampleRate; // 10ms
   
   // Beat detector constants (from reference library)
-  static const double _initHoldoffMs = 2000; // Wait before counting
+  static const double _initHoldoffMs = 1000; // Reduced from 2000 for faster response
   static const double _maskingHoldoffMs = 200; // Non-retriggerable window after beat
   static const double _invalidReadoutDelayMs = 2000; // Reset if no beat for this long
   static const double _bpFilterAlpha = 0.6; // EMA factor for beat period
@@ -125,7 +131,7 @@ class BioSignalProcessor {
   
   // Human detection parameters
   static const int _minBpmForHuman = 40;
-  static const int _maxBpmForHuman = 180;
+  static const int _maxBpmForHuman = 200; // Increased for children
   static const int _minSpo2ForHuman = 85;
   
   // Finger/wrist presence detection
@@ -319,25 +325,39 @@ class BioSignalProcessor {
     final displayBpm = (fingerDetected && bpm > 0) ? bpm : (fingerDetected ? _lastValidBpm : 0);
     final displaySpO2 = (fingerDetected && validSpO2 > 0) ? validSpO2 : (fingerDetected ? _lastValidSpO2 : 0);
     
-    // False Positive Check: BPM Variance
-    // If the BPM is jumping around wildly (e.g. 60 -> 140 -> 60), it's likely noise/motion artifact
-    final bpmStdDev = _calculateBpmStdDev();
-    final isBpmStable = _bpmHistory.length < 3 || bpmStdDev < 25.0; // Allow variance, or skip check if not enough data
+    // SIMPLIFIED Human Detection (Phase 1: Basic)
+    // Start with minimal requirements, add more checks if false positives occur
+    // This breaks the circular dependency on needing history before detecting
+    final hasValidVitals = displayBpm >= _minBpmForHuman && 
+                           displayBpm <= _maxBpmForHuman &&
+                           displaySpO2 >= _minSpo2ForHuman;
     
-    // Human detection requirements:
-    // 1. Finger must be detected (raw IR > threshold)
-    // 2. Sufficient BPM history (at least 3 samples)
-    // 3. SpO2 history exists
-    // 4. Current displayed BPM is reasonable
-    // 5. Finger has been present for sustained period (0.5 second)
-    // 6. BPM is stable (if enough history)
+    // Sustained finger presence check (0.5 second)
+    final fingerSustained = _consecutiveValidSamples > 50;
+    
+    // BPM stability check (only if we have enough history)
+    final bpmStdDev = _calculateBpmStdDev();
+    final isBpmStable = _bpmHistory.length < 3 || bpmStdDev < 30.0; // Relaxed from 25.0
+    
+    // Human detection: finger + vitals + sustained + stable
     final humanDetected = fingerDetected &&
-                          _bpmHistory.length >= 3 && 
-                          _spo2History.isNotEmpty &&
-                          displayBpm >= _minBpmForHuman && 
-                          displayBpm <= _maxBpmForHuman &&
-                          _consecutiveValidSamples > 50 && // > 0.5 second at 100Hz
+                          hasValidVitals &&
+                          fingerSustained &&
                           isBpmStable;
+    
+    // Debug logging
+    if (_debugMode) {
+      _debugLogCounter++;
+      if (_debugLogCounter >= _debugLogInterval) {
+        _debugLogCounter = 0;
+        debugPrint('[BIO] IR:$rawIr Filt:${filteredIr.toStringAsFixed(1)} '
+                   'State:$_state Thr:${_threshold.toStringAsFixed(1)}');
+        debugPrint('[BIO] BPM:$displayBpm SpO2:$displaySpO2 '
+                   'Hist:${_bpmHistory.length} Consec:$_consecutiveValidSamples');
+        debugPrint('[BIO] Finger:$fingerDetected Human:$humanDetected '
+                   'Amp:${amplitude.toStringAsFixed(1)} Strong:$signalStrong StdDev:${bpmStdDev.toStringAsFixed(1)}');
+      }
+    }
 
     _latestBioData = BioData(
       rawIr: rawIr,
@@ -411,6 +431,11 @@ class BioSignalProcessor {
           }
           
           _tsLastBeat = _sampleCount;
+          
+          // Debug: log beat detection
+          if (_debugMode) {
+            debugPrint('[BIO] *** BEAT DETECTED *** Period:${_beatPeriod.toStringAsFixed(0)}ms');
+          }
         } else {
           _state = _BeatState.followingSlope;
         }

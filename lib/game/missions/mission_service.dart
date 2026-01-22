@@ -62,21 +62,19 @@ class MissionService {
     }
   }
 
-  void _handleMissionCompletion(Mission mission) {
+  Future<void> _handleMissionCompletion(Mission mission) async {
     if (_petStats != null) {
       _petStats!.applyMissionReward(mission.goldReward, mission.happinessReward);
     }
     
-    // Log to cloud with new telemetry format
-    CloudService().logMissionCompletedV2(
+    // Log to cloud - await to ensure it's sent
+    await CloudService().logMissionCompleted(
       timestamp: DateTime.now(),
       missionId: mission.id,
     );
     
     // Notify UI for banner
     _completionController.add(mission);
-    
-    _saveProgress();
   }
 
   Future<void> _checkDailyReset() async {
