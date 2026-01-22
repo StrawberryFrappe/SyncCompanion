@@ -113,16 +113,6 @@ class CloudService {
     });
   }
 
-  Future<void> logMissionCompleted({
-    required String missionId,
-    required String missionTitle,
-  }) async {
-    await logEvent('mission_completed', {
-      'mission_id': missionId,
-      'mission_title': missionTitle,
-    });
-  }
-
   /// Report sync status at minute boundary (new telemetry format)
   Future<void> logSyncStatus({
     required DateTime timestamp,
@@ -138,8 +128,8 @@ class CloudService {
     });
   }
 
-  /// Report mission completion with timestamp (new telemetry format)
-  Future<void> logMissionCompletedV2({
+  /// Report mission completion
+  Future<void> logMissionCompleted({
     required DateTime timestamp,
     required String missionId,
   }) async {
