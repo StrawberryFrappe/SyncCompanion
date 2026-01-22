@@ -73,6 +73,10 @@ class DeviceService {
   bool _inSyncGracePeriod = false;
   bool _wasHumanDetected = false;
   
+  // Debounce buffer - require consecutive "no human" samples before triggering grace
+  static const int _noHumanDebounceThreshold = 20; // ~200ms at 100Hz
+  int _consecutiveNoHumanSamples = 0;
+  
   DeviceDisplayStatus get currentDisplayStatus {
     if (_currentState == DeviceConnectionState.connected) {
       // Check if human is detected via bio sensor OR in grace period
@@ -146,28 +150,38 @@ class DeviceService {
     _displayStatusController.add(currentDisplayStatus);
   }
   
-  /// Handle human detection changes with grace period.
+  /// Handle human detection changes with grace period and debounce.
   void _handleHumanDetectionChange(bool humanDetected) {
     if (humanDetected) {
-      // Human detected - cancel any pending grace timer and update
+      // Human detected - cancel any pending grace timer, reset debounce, and update
       _syncGraceTimer?.cancel();
       _inSyncGracePeriod = false;
+      _consecutiveNoHumanSamples = 0; // Reset debounce counter
       _wasHumanDetected = true;
       _displayStatusController.add(currentDisplayStatus);
-    } else if (_wasHumanDetected && !_inSyncGracePeriod) {
-      // Human just lost - start grace period
-      _inSyncGracePeriod = true;
-      _syncGraceTimer?.cancel();
-      _syncGraceTimer = Timer(_syncGracePeriod, () {
-        // Grace period expired
-        _inSyncGracePeriod = false;
-        _wasHumanDetected = false;
+    } else {
+      // Human not detected - increment debounce counter
+      _consecutiveNoHumanSamples++;
+      
+      if (_wasHumanDetected && !_inSyncGracePeriod) {
+        // Was synced, check if debounce threshold met
+        if (_consecutiveNoHumanSamples >= _noHumanDebounceThreshold) {
+          // Debounce threshold met - start grace period
+          _inSyncGracePeriod = true;
+          _syncGraceTimer?.cancel();
+          _syncGraceTimer = Timer(_syncGracePeriod, () {
+            // Grace period expired
+            _inSyncGracePeriod = false;
+            _wasHumanDetected = false;
+            _displayStatusController.add(currentDisplayStatus);
+          });
+        }
+        // Don't emit yet - either still in debounce or grace period
+      } else if (!_wasHumanDetected) {
+        // Never was synced, just emit current status
         _displayStatusController.add(currentDisplayStatus);
-      });
-      // Don't emit yet - still in grace period, status unchanged
-    } else if (!_wasHumanDetected) {
-      // Never was synced, just emit current status
-      _displayStatusController.add(currentDisplayStatus);
+      }
+      // If already in grace period, do nothing - let the timer handle it
     }
   }
 

@@ -134,9 +134,11 @@ class BioSignalProcessor {
   static const int _maxBpmForHuman = 200; // Increased for children
   static const int _minSpo2ForHuman = 85;
   
-  // Finger/wrist presence detection
+  // Finger/wrist presence detection with hysteresis
   // When no finger, Raw IR is low. With finger/wrist, Raw IR is high.
-  static const int _minRawIrForFinger = 5000;
+  static const int _fingerOnThreshold = 5000;   // IR must exceed this to detect finger
+  static const int _fingerOffThreshold = 3000;  // IR must drop below this to lose finger
+  bool _fingerDetectedState = false;  // Latched state for hysteresis
   
   // Signal amplitude validation - minimum peak-to-peak amplitude to consider valid
   // The LP filtered signal might be smaller, adjusted accordingly
@@ -229,9 +231,14 @@ class BioSignalProcessor {
     // Invert input because pulse is a dip in IR (absorption)
     final double filteredIr = _lpfIr.step(-acIr);
     
-    // === Finger/Wrist Presence Detection ===
-    // Simple check on Raw IR magnitude
-    final fingerDetected = rawIr > _minRawIrForFinger;
+    // === Finger/Wrist Presence Detection with Hysteresis ===
+    // Use hysteresis to prevent jitter near threshold
+    if (!_fingerDetectedState && rawIr > _fingerOnThreshold) {
+      _fingerDetectedState = true;  // Turn ON
+    } else if (_fingerDetectedState && rawIr < _fingerOffThreshold) {
+      _fingerDetectedState = false; // Turn OFF
+    }
+    final fingerDetected = _fingerDetectedState;
     
     // Track amplitude of the FILTERED signal for additional validation
     _updateAmplitudeTracking(filteredIr);
@@ -541,6 +548,7 @@ class BioSignalProcessor {
     _recentMaxIr = 0;
     _amplitudeSampleCount = 0;
     _initialized = false;
+    _fingerDetectedState = false;  // Reset hysteresis state
   }
   
   void _resetSpO2Calculator() {
