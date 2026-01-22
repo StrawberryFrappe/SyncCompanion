@@ -86,8 +86,8 @@ class _PulseOximeterScreenState extends State<PulseOximeterScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Vitals display (BPM and SpO2)
-              _buildVitalsRow(),
+              // Status bar at top for visibility
+              _buildStatusBar(),
               
               const SizedBox(height: 16),
               
@@ -98,8 +98,8 @@ class _PulseOximeterScreenState extends State<PulseOximeterScreen> {
               
               const SizedBox(height: 16),
               
-              // Status bar
-              _buildStatusBar(),
+              // Vitals display (BPM and SpO2)
+              _buildVitalsRow(),
             ],
           ),
         ),
@@ -195,31 +195,33 @@ class _PulseOximeterScreenState extends State<PulseOximeterScreen> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: statusColor.withAlpha(100), width: 1),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(statusIcon, color: statusColor, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            statusText,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontFamily: 'Monocraft',
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(statusIcon, color: statusColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 12,
+                  fontFamily: 'Monocraft',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
           if (_latestData.sensorConnected) ...[
-            const Spacer(),
-            Flexible(
-              child: Text(
-                'IR: ${_latestData.rawIr ?? 0}  RED: ${_latestData.rawRed ?? 0}',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                ),
+            const SizedBox(height: 4),
+            Text(
+              'IR: ${_latestData.rawIr ?? 0}  RED: ${_latestData.rawRed ?? 0}',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 10,
+                fontFamily: 'monospace',
               ),
             ),
           ],
@@ -291,13 +293,16 @@ class _VitalCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: isActive ? Colors.white : Colors.grey.shade700,
-              fontSize: 42,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Monocraft',
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.grey.shade700,
+                fontSize: 42,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Monocraft',
+              ),
             ),
           ),
           Text(

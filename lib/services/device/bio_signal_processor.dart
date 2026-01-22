@@ -189,8 +189,8 @@ class BioSignalProcessor {
   
   /// Process raw IR and RED values from the sensor.
   void process(int rawIr, int rawRed) {
-    // Handle sensor error/disconnected state
-    if (rawIr == -1 || rawIr == 65535 || rawRed == -1 || rawRed == 65535) {
+    // Handle sensor error/disconnected state (65535 = 0xFFFF = sensor error)
+    if (rawIr == 65535 || rawRed == 65535) {
       _latestBioData = const BioData(
         sensorConnected: false,
         humanDetected: false,
@@ -288,14 +288,11 @@ class BioSignalProcessor {
       bpm = (60000.0 / _beatPeriod).round().clamp(30, 220);
     }
     
-    // Update history for valid values (only if signal is strong)
-    bool isValidSample = false;
-    
-    if (signalStrong && bpm >= _minBpmForHuman && bpm <= _maxBpmForHuman) {
+    // Update history for valid BPM values
+    if (bpm >= _minBpmForHuman && bpm <= _maxBpmForHuman) {
       _lastValidBpm = bpm;
       _bpmHistory.addLast(bpm);
       while (_bpmHistory.length > 30) _bpmHistory.removeFirst();
-      isValidSample = true;
     }
     
     // SpO2 sanity check - must be in physiological range
@@ -304,41 +301,42 @@ class BioSignalProcessor {
       validSpO2 = 0; // Invalid reading
     }
     
-    if (signalStrong && validSpO2 >= _minSpo2ForHuman) {
+    if (validSpO2 >= _minSpo2ForHuman) {
       _lastValidSpO2 = validSpO2;
       _spo2History.addLast(validSpO2);
       while (_spo2History.length > 10) _spo2History.removeFirst();
     }
 
-    // Track consecutive valid samples to filter out momentary noise bursts
-    if (isValidSample) {
+    // Track consecutive samples with finger present (not BPM validity)
+    // This prevents momentary sensor glitches from triggering false positives
+    if (fingerDetected) {
       _consecutiveValidSamples++;
     } else {
       _consecutiveValidSamples = 0;
     }
     
-    // Display last valid values (persistence) - only if signal still strong
-    final displayBpm = (signalStrong && bpm > 0) ? bpm : (signalStrong ? _lastValidBpm : 0);
-    final displaySpO2 = (signalStrong && validSpO2 > 0) ? validSpO2 : (signalStrong ? _lastValidSpO2 : 0);
+    // Display last valid values (persistence) - only if finger detected
+    final displayBpm = (fingerDetected && bpm > 0) ? bpm : (fingerDetected ? _lastValidBpm : 0);
+    final displaySpO2 = (fingerDetected && validSpO2 > 0) ? validSpO2 : (fingerDetected ? _lastValidSpO2 : 0);
     
     // False Positive Check: BPM Variance
     // If the BPM is jumping around wildly (e.g. 60 -> 140 -> 60), it's likely noise/motion artifact
     final bpmStdDev = _calculateBpmStdDev();
-    final isBpmStable = bpmStdDev < 20.0; // Allow some variance (arrhythmia/adjustment) but not chaos
+    final isBpmStable = _bpmHistory.length < 3 || bpmStdDev < 25.0; // Allow variance, or skip check if not enough data
     
     // Human detection requirements:
-    // 1. Signal amplitude is strong (handled by signalStrong)
-    // 2. Sufficient history needed (at least 3 BPM samples)
+    // 1. Finger must be detected (raw IR > threshold)
+    // 2. Sufficient BPM history (at least 3 samples)
     // 3. SpO2 history exists
     // 4. Current displayed BPM is reasonable
-    // 5. [NEW] Signal has been valid for a sustained period (> 1 second)
-    // 6. [NEW] BPM is stable (low variance)
-    final humanDetected = signalStrong &&
+    // 5. Finger has been present for sustained period (0.5 second)
+    // 6. BPM is stable (if enough history)
+    final humanDetected = fingerDetected &&
                           _bpmHistory.length >= 3 && 
                           _spo2History.isNotEmpty &&
                           displayBpm >= _minBpmForHuman && 
                           displayBpm <= _maxBpmForHuman &&
-                          _consecutiveValidSamples > 100 && // > 1 second at 100Hz
+                          _consecutiveValidSamples > 50 && // > 0.5 second at 100Hz
                           isBpmStable;
 
     _latestBioData = BioData(

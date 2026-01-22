@@ -320,10 +320,10 @@ class TelemetryData {
       int? rawIr;
       int? rawRed;
       if (bytes.length == 16) {
-        // Bio values are transmitted as int16 but represent uint16
-        // -1 (0xFFFF) indicates sensor error
-        rawIr = byteData.getInt16(12, Endian.little);
-        rawRed = byteData.getInt16(14, Endian.little);
+        // Bio values are UNSIGNED 16-bit (0-65535)
+        // 65535 (0xFFFF) indicates sensor error
+        rawIr = byteData.getUint16(12, Endian.little);
+        rawRed = byteData.getUint16(14, Endian.little);
       }
       
       return TelemetryData(
