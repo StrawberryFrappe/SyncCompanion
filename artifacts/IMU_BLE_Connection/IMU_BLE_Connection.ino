@@ -238,8 +238,7 @@ void setup() {
 void loop() {
     M5.update();
     
-    // 60Hz Loop Cycle (~16ms)
-    delay(16); 
+    delay(10); 
 
     // 1. Read Internal IMU (Hardware I2C)
     float ax, ay, az, gx, gy, gz;

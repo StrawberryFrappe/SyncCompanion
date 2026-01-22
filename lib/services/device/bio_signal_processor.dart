@@ -52,14 +52,55 @@ enum _BeatState {
   masking,
 }
 
+/// DC Remover filter from MAX30100 library
+/// http://sam-koblenski.blogspot.de/2015/11/everyday-dsp-for-programmers-dc-and.html
+class DCRemover {
+  final double alpha;
+  double _dcw = 0.0;
+
+  DCRemover({this.alpha = 0.95});
+
+  double step(double x) {
+    final double olddcw = _dcw;
+    _dcw = x + alpha * _dcw;
+    return _dcw - olddcw;
+  }
+
+  double getDCW() {
+    return _dcw;
+  }
+  
+  void reset() {
+    _dcw = 0.0;
+  }
+}
+
+/// Low pass butterworth filter order=1 alpha1=0.1
+/// Fs=100Hz, Fc=6Hz
+/// http://www.schwietering.com/jayduino/filtuino/
+class FilterBuLp1 {
+  final List<double> _v = [0.0, 0.0];
+
+  double step(double x) {
+    _v[0] = _v[1];
+    _v[1] = (2.452372752527856026e-1 * x) + (0.50952544949442879485 * _v[0]);
+    return _v[0] + _v[1];
+  }
+  
+  void reset() {
+    _v[0] = 0.0;
+    _v[1] = 0.0;
+  }
+}
+
 /// Processes raw bio-sensor data from MAX30100 pulse oximeter.
 /// 
 /// Based on the reference implementation from Arduino-MAX30100 library.
 /// Uses state machine for beat detection and log-ratio for SpO2.
 class BioSignalProcessor {
-  // Timing configuration (converted to sample counts at 60Hz)
-  static const double _sampleRate = 60.0;
-  static const double _samplePeriodMs = 1000.0 / _sampleRate; // ~16.67ms
+  // Timing configuration (updated for 100Hz)
+  static const double _sampleRate = 100.0;
+  static const double _samplePeriodMs = 1000.0 / _sampleRate; // 10ms
   
   // Beat detector constants (from reference library)
   static const double _initHoldoffMs = 2000; // Wait before counting
@@ -88,25 +129,23 @@ class BioSignalProcessor {
   static const int _minSpo2ForHuman = 85;
   
   // Finger/wrist presence detection
-  // When no finger, DC values are low (close to 0). With finger/wrist, DC magnitude is high.
-  // Values can go negative on wrist - check absolute magnitude.
-  static const double _minDcMagnitudeForFinger = 500.0;
+  // When no finger, Raw IR is low. With finger/wrist, Raw IR is high.
+  static const int _minRawIrForFinger = 5000;
   
   // Signal amplitude validation - minimum peak-to-peak amplitude to consider valid
-  static const double _minPeakToPeakAmplitude = 30.0;
-  
-  // Beat stability - max variation between consecutive beat intervals
-  static const double _maxBeatVariabilityRatio = 0.5; // 50%
+  // The LP filtered signal might be smaller, adjusted accordingly
+  static const double _minPeakToPeakAmplitude = 2.0; 
   
   // SpO2 physiological range (wrist readings stay >90%)
   static const int _minPhysiologicalSpO2 = 70;
   static const int _maxPhysiologicalSpO2 = 100;
   
-  // DC removal state
-  double _dcIr = 0.0;
-  double _dcRed = 0.0;
-  bool _dcInitialized = false;
-  static const double _dcAlpha = 0.95;
+  // Filters
+  final DCRemover _dcFilterIr = DCRemover();
+  final DCRemover _dcFilterRed = DCRemover();
+  final FilterBuLp1 _lpfIr = FilterBuLp1();
+  
+  bool _initialized = false;
   
   // Beat detector state
   _BeatState _state = _BeatState.init;
@@ -115,7 +154,6 @@ class BioSignalProcessor {
   double _lastMaxValue = 0;
   int _tsLastBeat = 0; // In sample counts
   int _sampleCount = 0;
-  double _lastBeatIntervalMs = 0; // For beat stability check
   int _initStartSample = 0;
   
   // Waveform buffer
@@ -126,7 +164,7 @@ class BioSignalProcessor {
   double _recentMinIr = 0;
   double _recentMaxIr = 0;
   int _amplitudeSampleCount = 0;
-  static const int _amplitudeWindowSamples = 60; // 1 second at 60Hz
+  static const int _amplitudeWindowSamples = 100; // 1 second at 100Hz
   
   // SpO2 calculator state
   double _irAcSqSum = 0;
@@ -176,33 +214,32 @@ class BioSignalProcessor {
     
     _sampleCount++;
     
-    // === DC Removal (Exponential Moving Average) ===
-    if (!_dcInitialized) {
-      _dcIr = rawIr.toDouble();
-      _dcRed = rawRed.toDouble();
-      _dcInitialized = true;
-      _initStartSample = _sampleCount;
-    } else {
-      _dcIr = _dcAlpha * _dcIr + (1 - _dcAlpha) * rawIr;
-      _dcRed = _dcAlpha * _dcRed + (1 - _dcAlpha) * rawRed;
-    }
+    // === Signal Processing Pipeline ===
+    // 1. DC Removal
+    final double acIr = _dcFilterIr.step(rawIr.toDouble());
+    final double acRed = _dcFilterRed.step(rawRed.toDouble());
     
-    final filteredIr = rawIr - _dcIr;
-    final filteredRed = rawRed - _dcRed;
+    // 2. Low Pass Filtering (Butterworth) - Critical for noise rejection
+    // Invert input because pulse is a dip in IR (absorption)
+    final double filteredIr = _lpfIr.step(-acIr);
     
     // === Finger/Wrist Presence Detection ===
-    // Check DC magnitude - with no finger, values are low (close to 0)
-    // With finger/wrist, DC magnitude is high (can go negative on wrist)
-    final dcMagnitude = _dcIr.abs();
-    final fingerDetected = _dcInitialized && dcMagnitude >= _minDcMagnitudeForFinger;
+    // Simple check on Raw IR magnitude
+    final fingerDetected = rawIr > _minRawIrForFinger;
     
-    // Track amplitude for additional validation
+    // Track amplitude of the FILTERED signal for additional validation
     _updateAmplitudeTracking(filteredIr);
     final amplitude = _recentMaxIr - _recentMinIr;
     final signalStrong = amplitude >= _minPeakToPeakAmplitude;
     
-    // If no finger detected, reset state and return zeros
-    if (!fingerDetected) {
+    // Soft reset if no finger (just state, but don't stop processing stream completely if we want to see noise)
+    // Actually, if we don't reset, the state machine might drift. 
+    // But the user requested "no longer need the sensor to pause".
+    // Let's Keep processing but flag fingerDetected as false if rawIr is low.
+    
+    // Optimization: If rawIr is extremely low (e.g. < 1000), it's definitely air.
+    // If it's borderline, we process.
+    if (rawIr < 1000) {
       _resetOnNoFinger();
       _latestBioData = BioData(
         rawIr: rawIr,
@@ -211,11 +248,16 @@ class BioSignalProcessor {
         bpm: 0,
         spo2: 0,
         sensorConnected: true,
-        fingerDetected: false,
+        fingerDetected: false, // Explicitly false
         humanDetected: false,
       );
       _bioDataController.add(_latestBioData);
       return;
+    }
+    
+    if (!_initialized) {
+        _initialized = true;
+        _initStartSample = _sampleCount;
     }
     
     // === Store for waveform display ===
@@ -225,25 +267,35 @@ class BioSignalProcessor {
       _irBuffer.removeFirst();
     }
     
+    // === Anti-Freeze / Stale Data Protection ===
+    // If no beat detected for too long, flush history to prevent "sticking" to old values
+    final timeSinceLastBeatMs = (_sampleCount - _tsLastBeat) * _samplePeriodMs;
+    if (_tsLastBeat > 0 && timeSinceLastBeatMs > 5000) {
+      _flushHistory();
+    }
+    
     // === Beat Detection (State Machine) ===
     // The state machine will naturally reset if no valid beats found
     final beatDetected = _checkForBeat(filteredIr);
     
     // === SpO2 Calculation ===
-    _updateSpO2(filteredIr, filteredRed, beatDetected);
+    _updateSpO2(acIr, acRed, beatDetected);
     
     // === Calculate BPM from beat period ===
     int bpm = 0;
-    if (_beatPeriod > 0 && signalStrong) {
+    if (_beatPeriod > 0) {
       // beatPeriod is in ms
       bpm = (60000.0 / _beatPeriod).round().clamp(30, 220);
     }
     
     // Update history for valid values (only if signal is strong)
+    bool isValidSample = false;
+    
     if (signalStrong && bpm >= _minBpmForHuman && bpm <= _maxBpmForHuman) {
       _lastValidBpm = bpm;
       _bpmHistory.addLast(bpm);
       while (_bpmHistory.length > 30) _bpmHistory.removeFirst();
+      isValidSample = true;
     }
     
     // SpO2 sanity check - must be in physiological range
@@ -257,18 +309,38 @@ class BioSignalProcessor {
       _spo2History.addLast(validSpO2);
       while (_spo2History.length > 10) _spo2History.removeFirst();
     }
+
+    // Track consecutive valid samples to filter out momentary noise bursts
+    if (isValidSample) {
+      _consecutiveValidSamples++;
+    } else {
+      _consecutiveValidSamples = 0;
+    }
     
     // Display last valid values (persistence) - only if signal still strong
     final displayBpm = (signalStrong && bpm > 0) ? bpm : (signalStrong ? _lastValidBpm : 0);
     final displaySpO2 = (signalStrong && validSpO2 > 0) ? validSpO2 : (signalStrong ? _lastValidSpO2 : 0);
     
-    // Human detection - need consistent history and valid readings
+    // False Positive Check: BPM Variance
+    // If the BPM is jumping around wildly (e.g. 60 -> 140 -> 60), it's likely noise/motion artifact
+    final bpmStdDev = _calculateBpmStdDev();
+    final isBpmStable = bpmStdDev < 20.0; // Allow some variance (arrhythmia/adjustment) but not chaos
+    
+    // Human detection requirements:
+    // 1. Signal amplitude is strong (handled by signalStrong)
+    // 2. Sufficient history needed (at least 3 BPM samples)
+    // 3. SpO2 history exists
+    // 4. Current displayed BPM is reasonable
+    // 5. [NEW] Signal has been valid for a sustained period (> 1 second)
+    // 6. [NEW] BPM is stable (low variance)
     final humanDetected = signalStrong &&
                           _bpmHistory.length >= 3 && 
                           _spo2History.isNotEmpty &&
                           displayBpm >= _minBpmForHuman && 
-                          displayBpm <= _maxBpmForHuman;
-    
+                          displayBpm <= _maxBpmForHuman &&
+                          _consecutiveValidSamples > 100 && // > 1 second at 100Hz
+                          isBpmStable;
+
     _latestBioData = BioData(
       rawIr: rawIr,
       rawRed: rawRed,
@@ -276,7 +348,7 @@ class BioSignalProcessor {
       bpm: displayBpm,
       spo2: displaySpO2,
       sensorConnected: true,
-      fingerDetected: fingerDetected,
+      fingerDetected: fingerDetected, // Uses the robust raw check
       humanDetected: humanDetected,
     );
     
@@ -325,29 +397,17 @@ class BioSignalProcessor {
           // Found a beat!
           _lastMaxValue = sample;
           _state = _BeatState.masking;
+          beatDetected = true;
           
           if (_tsLastBeat > 0) {
             final deltaMs = timeSinceLastBeatMs;
             if (deltaMs > 0) {
-              // Beat stability check - reject if variation is too high
-              bool beatStable = true;
-              if (_lastBeatIntervalMs > 0 && _beatPeriod > 0) {
-                final avgInterval = _beatPeriod;
-                final variation = (deltaMs - avgInterval).abs() / avgInterval;
-                beatStable = variation <= _maxBeatVariabilityRatio;
-              }
-              
-              if (beatStable) {
-                beatDetected = true;
-                _lastBeatIntervalMs = deltaMs;
-                
-                // Low-pass filter the beat period
-                if (_beatPeriod == 0) {
-                  _beatPeriod = deltaMs;
-                } else {
-                  _beatPeriod = _bpFilterAlpha * deltaMs + 
-                               (1 - _bpFilterAlpha) * _beatPeriod;
-                }
+              // Low-pass filter the beat period
+              if (_beatPeriod == 0) {
+                _beatPeriod = deltaMs;
+              } else {
+                _beatPeriod = _bpFilterAlpha * deltaMs + 
+                             (1 - _bpFilterAlpha) * _beatPeriod;
               }
             }
           }
@@ -423,7 +483,6 @@ class BioSignalProcessor {
     _beatPeriod = 0;
     _lastMaxValue = 0;
     _tsLastBeat = 0;
-    _lastBeatIntervalMs = 0;
     _initStartSample = _sampleCount;
   }
   
@@ -448,6 +507,9 @@ class BioSignalProcessor {
   void _resetOnNoFinger() {
     _resetBeatDetector();
     _resetSpO2Calculator();
+    _dcFilterIr.reset();
+    _dcFilterRed.reset();
+    _lpfIr.reset();
     _bpmHistory.clear();
     _spo2History.clear();
     _lastValidBpm = 0;
@@ -455,6 +517,7 @@ class BioSignalProcessor {
     _recentMinIr = 0;
     _recentMaxIr = 0;
     _amplitudeSampleCount = 0;
+    _initialized = false;
   }
   
   void _resetSpO2Calculator() {
@@ -469,23 +532,39 @@ class BioSignalProcessor {
     return _irBuffer.toList();
   }
   
-  /// Reset all state.
-  void reset() {
-    _dcIr = 0;
-    _dcRed = 0;
-    _dcInitialized = false;
-    _irBuffer.clear();
-    _sampleCount = 0;
-    _resetBeatDetector();
-    _resetSpO2Calculator();
-    _currentSpO2 = 0;
+  // Track consecutive valid samples to ensure signal stability before confirming human
+  int _consecutiveValidSamples = 0;
+
+  void _flushHistory() {
     _bpmHistory.clear();
     _spo2History.clear();
     _lastValidBpm = 0;
     _lastValidSpO2 = 0;
-    _recentMinIr = 0;
-    _recentMaxIr = 0;
-    _amplitudeSampleCount = 0;
+    _consecutiveValidSamples = 0;
+    // We also reset the beat detector heavily to force resync
+    _resetBeatDetector();
+  }
+
+  double _calculateBpmStdDev() {
+    if (_bpmHistory.isEmpty) return 0.0;
+    
+    double sum = 0;
+    for (var b in _bpmHistory) sum += b;
+    double mean = sum / _bpmHistory.length;
+    
+    double varianceSum = 0;
+    for (var b in _bpmHistory) {
+      varianceSum += (b - mean) * (b - mean);
+    }
+    
+    return sqrt(varianceSum / _bpmHistory.length);
+  }
+  
+  /// Reset all state.
+  void reset() {
+    _irBuffer.clear();
+    _sampleCount = 0;
+    _resetOnNoFinger();
     _latestBioData = const BioData();
   }
   
