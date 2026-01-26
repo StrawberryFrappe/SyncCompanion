@@ -39,6 +39,21 @@ classDiagram
     DeviceService ..> DeviceEvent : emits
     DeviceService ..> TelemetryData : emits
 
+    %% Cloud Layer
+    class CloudService {
+        +init()
+        +logEvent(type, payload)
+        +flushQueue()
+    }
+
+    class TelemetryTracker {
+        +init()
+        -_onMinuteBoundary()
+    }
+
+    TelemetryTracker --> DeviceService : observes
+    TelemetryTracker --> CloudService : reports to
+
     %% Game Layer
     class FlameGame
     
@@ -102,6 +117,8 @@ classDiagram
 |---------|------|--------|
 | `BluetoothService` | Low-level BLE manager (scan, connect, foreground service) | `incomingRaw$` (bytes) |
 | `DeviceService` | High-level abstraction (parses bytes, detects gestures) | `telemetry$` (sensor data), `events$` (ShakeEvent, etc.) |
+| `CloudService` | Cloud connectivity & event queueing (ThingsBoard) | HTTP Telemetry |
+| `TelemetryTracker` | Aggregates data & tracks sessions | `sync_status`, `mission_completed` events |
 
 ### Game Layer (Flame Engine)
 | Component | Description |
@@ -116,8 +133,12 @@ classDiagram
 lib/
 ├── main.dart               # App entry point
 ├── services/
+├── services/
 │   ├── bluetooth_service.dart   # Low-level BLE
-│   └── device_service.dart      # High-level device abstraction
+│   ├── device_service.dart      # High-level device abstraction
+│   └── cloud/                   # Cloud connectivity
+│       ├── cloud_service.dart   # ThingsBoard API
+│       └── telemetry_tracker.dart # Session tracking
 ├── game/
 │   ├── virtual_pet_game.dart    # Main pet game
 │   ├── bob_the_blob.dart        # Pet implementation
@@ -137,7 +158,7 @@ flutter run -d <device-id>
 ## Development Status
 
 ### Current Stage: Stage 4 — Cloud Connectivity
-*Goals TBD — see `artifacts/DEVELOPMENT_STATUS.md` for details*
+*Accomplished — Telemetry streaming and Mission logging enabled*
 
 ### Stage History
 | Stage | Focus | Status |
@@ -145,4 +166,12 @@ flutter run -d <device-id>
 | 1 | **Connectivity** — Background BLE stability | ✅ Complete |
 | 2 | **Virtual Pet Base** — Hunger, Happiness, Currency | ✅ Complete |
 | 3 | **Telemetry Minigames** — Motion-controlled games | ✅ Accomplished |
-| 4 | **Cloud Connectivity** — Mission system + cloud sync | 🚧 In Progress |
+| 4 | **Cloud Connectivity** — Mission system + cloud sync | ✅ Accomplished |
+
+## Configuration
+
+To enable cloud telemetry:
+1. Go to **Settings** > **Advanced Settings**.
+2. Enter your **Cloud Base URL** (e.g., `http://YOUR_THINGSBOARD_IP:8080`).
+3. Enter your **Device Token**.
+4. The app will automatically start queuing and sending data when connected.
