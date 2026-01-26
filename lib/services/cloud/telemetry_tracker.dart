@@ -39,6 +39,8 @@ class TelemetryTracker {
   int _currentBpm = 0;
   int _currentSpo2 = 0;
 
+  bool _isDisposed = false;
+
   /// Initialize the telemetry tracker.
   Future<void> init() async {
     if (_isInitialized) return;
@@ -89,6 +91,8 @@ class TelemetryTracker {
 
   /// Schedule timer for next minute boundary.
   void _scheduleMinuteTimer() {
+    if (_isDisposed) return;
+
     final now = DateTime.now();
     final delay = _currentMinuteStart.difference(now);
     
@@ -101,6 +105,7 @@ class TelemetryTracker {
 
     _minuteTimer?.cancel();
     _minuteTimer = Timer(delay, () {
+      if (_isDisposed) return;
       _onMinuteBoundary();
       // Schedule next minute
       _currentMinuteStart = _currentMinuteStart.add(const Duration(minutes: 1));
@@ -137,7 +142,7 @@ class TelemetryTracker {
   void _onMinuteBoundary() {
     // Only send if device was connected at some point this minute
     if (!_wasConnectedThisMinute) {
-      print('[TelemetryTracker] Device not connected this minute, skipping');
+      // print('[TelemetryTracker] Device not connected this minute, skipping'); // optional noise reduction
       _resetMinuteCounters();
       return;
     }
@@ -180,6 +185,7 @@ class TelemetryTracker {
 
   /// Dispose resources.
   void dispose() {
+    _isDisposed = true;
     _displayStatusSub?.cancel();
     _bioDataSub?.cancel();
     _secondTimer?.cancel();

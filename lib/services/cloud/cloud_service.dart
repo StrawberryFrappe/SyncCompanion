@@ -18,8 +18,8 @@ class CloudService {
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   // Configurable cloud settings (can be changed in Advanced Settings)
-  String _baseUrl = 'http://200.13.5.20:8080';
-  String _deviceToken = 'uwautRSJ5BVg1ZbdsZLC';
+  String _baseUrl = '';
+  String _deviceToken = '';
   
   // Preference keys
   static const String _prefKeyBaseUrl = 'cloud_base_url';
@@ -49,17 +49,22 @@ class CloudService {
       _onConnectivityChanged,
     );
 
-    // Attempt initial flush
-    await flushQueue();
+    // Attempt initial flush logic only if configured
+    if (_isConfigured) {
+      await flushQueue();
+    }
 
     _isInitialized = true;
   }
 
+  /// Check if cloud service is configured with valid credentials
+  bool get _isConfigured => _baseUrl.isNotEmpty && _deviceToken.isNotEmpty;
+
   /// Load configuration from shared preferences
   Future<void> _loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? 'http://200.13.5.20:8080';
-    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? 'uwautRSJ5BVg1ZbdsZLC';
+    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? '';
+    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? '';
   }
 
   /// Update cloud configuration
@@ -78,13 +83,16 @@ class CloudService {
   /// Handle connectivity changes
   void _onConnectivityChanged(ConnectivityResult result) {
     final hasConnection = result != ConnectivityResult.none;
-    if (hasConnection && !_queue.isEmpty) {
+    if (hasConnection && !_queue.isEmpty && _isConfigured) {
       flushQueue();
     }
   }
 
   /// Log an event to be sent to the cloud
   Future<void> logEvent(String eventType, Map<String, dynamic> payload) async {
+    // silently ignore if not configured
+    if (!_isConfigured) return;
+
     final event = CloudEvent(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       timestamp: DateTime.now(),
@@ -153,7 +161,7 @@ class CloudService {
 
   /// Flush all queued events to the cloud
   Future<void> flushQueue() async {
-    if (_isFlushing || _queue.isEmpty) return;
+    if (_isFlushing || _queue.isEmpty || !_isConfigured) return;
     _isFlushing = true;
 
     try {
@@ -189,6 +197,8 @@ class CloudService {
 
   /// Send a single event to ThingsBoard
   Future<bool> _sendEvent(CloudEvent event) async {
+    if (!_isConfigured) return false;
+    
     try {
       // ThingsBoard telemetry API format
       final url = Uri.parse('$_baseUrl/api/v1/$_deviceToken/telemetry');
