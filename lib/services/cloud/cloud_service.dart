@@ -90,8 +90,11 @@ class CloudService {
 
   /// Log an event to be sent to the cloud
   Future<void> logEvent(String eventType, Map<String, dynamic> payload) async {
-    // silently ignore if not configured
-    if (!_isConfigured) return;
+    // Ignore if not configured, but log for debugging
+    if (!_isConfigured) {
+      print('[CloudService] Dropping event "$eventType": cloud service not configured');
+      return;
+    }
 
     final event = CloudEvent(
       id: DateTime.now().microsecondsSinceEpoch.toString(),

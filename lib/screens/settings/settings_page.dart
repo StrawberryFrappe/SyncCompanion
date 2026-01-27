@@ -29,10 +29,10 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _loading = true;
   bool _isConnected = false;
   
-  // Stat rates
-  double _hungerDecayRate = 0.01;
-  double _happinessGainRate = 0.02;
-  double _happinessDecayRate = 0.01;
+  // Stat rates (defaults: 6h decay, 2h gain)
+  double _hungerDecayRate = 0.0000463;
+  double _happinessGainRate = 0.0001389;
+  double _happinessDecayRate = 0.0000463;
   double _lowWellbeingThreshold = 0.25;
   double _flappyCoinMultiplier = 1.0;
   
@@ -94,20 +94,20 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadPersistedRates() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _hungerDecayRate = prefs.getDouble('hunger_decay_rate') ?? 0.01;
-      _happinessGainRate = prefs.getDouble('happiness_gain_rate') ?? 0.02;
-      _happinessDecayRate = prefs.getDouble('happiness_decay_rate') ?? 0.01;
-      _lowWellbeingThreshold = prefs.getDouble('low_wellbeing_threshold') ?? 0.25;
+      _hungerDecayRate = prefs.getDouble('pet_hunger_decay_rate') ?? 0.0000463;
+      _happinessGainRate = prefs.getDouble('pet_happiness_gain_rate') ?? 0.0001389;
+      _happinessDecayRate = prefs.getDouble('pet_happiness_decay_rate') ?? 0.0000463;
+      _lowWellbeingThreshold = prefs.getDouble('pet_low_wellbeing_threshold') ?? 0.25;
       _flappyCoinMultiplier = prefs.getDouble('flappy_coin_multiplier') ?? 1.0;
     });
   }
   
   Future<void> _saveRates() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('hunger_decay_rate', _hungerDecayRate);
-    await prefs.setDouble('happiness_gain_rate', _happinessGainRate);
-    await prefs.setDouble('happiness_decay_rate', _happinessDecayRate);
-    await prefs.setDouble('low_wellbeing_threshold', _lowWellbeingThreshold);
+    await prefs.setDouble('pet_hunger_decay_rate', _hungerDecayRate);
+    await prefs.setDouble('pet_happiness_gain_rate', _happinessGainRate);
+    await prefs.setDouble('pet_happiness_decay_rate', _happinessDecayRate);
+    await prefs.setDouble('pet_low_wellbeing_threshold', _lowWellbeingThreshold);
     await prefs.setDouble('flappy_coin_multiplier', _flappyCoinMultiplier);
   }
   

@@ -39,14 +39,14 @@ class MissionService {
   }
 
   /// Update all active missions with new context
-  void update(MissionContext ctx) {
+  Future<void> update(MissionContext ctx) async {
     bool stateChanged = false;
 
     for (final mission in _activeMissions) {
       if (!mission.isCompleted) {
         final justCompleted = mission.update(ctx);
         if (justCompleted) {
-          _handleMissionCompletion(mission);
+          await _handleMissionCompletion(mission);
           stateChanged = true;
         } else if (mission.progress > 0) {
           // If progress changed but not completed, we might still want to notify UI
