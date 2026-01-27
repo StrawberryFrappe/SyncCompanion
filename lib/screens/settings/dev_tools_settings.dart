@@ -64,6 +64,14 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     
     _userActionSub = _device.userAction$.listen((a) => _handleUserAction(a));
     
+    // Check current state immediately (popup might open when already connected)
+    final currentState = _device.currentState;
+    if (currentState == DeviceConnectionState.connected) {
+      _isConnected = true;
+      _status = 'LINKED';
+      _loadPersistedDeviceId();
+    }
+    
     // Unified state listener - single source of truth for connection state
     _connStateSub = _device.connectionState$.listen((state) {
       final connected = state == DeviceConnectionState.connected;
@@ -234,11 +242,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   }
 
   Future<void> _forget() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('saved_device_id');
-    try {
-      await _device.disconnect();
-    } catch (_) {}
+    // BluetoothService.forget() handles pref removal and clearing internal state
+    // preventing the "stale saved ID" issue that causes WAITING status.
+    await _device.forget();
     setState(() {
       _status = 'SEARCHING';
       _connectedDevice = null;
