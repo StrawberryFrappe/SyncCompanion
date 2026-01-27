@@ -170,6 +170,7 @@ class PetStats {
   /// Feed the pet - increases hunger by amount
   void feed({double amount = 0.25}) {
     _hunger = min(1.0, _hunger + amount);
+    saveToPrefs();
   }
 
   /// Reset stats to full
@@ -178,6 +179,7 @@ class PetStats {
     _happiness = 1.0;
     _happinessBuffer = 0.0;
     _lastUpdateTime = DateTime.now();
+    saveToPrefs();
   }
 
   // ============ MONEY METHODS ============
@@ -186,6 +188,7 @@ class PetStats {
   void addGold(int amount) {
     if (amount > 0) {
       _goldCoins += amount;
+      saveToPrefs();
     }
   }
 
@@ -193,6 +196,7 @@ class PetStats {
   bool spendGold(int amount) {
     if (amount > 0 && _goldCoins >= amount) {
       _goldCoins -= amount;
+      saveToPrefs();
       return true;
     }
     return false;
@@ -202,6 +206,7 @@ class PetStats {
   void addSilver(int amount) {
     if (amount > 0) {
       _silverCoins += amount;
+      saveToPrefs();
     }
   }
 
@@ -209,6 +214,7 @@ class PetStats {
   bool spendSilver(int amount) {
     if (amount > 0 && _silverCoins >= amount) {
       _silverCoins -= amount;
+      saveToPrefs();
       return true;
     }
     return false;
@@ -220,6 +226,7 @@ class PetStats {
   void unlockClothing(String id) {
     if (!_unlockedClothingIds.contains(id)) {
       _unlockedClothingIds.add(id);
+      saveToPrefs();
     }
   }
 
@@ -229,11 +236,13 @@ class PetStats {
   /// Equip clothing item (replaces existing item in same slot)
   void equipClothing(String slotName, String id) {
     _equippedClothing[slotName] = id;
+    saveToPrefs();
   }
 
   /// Unequip clothing from slot
   void unequipClothing(String slotName) {
     _equippedClothing.remove(slotName);
+    saveToPrefs();
   }
 
 
@@ -256,6 +265,7 @@ class PetStats {
   void addFood(String id, int quantity) {
     if (quantity > 0) {
       _foodInventory[id] = (_foodInventory[id] ?? 0) + quantity;
+      saveToPrefs();
     }
   }
 
@@ -267,6 +277,7 @@ class PetStats {
       if (_foodInventory[id] == 0) {
         _foodInventory.remove(id);
       }
+      saveToPrefs();
       return true;
     }
     return false;

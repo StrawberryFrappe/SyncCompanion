@@ -87,11 +87,29 @@ class DeviceService {
   static const int _noHumanDebounceThreshold = 20; // ~200ms at 100Hz
   int _consecutiveNoHumanSamples = 0;
   
+  // Liveness tracking - require recent telemetry data to consider "connected"
+  static const Duration _livenessTimeout = Duration(seconds: 3);
+  DateTime? _lastTelemetryTime;
+  
+  /// Check if we have received telemetry data recently (liveness check).
+  bool get _hasRecentTelemetry {
+    if (_lastTelemetryTime == null) return false;
+    return DateTime.now().difference(_lastTelemetryTime!) < _livenessTimeout;
+  }
+  
   DeviceDisplayStatus get currentDisplayStatus {
     if (_currentState == DeviceConnectionState.connected) {
-      // Check if human is detected via appropriate sensor OR in grace period
+      // Require recent telemetry data (IMU liveness check) to truly be "connected"
+      if (!_hasRecentTelemetry) {
+        // No recent data - we're waiting for connection to establish
+        final hasSaved = _bluetooth.getSavedDeviceId() != null;
+        return hasSaved ? DeviceDisplayStatus.waiting : DeviceDisplayStatus.searching;
+      }
+      
+      // We have recent data - check if human is detected via appropriate sensor
+      // Grace period only applies if we previously had REAL synced status with actual data
       final humanDetected = _isHumanDetected();
-      if (humanDetected || _inSyncGracePeriod) {
+      if (humanDetected || (_inSyncGracePeriod && _wasHumanDetected)) {
         return DeviceDisplayStatus.synced;
       }
       return DeviceDisplayStatus.connected;
@@ -156,6 +174,11 @@ class DeviceService {
            _deviceType = DeviceType.unknown;
            _bioProcessor.reset();
            _tempProcessor.reset();
+           // Reset liveness and grace period state
+           _lastTelemetryTime = null;
+           _inSyncGracePeriod = false;
+           _wasHumanDetected = false;
+           _syncGraceTimer?.cancel();
          }
        }
     });
@@ -169,6 +192,9 @@ class DeviceService {
     _rawSub = _bluetooth.incomingRaw$.listen((bytes) {
       final data = TelemetryData.fromBytes(bytes);
       if (data != null) {
+        // Update liveness timestamp on every valid packet (IMU data = device alive)
+        _lastTelemetryTime = DateTime.now();
+        
         _telemetryController.add(data);
         _checkForHighLevelEvents(data);
         
@@ -187,6 +213,9 @@ class DeviceService {
         } else if (data.rawTemp != null) {
           _tempProcessor.process(data.rawTemp!);
         }
+        
+        // Update display status since liveness may have changed
+        _displayStatusController.add(currentDisplayStatus);
       }
     });
     

@@ -41,7 +41,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   bool _bgServiceRunning = false;
   ForegroundNotificationUpdater? _notifUpdater;
 
-  StreamSubscription<BluetoothDevice?>? _connSub;
   StreamSubscription<BluetoothUserAction>? _userActionSub;
   StreamSubscription<DeviceConnectionState>? _connStateSub;
 
@@ -62,36 +61,34 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     _device.init();
     _loadPersisted();
     _loadFakeSyncSettings();
+    
     _userActionSub = _device.userAction$.listen((a) => _handleUserAction(a));
-    _connSub = _device.connectedDevice$.listen((d) {
+    
+    // Check current state immediately (popup might open when already connected)
+    final currentState = _device.currentState;
+    if (currentState == DeviceConnectionState.connected) {
+      _isConnected = true;
+      _status = 'LINKED';
+      _loadPersistedDeviceId();
+    }
+    
+    // Unified state listener - single source of truth for connection state
+    _connStateSub = _device.connectionState$.listen((state) {
+      final connected = state == DeviceConnectionState.connected;
+      
       setState(() {
-        _connectedDevice = d;
-        if (d != null) {
-          _isConnected = true;
-          _deviceId = d.remoteId.str;
+        _isConnected = connected;
+        if (connected) {
           _status = 'LINKED';
           _notifySyncStatus(true);
         } else {
-          _isConnected = false;
-          _deviceId = null;
           _status = 'SEARCHING';
           _notifySyncStatus(false);
         }
       });
-      if (d != null) {
+      
+      if (connected) {
         _startBackgroundTask();
-      }
-    });
-    _connStateSub = _device.connectionState$.listen((state) {
-      final connected = state == DeviceConnectionState.connected;
-      setState(() {
-        _isConnected = connected;
-        if (!connected) {
-          _status = 'SEARCHING';
-        }
-      });
-      _notifySyncStatus(connected);
-      if (connected && _deviceId == null) {
         _loadPersistedDeviceId();
       }
     });
@@ -106,7 +103,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   void dispose() {
     _statDisplayTimer?.cancel();
     _notifUpdater?.stop();
-    _connSub?.cancel();
     _userActionSub?.cancel();
     _connStateSub?.cancel();
     super.dispose();
@@ -128,13 +124,12 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   Future<void> _loadPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getString('saved_device_id');
+    // Don't optimistically set connected=true here. Wait for real state from DeviceService.
     if (id != null) {
       setState(() {
-        _isConnected = true;
         _deviceId = id;
-        _status = 'LINKED';
+        // Status remains SEARCHING until we get actual connection confirmation
       });
-      _notifySyncStatus(true);
     }
   }
 
@@ -247,11 +242,9 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   }
 
   Future<void> _forget() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('saved_device_id');
-    try {
-      await _device.disconnect();
-    } catch (_) {}
+    // BluetoothService.forget() handles pref removal and clearing internal state
+    // preventing the "stale saved ID" issue that causes WAITING status.
+    await _device.forget();
     setState(() {
       _status = 'SEARCHING';
       _connectedDevice = null;
@@ -329,8 +322,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                   hunger: hunger,
                   happiness: happiness,
                   wellbeing: wellbeing,
-                  onFeed: () => widget.game?.feedPet(),
-                  onReset: () => widget.game?.resetPetStats(),
                   onAddGold: () => widget.game?.currentPet.stats.addGold(100),
                   onAddSilver: () => widget.game?.currentPet.stats.addSilver(100),
                 ),

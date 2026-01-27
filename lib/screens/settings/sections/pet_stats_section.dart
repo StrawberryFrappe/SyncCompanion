@@ -5,8 +5,6 @@ class PetStatsSection extends StatelessWidget {
   final double hunger;
   final double happiness;
   final double wellbeing;
-  final VoidCallback? onFeed;
-  final VoidCallback? onReset;
   final VoidCallback? onAddGold;
   final VoidCallback? onAddSilver;
 
@@ -15,11 +13,10 @@ class PetStatsSection extends StatelessWidget {
     required this.hunger,
     required this.happiness,
     required this.wellbeing,
-    this.onFeed,
-    this.onReset,
     this.onAddGold,
     this.onAddSilver,
   });
+
 
   @override
   Widget build(BuildContext context) {
@@ -40,36 +37,7 @@ class PetStatsSection extends StatelessWidget {
           const SizedBox(height: 4),
           _buildStatBar('Wellbeing', wellbeing, Colors.green),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade100,
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(width: 1, color: Colors.black),
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                  ),
-                  onPressed: onFeed,
-                  child: const Text('FEED', style: TextStyle(fontSize: 10)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade100,
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(width: 1, color: Colors.black),
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                  ),
-                  onPressed: onReset,
-                  child: const Text('RESET', style: TextStyle(fontSize: 10)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+          
           // Money Debug Controls
           const Text('ECONOMY (DEBUG)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
