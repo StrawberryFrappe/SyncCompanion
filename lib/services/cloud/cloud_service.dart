@@ -18,8 +18,8 @@ class CloudService {
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   // Configurable cloud settings (can be changed in Advanced Settings)
-  String _baseUrl = 'http://192.168.1.100:8080';
-  String _deviceToken = 'YOUR_DEVICE_ACCESS_TOKEN';
+  String _baseUrl = '';
+  String _deviceToken = '';
   
   // Preference keys
   static const String _prefKeyBaseUrl = 'cloud_base_url';
@@ -49,17 +49,22 @@ class CloudService {
       _onConnectivityChanged,
     );
 
-    // Attempt initial flush
-    await flushQueue();
+    // Attempt initial flush logic only if configured
+    if (_isConfigured) {
+      await flushQueue();
+    }
 
     _isInitialized = true;
   }
 
+  /// Check if cloud service is configured with valid credentials
+  bool get _isConfigured => _baseUrl.isNotEmpty && _deviceToken.isNotEmpty;
+
   /// Load configuration from shared preferences
   Future<void> _loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? 'http://192.168.1.100:8080';
-    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? 'YOUR_DEVICE_ACCESS_TOKEN';
+    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? '';
+    _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? '';
   }
 
   /// Update cloud configuration
@@ -78,13 +83,16 @@ class CloudService {
   /// Handle connectivity changes
   void _onConnectivityChanged(ConnectivityResult result) {
     final hasConnection = result != ConnectivityResult.none;
-    if (hasConnection && !_queue.isEmpty) {
+    if (hasConnection && !_queue.isEmpty && _isConfigured) {
       flushQueue();
     }
   }
 
   /// Log an event to be sent to the cloud
   Future<void> logEvent(String eventType, Map<String, dynamic> payload) async {
+    // silently ignore if not configured
+    if (!_isConfigured) return;
+
     final event = CloudEvent(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       timestamp: DateTime.now(),
@@ -113,13 +121,45 @@ class CloudService {
     });
   }
 
+  /// Report sync status at minute boundary (new telemetry format)
+  /// 
+  /// For MAX30100 devices: provide avgBpm and avgSpo2
+  /// For GY906 devices: provide avgTemp
+  /// Vitals are wrapped in a 'vitals' object for consistent cloud parsing.
+  Future<void> logSyncStatus({
+    required DateTime timestamp,
+    required bool synced,
+    int? avgBpm,
+    int? avgSpo2,
+    double? avgTemp,
+  }) async {
+    // Build vitals object based on which readings are available
+    final Map<String, dynamic> vitals = {};
+    if (avgBpm != null && avgBpm > 0) {
+      vitals['avgBpm'] = avgBpm;
+    }
+    if (avgSpo2 != null && avgSpo2 > 0) {
+      vitals['avgSpo2'] = avgSpo2;
+    }
+    if (avgTemp != null) {
+      vitals['avgTemp'] = (avgTemp * 10).round() / 10;
+    }
+    
+    await logEvent('sync_status', {
+      'timestamp': timestamp.toIso8601String(),
+      'synced': synced,
+      'vitals': vitals,
+    });
+  }
+
+  /// Report mission completion
   Future<void> logMissionCompleted({
+    required DateTime timestamp,
     required String missionId,
-    required String missionTitle,
   }) async {
     await logEvent('mission_completed', {
+      'timestamp': timestamp.toIso8601String(),
       'mission_id': missionId,
-      'mission_title': missionTitle,
     });
   }
 
@@ -137,7 +177,7 @@ class CloudService {
 
   /// Flush all queued events to the cloud
   Future<void> flushQueue() async {
-    if (_isFlushing || _queue.isEmpty) return;
+    if (_isFlushing || _queue.isEmpty || !_isConfigured) return;
     _isFlushing = true;
 
     try {
@@ -173,14 +213,23 @@ class CloudService {
 
   /// Send a single event to ThingsBoard
   Future<bool> _sendEvent(CloudEvent event) async {
+    if (!_isConfigured) return false;
+    
     try {
       // ThingsBoard telemetry API format
       final url = Uri.parse('$_baseUrl/api/v1/$_deviceToken/telemetry');
+      final eventData = {
+        'event_type': event.eventType,
+        ...event.payload,
+      };
+      
+      // Use 'mission' key for mission events, 'telemetry' for others
+      final key = event.eventType == 'mission_completed' ? 'mission' : 'telemetry';
+      
       final body = jsonEncode({
         'ts': event.timestamp.millisecondsSinceEpoch,
         'values': {
-          'event_type': event.eventType,
-          ...event.payload,
+          key: jsonEncode(eventData),
         },
       });
 

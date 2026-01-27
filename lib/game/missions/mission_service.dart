@@ -62,21 +62,19 @@ class MissionService {
     }
   }
 
-  void _handleMissionCompletion(Mission mission) {
+  Future<void> _handleMissionCompletion(Mission mission) async {
     if (_petStats != null) {
       _petStats!.applyMissionReward(mission.goldReward, mission.happinessReward);
     }
     
-    // Log to cloud
-    CloudService().logMissionCompleted(
-      missionId: mission.id, 
-      missionTitle: mission.title
+    // Log to cloud - await to ensure it's sent
+    await CloudService().logMissionCompleted(
+      timestamp: DateTime.now(),
+      missionId: mission.id,
     );
     
     // Notify UI for banner
     _completionController.add(mission);
-    
-    _saveProgress();
   }
 
   Future<void> _checkDailyReset() async {
@@ -93,7 +91,7 @@ class MissionService {
     // Generate 3 random missions for the day
     // In a real app, use a seed based on the date so it's deterministic
     final missions = <Mission>[
-      SyncDurationMission(targetDuration: 10 * 60, rewardGold: 50), // 10 mins
+      SyncDurationMission(targetDuration: 120 * 60, rewardGold: 50), // 2 hours
       MinigamePlayMission(targetPlays: 3, rewardGold: 30),
       FeedPetMission(targetFeeds: 3, rewardGold: 20),
     ];

@@ -11,18 +11,13 @@ class BluetoothScannerDialog extends StatefulWidget {
   final DeviceService device;
   final BluetoothDevice? connectedDevice;
   final String? persistedDeviceId;
-  final String adapterState;
-  final Map<String, bool> permissionStatuses;
   final VoidCallback onForget;
   final Future<void> Function(BluetoothDevice device) onConnect;
-
   const BluetoothScannerDialog({
     super.key,
     required this.device,
     required this.connectedDevice,
     required this.persistedDeviceId,
-    required this.adapterState,
-    required this.permissionStatuses,
     required this.onForget,
     required this.onConnect,
   });
@@ -77,47 +72,9 @@ class _BluetoothScannerDialogState extends State<BluetoothScannerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Status info section
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Adapter: ${widget.adapterState}', style: const TextStyle(fontSize: 8)),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Perms: ${widget.permissionStatuses.entries.map((e) => '${e.key.split('.').last}:${e.value ? "Y" : "N"}').join(', ')}',
-                    style: const TextStyle(fontSize: 8),
-                  ),
-                  const SizedBox(height: 6),
-                  if (widget.connectedDevice != null)
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          widget.connectedDevice!.platformName.isNotEmpty
-                              ? widget.connectedDevice!.platformName
-                              : widget.connectedDevice!.remoteId.str,
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ),
-                    ),
-                  if (widget.connectedDevice == null && widget.persistedDeviceId != null)
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(border: Border.all(width: 2, color: Colors.black)),
-                      child: Text(
-                        'Persisted: ${widget.persistedDeviceId}',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
+            // Title
+            const Text('Scan for Devices', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             // Main content: terminal or scan results
             Expanded(
               child: widget.connectedDevice != null

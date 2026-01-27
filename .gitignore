@@ -70,3 +70,9 @@ doc/api/
 
 # Crashlytics
 com_crashlytics_export_strings.xml
+
+# Reference libraries and artifacts (Selective tracking)
+artifacts/*
+!artifacts/gy906_connection/
+!artifacts/IMU_BLE_Connection/
+!artifacts/*.md

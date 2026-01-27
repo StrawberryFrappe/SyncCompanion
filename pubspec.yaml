@@ -1,5 +1,5 @@
-name: sync_companion
-description: A minimal Flutter starter app.
+name: Therapets
+description: Virtual pet therapy app for orthotic devices.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -44,7 +44,6 @@ flutter:
       fonts:
         - asset: Monocraft.ttf
   assets:
-    - placeholder.png
     - assets/images/
     - assets/models/
 

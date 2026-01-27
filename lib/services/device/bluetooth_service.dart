@@ -481,13 +481,7 @@ class BluetoothService {
     } catch (_) {}
   }
 
-  /// Set the notif_show_data preference in Android's PreferenceManager storage
-  /// so that the native foreground service can read it correctly.
-  Future<void> setNotifShowData(bool value) async {
-    try {
-      await _platform.invokeMethod('setNotifShowData', {'value': value});
-    } catch (_) {}
-  }
+
 
   /// Forget any saved device id and request disconnect from native service.
   Future<void> forget() async {

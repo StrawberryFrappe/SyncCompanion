@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'screens/game_screen.dart';
 import 'services/cloud/cloud_service.dart';
+import 'services/cloud/telemetry_tracker.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,9 @@ Future<void> main() async {
   
   // Initialize cloud service (event queue + connectivity listener)
   await CloudService().init();
+  
+  // Initialize telemetry tracker (sync status monitoring)
+  await TelemetryTracker().init();
   
   // Initialize communication port between task isolate and main isolate.
   FlutterForegroundTask.initCommunicationPort();

@@ -268,8 +268,6 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
         device: _device,
         connectedDevice: _connectedDevice,
         persistedDeviceId: _deviceId,
-        adapterState: _adapterState,
-        permissionStatuses: _permissionStatuses,
         onForget: _forget,
         onConnect: _connectTo,
       ),
