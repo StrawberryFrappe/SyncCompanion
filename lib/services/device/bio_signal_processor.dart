@@ -99,8 +99,8 @@ class FilterBuLp1 {
 /// Based on the reference implementation from Arduino-MAX30100 library.
 /// Uses state machine for beat detection and log-ratio for SpO2.
 class BioSignalProcessor {
-  // Debug mode - set to true to enable console logging
-  static const bool _debugMode = true;
+  // Debug mode - uses Flutter's kDebugMode to disable logging in release builds
+  static const bool _debugMode = kDebugMode;
   int _debugLogCounter = 0;
   static const int _debugLogInterval = 50; // Log every N samples (0.5s at 100Hz)
   
