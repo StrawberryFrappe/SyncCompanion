@@ -379,7 +379,7 @@ class TelemetryData {
   /// Temperature in Celsius (null if not a GY906 packet).
   /// Only valid when rawTemp is not null.
   double? get temperatureCelsius => rawTemp != null 
-      ? (rawTemp! * 0.02) - 273.15 
+      ? TemperatureSignalProcessor.rawToCelsius(rawTemp!) 
       : null;
 
   /// Factory to decode 12, 14, or 16-byte payload.

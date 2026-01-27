@@ -142,7 +142,7 @@ class CloudService {
       vitals['avgSpo2'] = avgSpo2;
     }
     if (avgTemp != null) {
-      vitals['avgTemp'] = double.parse(avgTemp.toStringAsFixed(1));
+      vitals['avgTemp'] = (avgTemp * 10).round() / 10;
     }
     
     await logEvent('sync_status', {

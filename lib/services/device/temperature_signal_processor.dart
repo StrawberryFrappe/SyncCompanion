@@ -15,7 +15,7 @@ class TemperatureData {
   /// Whether the sensor is connected and working
   final bool sensorConnected;
   
-  /// Whether a human is detected (temperature in valid range: 35.9°C - 41°C)
+  /// Whether a human is detected (temperature in forearm-adjusted range: 29.7°C - 41°C)
   final bool humanDetected;
   
   const TemperatureData({
@@ -32,10 +32,11 @@ class TemperatureData {
 
 /// Processes raw temperature data from GY906 IR temperature sensor.
 /// 
-/// Human detection is based on temperature being in the physiological range
-/// of 35.9°C to 41°C (normal human body temperature range).
+/// Human detection is based on temperature being in the forearm-adjusted range
+/// of 29.7°C to 41°C. This is lower than core body temperature (35.9°C-41°C)
+/// because skin surface temperature on the forearm is typically 5-8°C cooler.
 class TemperatureSignalProcessor {
-  // Human detection thresholds (body temperature range - forearm adjusted)
+  // Human detection thresholds (forearm skin surface temperature range)
   static const double _minHumanTemp = 29.7;
   static const double _maxHumanTemp = 41.0;
   
@@ -65,10 +66,11 @@ class TemperatureSignalProcessor {
   
   /// Process raw temperature value from the sensor.
   void process(int rawTemp) {
-    // Handle sensor error (0 typically means no reading)
+    // Handle sensor error: rawTemp of 0 converts to -273.15°C (absolute zero),
+    // which indicates the sensor is disconnected or malfunctioning.
     if (rawTemp == 0) {
       _latestData = const TemperatureData(
-        sensorConnected: true,
+        sensorConnected: false,
         humanDetected: false,
       );
       _dataController.add(_latestData);
