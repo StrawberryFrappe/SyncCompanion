@@ -77,9 +77,9 @@ class VirtualPetGame extends FlameGame {
   Map<String, double> getStatRates() {
     if (_currentPet == null) {
       return {
-        'hungerDecayRate': 0.01,
-        'happinessGainRate': 0.02,
-        'happinessDecayRate': 0.01,
+        'hungerDecayRate': 0.0000463,
+        'happinessGainRate': 0.0001389,
+        'happinessDecayRate': 0.0000463,
       };
     }
     return {

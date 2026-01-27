@@ -56,9 +56,9 @@ class PetStats {
     int silverCoins = 0,
     List<String>? unlockedClothingIds,
     Map<String, String>? equippedClothing,
-    this.hungerDecayRate = 0.01,
-    this.happinessGainRate = 0.02,
-    this.happinessDecayRate = 0.01,
+    this.hungerDecayRate = 0.0000463,  // 6 hours to deplete
+    this.happinessGainRate = 0.0001389, // 2 hours to fill
+    this.happinessDecayRate = 0.0000463, // 6 hours to deplete
     this.lowWellbeingThreshold = 0.25,
     DateTime? lastUpdateTime,
   })  : _hunger = hunger.clamp(0.0, 1.0),
