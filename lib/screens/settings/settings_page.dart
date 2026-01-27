@@ -360,6 +360,46 @@ class _SettingsPageState extends State<SettingsPage> {
               label: const Text('RAW DATA TERMINAL', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
             ),
           ],
+          
+          const SizedBox(height: 24),
+          const Divider(thickness: 2),
+          const SizedBox(height: 12),
+          
+          // Reset Stats Button
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[100],
+              foregroundColor: Colors.red[900],
+              side: BorderSide(width: 2, color: Colors.red[900]!),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Reset Stats', style: TextStyle(fontSize: 14)),
+                  content: const Text('Are you sure you want to reset all pet stats? This cannot be undone.', style: TextStyle(fontSize: 12)),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('RESET', style: TextStyle(color: Colors.red))),
+                  ],
+                ),
+              );
+              
+              if (confirmed == true) {
+                widget.game?.resetPetStats();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Pet stats reset successfully')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('RESET STATS', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft', fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 24),
+
         ],
       ),
     );

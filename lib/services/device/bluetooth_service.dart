@@ -120,8 +120,10 @@ class BluetoothService {
       // to avoid UI reset when native status will override it.
       if (!nativeRunning) {
         try {
-          final persistedConnected = _savedId != null;
-          _nativeConnectedController.add(persistedConnected);
+          // Do NOT emit connected=true just because we have a saved ID.
+          // This causes "ghost" connections where the UI thinks we are connected
+          // but there is no actual connection.
+          // instead, we only emit stored bytes if available for debug.
           final lastB64 = prefs.getString('last_bytes_b64');
           if (lastB64 != null) {
             try {
@@ -132,7 +134,6 @@ class BluetoothService {
               }
             } catch (_) {}
           }
-          if (BLE_DEBUG) print('BLE: emitted persisted native connected=$persistedConnected lastBytesLen=${lastB64 != null ? base64.decode(lastB64).length : 0}');
         } catch (_) {}
       }
       // Ask for native status and wait for its reply so UI doesn't flip.
@@ -231,7 +232,11 @@ class BluetoothService {
         _connectedController.add(null);
       }
       // If native provided a device id, update saved id
-      if (m.containsKey('deviceId')) {
+      // CRITICAL FIX: Only update saved ID if we are actually connected.
+      // If we are disconnecting (status=false), the native service might send
+      // the ID of the device being disconnected. We should NOT overwrite our
+      // current target device ID with the old one we just left.
+      if (m.containsKey('deviceId') && connected) {
         try {
           final id = m['deviceId'] as String?;
           if (id != null) {
