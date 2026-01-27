@@ -133,10 +133,10 @@ class _TokenScannerPageState extends State<TokenScannerPage> {
           Positioned(
             top: MediaQuery.of(context).padding.top + 10,
             right: 10,
-            child: ValueListenableBuilder(
-              valueListenable: _controller.torchState,
+            child: ValueListenableBuilder<MobileScannerState>(
+              valueListenable: _controller,
               builder: (context, state, child) {
-                final isTorchOn = state == TorchState.on;
+                final isTorchOn = state.torchState == TorchState.on;
                 return IconButton(
                   icon: Icon(
                     isTorchOn ? Icons.flash_on : Icons.flash_off,

@@ -77,6 +77,15 @@ class DeviceService {
   DeviceConnectionState _currentState = DeviceConnectionState.disconnected;
   DeviceConnectionState get currentState => _currentState;
   
+  DeviceDisplayStatus? _lastEmittedStatus;
+
+  void _emitDisplayStatus(DeviceDisplayStatus status) {
+    if (_lastEmittedStatus != status) {
+      _lastEmittedStatus = status;
+      _displayStatusController.add(status);
+    }
+  }
+  
   // Grace period for sync status (2 seconds)
   static const Duration _syncGracePeriod = Duration(seconds: 2);
   Timer? _syncGraceTimer;
@@ -215,7 +224,7 @@ class DeviceService {
         }
         
         // Update display status since liveness may have changed
-        _displayStatusController.add(currentDisplayStatus);
+        _emitDisplayStatus(currentDisplayStatus);
       }
     });
     
@@ -230,7 +239,7 @@ class DeviceService {
     });
     
     // Initial emission
-    _displayStatusController.add(currentDisplayStatus);
+    _emitDisplayStatus(currentDisplayStatus);
   }
   
   /// Handle human detection changes with grace period and debounce.
@@ -241,7 +250,7 @@ class DeviceService {
       _inSyncGracePeriod = false;
       _consecutiveNoHumanSamples = 0; // Reset debounce counter
       _wasHumanDetected = true;
-      _displayStatusController.add(currentDisplayStatus);
+      _emitDisplayStatus(currentDisplayStatus);
     } else {
       // Human not detected - increment debounce counter
       _consecutiveNoHumanSamples++;
@@ -256,13 +265,13 @@ class DeviceService {
             // Grace period expired
             _inSyncGracePeriod = false;
             _wasHumanDetected = false;
-            _displayStatusController.add(currentDisplayStatus);
+            _emitDisplayStatus(currentDisplayStatus);
           });
         }
         // Don't emit yet - either still in debounce or grace period
       } else if (!_wasHumanDetected) {
         // Never was synced, just emit current status
-        _displayStatusController.add(currentDisplayStatus);
+        _emitDisplayStatus(currentDisplayStatus);
       }
       // If already in grace period, do nothing - let the timer handle it
     }
@@ -273,7 +282,7 @@ class DeviceService {
       _currentState = newState;
       _connectionStateController.add(newState);
       // Also update display status
-      _displayStatusController.add(currentDisplayStatus);
+      _emitDisplayStatus(currentDisplayStatus);
     }
   }
 

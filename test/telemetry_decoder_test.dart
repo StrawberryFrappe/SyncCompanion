@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sync_companion/services/device/device_service.dart';
+import 'package:Therapets/services/device/device_service.dart';
 
 void main() {
   group('TelemetryData', () {

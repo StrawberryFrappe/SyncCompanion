@@ -1,5 +1,0 @@
-# Release signing keystore - DO NOT COMMIT
-upload-keystore.jks
-
-# Key properties file - contains passwords, DO NOT COMMIT
-key.properties
