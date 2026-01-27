@@ -6,6 +6,7 @@ import '../../services/device/device_service.dart';
 import '../../services/cloud/cloud_service.dart';
 import '../../game/virtual_pet_game.dart';
 import '../pulse_oximeter/pulse_oximeter_screen.dart';
+import '../temperature_sensor/temperature_sensor_screen.dart';
 
 import 'sections/stat_rates_section.dart';
 import 'sections/notifications_section.dart';
@@ -306,22 +307,41 @@ class _SettingsPageState extends State<SettingsPage> {
           // Device-specific buttons (only when connected)
           if (_isConnected) ...[
             const SizedBox(height: 12),
-            // Pulse Oximeter Button
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A3A1A),
-                foregroundColor: const Color(0xFF00FF00),
-                side: const BorderSide(width: 2, color: Color(0xFF00AA00)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PulseOximeterScreen(device: widget.device),
+            // Show sensor button based on device type
+            if (widget.device.deviceType == DeviceType.max30100)
+              // Pulse Oximeter Button
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A3A1A),
+                  foregroundColor: const Color(0xFF00FF00),
+                  side: const BorderSide(width: 2, color: Color(0xFF00AA00)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PulseOximeterScreen(device: widget.device),
+                  ),
+                ),
+                icon: const Icon(Icons.monitor_heart),
+                label: const Text('PULSE OXIMETER', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
+              )
+            else if (widget.device.deviceType == DeviceType.gy906)
+              // Temperature Sensor Button
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3A2A1A),
+                  foregroundColor: const Color(0xFFFF6600),
+                  side: const BorderSide(width: 2, color: Color(0xFFAA5500)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TemperatureSensorScreen(device: widget.device),
+                  ),
+                ),
+                icon: const Icon(Icons.thermostat),
+                label: const Text('TEMPERATURE SENSOR', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
               ),
-              icon: const Icon(Icons.monitor_heart),
-              label: const Text('PULSE OXIMETER', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
-            ),
             const SizedBox(height: 8),
             // Raw Data Terminal Button
             ElevatedButton.icon(
