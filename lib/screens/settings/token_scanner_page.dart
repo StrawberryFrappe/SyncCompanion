@@ -133,7 +133,7 @@ class _TokenScannerPageState extends State<TokenScannerPage> {
           Positioned(
             top: MediaQuery.of(context).padding.top + 10,
             right: 10,
-            child: ValueListenableBuilder(
+            child: ValueListenableBuilder<MobileScannerState>(
               valueListenable: _controller,
               builder: (context, state, child) {
                 final isTorchOn = state.torchState == TorchState.on;

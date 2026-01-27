@@ -42,6 +42,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   ForegroundNotificationUpdater? _notifUpdater;
 
   StreamSubscription<BluetoothUserAction>? _userActionSub;
+  StreamSubscription? _connSub;
   StreamSubscription<DeviceConnectionState>? _connStateSub;
 
   bool _isConnected = false;
@@ -97,6 +98,11 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     _statDisplayTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (mounted) setState(() {});
     });
+
+    // Subscribe to connected device updates
+    _connSub = _device.connectedDevice$.listen((device) {
+      if (mounted) setState(() => _connectedDevice = device);
+    });
   }
 
   @override
@@ -104,6 +110,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     _statDisplayTimer?.cancel();
     _notifUpdater?.stop();
     _userActionSub?.cancel();
+    _connSub?.cancel();
     _connStateSub?.cancel();
     super.dispose();
   }
