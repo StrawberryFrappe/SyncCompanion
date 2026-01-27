@@ -91,7 +91,7 @@ class MissionService {
     // Generate 3 random missions for the day
     // In a real app, use a seed based on the date so it's deterministic
     final missions = <Mission>[
-      SyncDurationMission(targetDuration: 10 * 60, rewardGold: 50), // 10 mins
+      SyncDurationMission(targetDuration: 120 * 60, rewardGold: 50), // 2 hours
       MinigamePlayMission(targetPlays: 3, rewardGold: 30),
       FeedPetMission(targetFeeds: 3, rewardGold: 20),
     ];

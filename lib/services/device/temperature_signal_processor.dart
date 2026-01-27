@@ -35,8 +35,8 @@ class TemperatureData {
 /// Human detection is based on temperature being in the physiological range
 /// of 35.9°C to 41°C (normal human body temperature range).
 class TemperatureSignalProcessor {
-  // Human detection thresholds (body temperature range)
-  static const double _minHumanTemp = 35.9;
+  // Human detection thresholds (body temperature range - forearm adjusted)
+  static const double _minHumanTemp = 29.7;
   static const double _maxHumanTemp = 41.0;
   
   // Temperature buffer for waveform display (5 seconds at ~100Hz)
