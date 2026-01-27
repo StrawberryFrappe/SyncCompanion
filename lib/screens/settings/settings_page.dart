@@ -7,6 +7,7 @@ import '../../services/cloud/cloud_service.dart';
 import '../../game/virtual_pet_game.dart';
 import '../pulse_oximeter/pulse_oximeter_screen.dart';
 import '../temperature_sensor/temperature_sensor_screen.dart';
+import 'token_scanner_page.dart';
 
 import 'sections/stat_rates_section.dart';
 import 'sections/notifications_section.dart';
@@ -167,13 +168,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),
               const SizedBox(height: 12),
+
               TextField(
                 controller: tokenController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Device Token',
                   hintText: 'YOUR_DEVICE_ACCESS_TOKEN',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () async {
+                      final token = await Navigator.of(context).push<String>(
+                        MaterialPageRoute(
+                          builder: (context) => const TokenScannerPage(),
+                        ),
+                      );
+                      
+                      if (token != null && mounted) {
+                        tokenController.text = token;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Token Scanned! Remember to save.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ),
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),

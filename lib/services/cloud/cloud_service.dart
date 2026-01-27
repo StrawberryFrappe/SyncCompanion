@@ -18,7 +18,7 @@ class CloudService {
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   // Configurable cloud settings (can be changed in Advanced Settings)
-  String _baseUrl = '';
+  String _baseUrl = 'http://200.13.5.20:8080';
   String _deviceToken = '';
   
   // Preference keys
@@ -63,7 +63,8 @@ class CloudService {
   /// Load configuration from shared preferences
   Future<void> _loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? '';
+    // Default to hardcoded IP if not set
+    _baseUrl = prefs.getString(_prefKeyBaseUrl) ?? 'http://200.13.5.20:8080';
     _deviceToken = prefs.getString(_prefKeyDeviceToken) ?? '';
   }
 
