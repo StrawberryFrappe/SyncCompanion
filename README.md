@@ -2,6 +2,10 @@
 
 A Flutter-based virtual pet app that uses a custom BLE hardware companion (M5-IMU-Sensor) to bring your pet to life through motion controls and real-time telemetry.
 
+**Supports two hardware variants:**
+- **MAX30100**: Pulse Oximeter + IMU
+- **GY906**: IR Temperature Sensor + IMU
+
 ## Architecture
 
 ```mermaid
@@ -128,6 +132,16 @@ classDiagram
 | `FlappyBirdGame` | Action game. Listens to **discrete events** (`ShakeEvent`) to jump. Awards Silver coins. |
 | `OrchestraGame` | Creative tool. Listens to **continuous telemetry** to map tilt to pitch/volume. |
 
+### Supported Devices
+The app automatically detects the connected device type based on the BLE packet size (Sticky detection):
+
+| Device Variant | Sensor | Packet Size | Features |
+|----------------|--------|-------------|----------|
+| **MAX30100** | Pulse Oximeter | 16 bytes | BPM, SpO2, Heartbeat Waveform |
+| **GY906** | IR Thermometer | 14 bytes | Body Temperature, Trend Waveform |
+
+*Both variants include 6-axis IMU data (Accelerometer + Gyroscope).*
+
 ## Project Structure
 ```
 lib/
@@ -147,6 +161,8 @@ lib/
 │       ├── flappy_bird/         # Flappy Bird minigame
 │       └── orchestra/           # Pet Orchestra minigame
 └── screens/                     # Flutter UI screens
+    ├── pulse_oximeter/          # MAX30100 UI
+    └── temperature_sensor/      # GY906 UI
 ```
 
 ## Quick Start
