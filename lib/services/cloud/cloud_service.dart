@@ -122,17 +122,33 @@ class CloudService {
   }
 
   /// Report sync status at minute boundary (new telemetry format)
+  /// 
+  /// For MAX30100 devices: provide avgBpm and avgSpo2
+  /// For GY906 devices: provide avgTemp
+  /// Vitals are wrapped in a 'vitals' object for consistent cloud parsing.
   Future<void> logSyncStatus({
     required DateTime timestamp,
     required bool synced,
-    required int avgBpm,
-    required int avgSpo2,
+    int? avgBpm,
+    int? avgSpo2,
+    double? avgTemp,
   }) async {
+    // Build vitals object based on which readings are available
+    final Map<String, dynamic> vitals = {};
+    if (avgBpm != null && avgBpm > 0) {
+      vitals['avgBpm'] = avgBpm;
+    }
+    if (avgSpo2 != null && avgSpo2 > 0) {
+      vitals['avgSpo2'] = avgSpo2;
+    }
+    if (avgTemp != null) {
+      vitals['avgTemp'] = double.parse(avgTemp.toStringAsFixed(1));
+    }
+    
     await logEvent('sync_status', {
       'timestamp': timestamp.toIso8601String(),
       'synced': synced,
-      'avg_bpm': avgBpm,
-      'avg_spo2': avgSpo2,
+      'vitals': vitals,
     });
   }
 
