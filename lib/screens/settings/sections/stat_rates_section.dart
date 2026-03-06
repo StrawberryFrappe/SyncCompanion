@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../widgets/settings_inputs.dart';
 
 /// Stat Rates settings section.
@@ -34,26 +35,26 @@ class StatRatesSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('STAT RATES', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(AppLocalizations.of(context)!.statRates, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               Text('(${(hungerDecayRate * 100).toStringAsFixed(3)}%/s, ${(happinessGainRate * 100).toStringAsFixed(3)}%/s, ${(happinessDecayRate * 100).toStringAsFixed(3)}%/s)', 
                 style: const TextStyle(fontSize: 8, color: Colors.grey)),
             ],
           ),
           const SizedBox(height: 8),
           RateInput(
-            label: 'Hunger Decay',
+            label: AppLocalizations.of(context)!.hungerDecay,
             currentRate: hungerDecayRate,
             onApply: onHungerDecayChanged,
           ),
           const SizedBox(height: 8),
           RateInput(
-            label: 'Happiness Gain (synced)',
+            label: AppLocalizations.of(context)!.happinessGainSynced,
             currentRate: happinessGainRate,
             onApply: onHappinessGainChanged,
           ),
           const SizedBox(height: 8),
           RateInput(
-            label: 'Happiness Decay (not synced)',
+            label: AppLocalizations.of(context)!.happinessDecayNotSynced,
             currentRate: happinessDecayRate,
             onApply: onHappinessDecayChanged,
           ),

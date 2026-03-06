@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../services/device/device_service.dart';
 import 'currency_display.dart';
 import 'mission_overlay.dart';
@@ -24,6 +25,7 @@ class GameHud extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Determine status UI properties
     Color statusColor;
     String statusText;
@@ -31,20 +33,20 @@ class GameHud extends StatelessWidget {
     switch (connectionStatus) {
       case DeviceDisplayStatus.synced:
         statusColor = Colors.green;
-        statusText = 'SYNCED';
+        statusText = l10n.statusSynced;
         break;
       case DeviceDisplayStatus.connected:
         statusColor = Colors.blue;
-        statusText = 'CONNECTED';
+        statusText = l10n.statusConnected;
         break;
       case DeviceDisplayStatus.waiting:
         statusColor = Colors.amber;
-        statusText = 'WAITING';
+        statusText = l10n.statusWaiting;
         break;
       case DeviceDisplayStatus.searching:
       default:
         statusColor = Colors.red;
-        statusText = 'SEARCHING';
+        statusText = l10n.statusSearching;
         break;
     }
 

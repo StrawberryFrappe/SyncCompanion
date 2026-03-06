@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../game/items/food_item.dart';
 
 class FoodStore extends StatelessWidget {
@@ -33,9 +34,9 @@ class FoodStore extends StatelessWidget {
             // Header
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'FOOD STORE',
+                    AppLocalizations.of(context)!.foodStore,
                     style: TextStyle(
                       fontFamily: 'Monocraft',
                       fontSize: 18,
@@ -51,7 +52,7 @@ class FoodStore extends StatelessWidget {
                     border: Border.all(width: 1, color: Colors.black),
                   ),
                   child: Text(
-                    '$currentSilver Silver',
+                    AppLocalizations.of(context)!.silverCurrency(currentSilver),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -102,7 +103,7 @@ class FoodStore extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            item.name,
+                            _localizedFoodName(context, item),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
@@ -118,7 +119,7 @@ class FoodStore extends StatelessWidget {
                                     onBuy(item);
                                   } 
                                 : null,
-                            child: Text('Buy ${item.cost} S'),
+                            child: Text(AppLocalizations.of(context)!.buyButton(item.cost)),
                           ),
                         ],
                       ),
@@ -132,6 +133,18 @@ class FoodStore extends StatelessWidget {
       ),
       ),
     );
+  }
+}
+
+String _localizedFoodName(BuildContext context, FoodItem item) {
+  final l10n = AppLocalizations.of(context)!;
+  switch (item.id) {
+    case 'apple': return l10n.foodApple;
+    case 'burger': return l10n.foodBurger;
+    case 'sushi': return l10n.foodSushi;
+    case 'cake': return l10n.foodCake;
+    case 'water': return l10n.foodWater;
+    default: return item.name;
   }
 }
 

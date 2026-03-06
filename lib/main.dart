@@ -2,18 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // Note: using bundled `Monocraft` font; removed runtime google_fonts usage.
 
 import 'screens/game_screen.dart';
 import 'services/cloud/cloud_service.dart';
 import 'services/cloud/telemetry_tracker.dart';
+import 'services/locale_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize Hive for persistent storage
   await Hive.initFlutter();
+  
+  // Initialize locale service (language preference + device detection)
+  await LocaleService().init();
   
   // Initialize cloud service (event queue + connectivity listener)
   await CloudService().init();
@@ -55,23 +61,36 @@ class SyncCompanionApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final base = ThemeData.light();
     final appTextTheme = base.textTheme.apply(fontFamily: 'Monocraft', bodyColor: Colors.black);
-    return MaterialApp(
-      title: 'Therapets',
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        textTheme: appTextTheme,
-        primaryTextTheme: appTextTheme,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          titleTextStyle: appTextTheme.titleLarge?.copyWith(fontSize: 14) ?? const TextStyle(fontFamily: 'Monocraft', fontSize: 14),
-          toolbarTextStyle: appTextTheme.bodyLarge,
-        ),
-        textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
-        elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
-      ),
-      home: const GameScreen(),
+    return ListenableBuilder(
+      listenable: LocaleService(),
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Therapets',
+          locale: LocaleService().locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          theme: ThemeData(
+            scaffoldBackgroundColor: Colors.white,
+            textTheme: appTextTheme,
+            primaryTextTheme: appTextTheme,
+            appBarTheme: AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              titleTextStyle: appTextTheme.titleLarge?.copyWith(fontSize: 14) ?? const TextStyle(fontFamily: 'Monocraft', fontSize: 14),
+              toolbarTextStyle: appTextTheme.bodyLarge,
+            ),
+            textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
+            elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(textStyle: appTextTheme.bodyMedium)),
+          ),
+          home: const GameScreen(),
+        );
+      },
     );
   }
 }

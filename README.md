@@ -175,8 +175,8 @@ flutter run -d <device-id>
 
 ## Development Status
 
-### Current Stage: Stage 4 — Cloud Connectivity
-*Accomplished — Telemetry streaming and Mission logging enabled*
+### Current Stage: Stage 5 — Multilingual Support ✅
+*Completed: Added English and Spanish localization with automatic device language detection and manual language switching via flag buttons in Settings.*
 
 ### Stage History
 | Stage | Focus | Status |
@@ -185,6 +185,7 @@ flutter run -d <device-id>
 | 2 | **Virtual Pet Base** — Hunger, Happiness, Currency | ✅ Complete |
 | 3 | **Telemetry Minigames** — Motion-controlled games | ✅ Accomplished |
 | 4 | **Cloud Connectivity** — Mission system + cloud sync | ✅ Accomplished |
+| 5 | **Multilingual Support** — English + Spanish with device language detection | ✅ Complete |
 
 ## Configuration
 

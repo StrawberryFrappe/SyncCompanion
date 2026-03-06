@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/device/device_service.dart';
 import '../../services/cloud/cloud_service.dart';
@@ -148,21 +149,21 @@ class _SettingsPageState extends State<SettingsPage> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cloud Configuration', style: TextStyle(fontSize: 14)),
+        title: Text(AppLocalizations.of(context)!.cloudConfiguration, style: const TextStyle(fontSize: 14)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Configure the endpoint URL and device token for cloud sync.',
-                style: TextStyle(fontSize: 10, color: Colors.grey)),
+              Text(AppLocalizations.of(context)!.cloudConfigDesc,
+                style: const TextStyle(fontSize: 10, color: Colors.grey)),
               const SizedBox(height: 12),
               TextField(
                 controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Base URL',
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.baseUrl,
                   hintText: 'http://192.168.1.100:8080',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
@@ -172,7 +173,7 @@ class _SettingsPageState extends State<SettingsPage> {
               TextField(
                 controller: tokenController,
                 decoration: InputDecoration(
-                  labelText: 'Device Token',
+                  labelText: AppLocalizations.of(context)!.deviceToken,
                   hintText: 'YOUR_DEVICE_ACCESS_TOKEN',
                   border: const OutlineInputBorder(),
                   isDense: true,
@@ -188,9 +189,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       if (token != null && mounted) {
                         tokenController.text = token;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Token Scanned! Remember to save.'),
-                            duration: Duration(seconds: 2),
+                          SnackBar(
+                            content: Text(AppLocalizations.of(context)!.tokenScanned),
+                            duration: const Duration(seconds: 2),
                           ),
                         );
                       }
@@ -210,14 +211,14 @@ class _SettingsPageState extends State<SettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('CANCEL'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () {
               _saveCloudConfig(urlController.text, tokenController.text);
               Navigator.of(ctx).pop();
             },
-            child: const Text('SAVE'),
+            child: Text(AppLocalizations.of(context)!.save),
           ),
         ],
       ),
@@ -234,7 +235,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
-      appBar: AppBar(title: const Text('Advanced Settings', style: TextStyle(fontSize: 14))),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.advancedSettings, style: const TextStyle(fontSize: 14))),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -345,7 +346,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 icon: const Icon(Icons.monitor_heart),
-                label: const Text('PULSE OXIMETER', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
+                label: Text(AppLocalizations.of(context)!.pulseOximeter, style: const TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
               )
             else if (widget.device.deviceType == DeviceType.gy906)
               // Temperature Sensor Button
@@ -362,7 +363,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 icon: const Icon(Icons.thermostat),
-                label: const Text('TEMPERATURE SENSOR', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
+                label: Text(AppLocalizations.of(context)!.temperatureSensor, style: const TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
               ),
             const SizedBox(height: 8),
             // Raw Data Terminal Button
@@ -379,7 +380,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               icon: const Icon(Icons.terminal),
-              label: const Text('RAW DATA TERMINAL', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
+              label: Text(AppLocalizations.of(context)!.rawDataTerminal, style: const TextStyle(fontSize: 12, fontFamily: 'Monocraft')),
             ),
           ],
           
@@ -399,11 +400,11 @@ class _SettingsPageState extends State<SettingsPage> {
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Reset Stats', style: TextStyle(fontSize: 14)),
-                  content: const Text('Are you sure you want to reset all pet stats? This cannot be undone.', style: TextStyle(fontSize: 12)),
+                  title: Text(AppLocalizations.of(context)!.resetStatsTitle, style: const TextStyle(fontSize: 14)),
+                  content: Text(AppLocalizations.of(context)!.resetStatsConfirm, style: const TextStyle(fontSize: 12)),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
-                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('RESET', style: TextStyle(color: Colors.red))),
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text(AppLocalizations.of(context)!.cancel)),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text(AppLocalizations.of(context)!.reset, style: const TextStyle(color: Colors.red))),
                   ],
                 ),
               );
@@ -412,13 +413,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 widget.game?.resetPetStats();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pet stats reset successfully')),
+                    SnackBar(content: Text(AppLocalizations.of(context)!.petStatsResetSuccess)),
                   );
                 }
               }
             },
             icon: const Icon(Icons.restart_alt),
-            label: const Text('RESET STATS', style: TextStyle(fontSize: 12, fontFamily: 'Monocraft', fontWeight: FontWeight.bold)),
+            label: Text(AppLocalizations.of(context)!.resetStats, style: const TextStyle(fontSize: 12, fontFamily: 'Monocraft', fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 24),
 
@@ -438,7 +439,7 @@ class _RawDataTerminalScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Raw Data Terminal', style: TextStyle(fontSize: 14)),
+        title: Text(AppLocalizations.of(context)!.rawDataTerminalTitle, style: const TextStyle(fontSize: 14)),
         backgroundColor: Colors.grey[900],
         foregroundColor: Colors.white,
       ),
