@@ -1,6 +1,7 @@
 // dart:math is unused
 
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../game/missions/mission.dart';
 import '../../../game/missions/mission_service.dart';
 
@@ -61,12 +62,12 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Mission Completed!', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(AppLocalizations.of(context)!.missionCompleted, style: const TextStyle(fontWeight: FontWeight.bold)),
                   Text(mission.title),
                 ],
               ),
             ),
-            Text('+${mission.goldReward} Gold', style: const TextStyle(color: Colors.amber)),
+            Text(AppLocalizations.of(context)!.goldReward(mission.goldReward), style: const TextStyle(color: Colors.amber)),
           ],
         ),
         behavior: SnackBarBehavior.floating,
@@ -151,8 +152,8 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Daily Missions', 
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              Text(AppLocalizations.of(context)!.dailyMissions, 
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                               Text('$completedCount/$totalCount',
                                 style: const TextStyle(color: Colors.grey),
@@ -162,7 +163,7 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
                           const Divider(thickness: 2),
                           const SizedBox(height: 8),
                           if (missions.isEmpty)
-                            const Text('No missions available today.'),
+                            Text(AppLocalizations.of(context)!.noMissionsAvailable),
                           ...missions.map((mission) => _buildMissionItem(mission)),
                         ],
                       ),

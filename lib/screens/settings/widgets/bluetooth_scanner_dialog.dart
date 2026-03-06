@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../../../services/device/device_service.dart';
 import 'telemetry_terminal.dart';
@@ -124,7 +125,7 @@ class _BluetoothScannerDialogState extends State<BluetoothScannerDialog> {
                   Navigator.of(context).pop();
                   widget.onForget();
                 },
-                child: const Text('Disconnect & Forget', style: TextStyle(fontSize: 10)),
+                child: Text(AppLocalizations.of(context)!.disconnectForget, style: const TextStyle(fontSize: 10)),
               ),
           ],
         ),

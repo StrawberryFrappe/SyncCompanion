@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../game/items/clothing_item.dart';
 import '../../../game/pets/pet_stats.dart';
 
@@ -43,10 +44,10 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
             // Header
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'WARDROBE',
-                    style: TextStyle(
+                    AppLocalizations.of(context)!.wardrobe,
+                    style: const TextStyle(
                       fontFamily: 'Monocraft',
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -61,7 +62,7 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
                     border: Border.all(width: 1, color: Colors.black),
                   ),
                   child: Text(
-                    '${widget.stats.goldCoins} GOLD',
+                    AppLocalizations.of(context)!.goldCurrency(widget.stats.goldCoins),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -121,7 +122,7 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
                                 children: [
                                   const Icon(Icons.checkroom, size: 32, color: Colors.grey),
                                   const SizedBox(height: 4),
-                                  Text('Missing', style: TextStyle(fontSize: 8, color: Colors.red)),
+                                  Text(AppLocalizations.of(context)!.missingAsset, style: TextStyle(fontSize: 8, color: Colors.red)),
                                 ],
                               ),
                             ),
@@ -131,7 +132,7 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
                         const SizedBox(height: 8),
                         
                         Text(
-                          item.name,
+                          _localizedClothingName(context, item),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
@@ -176,7 +177,7 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
              widget.onUnequip(item);
              setState(() {});
           },
-          child: const Text('UNEQUIP', style: TextStyle(fontSize: 10)),
+          child: Text(AppLocalizations.of(context)!.unequip, style: const TextStyle(fontSize: 10)),
         );
       } else {
         return ElevatedButton(
@@ -190,7 +191,7 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
             widget.onEquip(item);
             setState(() {});
           },
-          child: const Text('EQUIP', style: TextStyle(fontSize: 10)),
+          child: Text(AppLocalizations.of(context)!.equip, style: const TextStyle(fontSize: 10)),
         );
       }
     } else {
@@ -208,8 +209,20 @@ class _WardrobeMenuWidgetState extends State<WardrobeMenuWidget> {
                 setState(() {});
               } 
             : null,
-        child: Text('${item.cost} G', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+        child: Text(AppLocalizations.of(context)!.costGold(item.cost), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
       );
     }
+  }
+}
+
+String _localizedClothingName(BuildContext context, ClothingItem item) {
+  final l10n = AppLocalizations.of(context)!;
+  switch (item.id) {
+    case 'hat_basic': return l10n.clothingFancyHat;
+    case 'hat_winter': return l10n.clothingWinterEarmuffs;
+    case 'hat_spring': return l10n.clothingFlowerCrown;
+    case 'hat_summer': return l10n.clothingCoolShades;
+    case 'hat_autumn': return l10n.clothingLeafBeret;
+    default: return item.name;
   }
 }

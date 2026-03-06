@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'settings_page.dart';
@@ -12,6 +13,7 @@ import 'sections/pet_stats_section.dart';
 import 'widgets/bluetooth_scanner_dialog.dart';
 import '../../game/virtual_pet_game.dart';
 import '../../services/device/device_service.dart';
+import '../../services/locale_service.dart';
 import '../../services/notifications/foreground_notification.dart';
 
 /// DevToolsSettings - Contains all Bluetooth pairing, telemetry, diagnostic
@@ -164,14 +166,15 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
   Future<void> _handleUserAction(BluetoothUserAction action) async {
     try {
       if (action.type == BluetoothUserActionType.enableBluetooth) {
+        final l10n = AppLocalizations.of(context)!;
         final pressed = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
-            title: const Text('Bluetooth Disabled', style: TextStyle(fontSize: 12)),
-            content: const Text('Bluetooth needs to be enabled to scan for devices.', style: TextStyle(fontSize: 10)),
+            title: Text(l10n.bluetoothDisabled, style: const TextStyle(fontSize: 12)),
+            content: Text(l10n.bluetoothNeeded, style: const TextStyle(fontSize: 10)),
             actions: [
-              TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('CANCEL', style: TextStyle(fontSize: 10))),
-              TextButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('ENABLE BLUETOOTH', style: TextStyle(fontSize: 10))),
+              TextButton(onPressed: () => Navigator.of(c).pop(false), child: Text(l10n.cancel, style: const TextStyle(fontSize: 10))),
+              TextButton(onPressed: () => Navigator.of(c).pop(true), child: Text(l10n.enableBluetooth, style: const TextStyle(fontSize: 10))),
             ],
           ),
         );
@@ -180,14 +183,15 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           setState(() => _adapterState = enabled ? 'ON' : 'OFF');
         }
       } else if (action.type == BluetoothUserActionType.requestPermissions) {
+        final l10n2 = AppLocalizations.of(context)!;
         final pressed = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
-            title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
-            content: const Text('Bluetooth permissions are required. Please grant them in Settings or allow when prompted.', style: TextStyle(fontSize: 10)),
+            title: Text(l10n2.permissionsRequired, style: const TextStyle(fontSize: 12)),
+            content: Text(l10n2.permissionsNeededBle, style: const TextStyle(fontSize: 10)),
             actions: [
-              TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('CANCEL', style: TextStyle(fontSize: 10))),
-              TextButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('REQUEST', style: TextStyle(fontSize: 10))),
+              TextButton(onPressed: () => Navigator.of(c).pop(false), child: Text(l10n2.cancel, style: const TextStyle(fontSize: 10))),
+              TextButton(onPressed: () => Navigator.of(c).pop(true), child: Text(l10n2.request, style: const TextStyle(fontSize: 10))),
             ],
           ),
         );
@@ -195,10 +199,11 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
           final ok = await _device.performRequestPermissions();
           setState(() => _permissionStatuses = _device.permissionStatuses);
           if (!ok) {
+            final l10n3 = AppLocalizations.of(context)!;
             await showDialog<void>(context: context, builder: (c) => AlertDialog(
-              title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
-              content: const Text('Could not acquire required permissions. Please grant them in Android Settings.', style: TextStyle(fontSize: 10)),
-              actions: [TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10)))],
+              title: Text(l10n3.permissionsRequired, style: const TextStyle(fontSize: 12)),
+              content: Text(l10n3.permissionsDenied, style: const TextStyle(fontSize: 10)),
+              actions: [TextButton(onPressed: () => Navigator.of(c).pop(), child: Text(l10n3.ok, style: const TextStyle(fontSize: 10)))],
             ));
           }
         }
@@ -214,11 +219,12 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
     final scanOk = _permissionStatuses['android.permission.BLUETOOTH_SCAN'] == true || _permissionStatuses['BLUETOOTH_SCAN'] == true;
     final connectOk = _permissionStatuses['android.permission.BLUETOOTH_CONNECT'] == true || _permissionStatuses['BLUETOOTH_CONNECT'] == true;
     if (!scanOk || !connectOk) {
+      final l10n = AppLocalizations.of(context)!;
       await showDialog<void>(context: context, builder: (c) => AlertDialog(
-        title: const Text('Permissions required', style: TextStyle(fontSize: 12)),
-        content: const Text('Bluetooth permissions are required to run the native BLE service. Please grant them in Settings.', style: TextStyle(fontSize: 10)),
+        title: Text(l10n.permissionsRequired, style: const TextStyle(fontSize: 12)),
+        content: Text(l10n.permissionsRequiredNative, style: const TextStyle(fontSize: 10)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10))),
+          TextButton(onPressed: () => Navigator.of(c).pop(), child: Text(l10n.ok, style: const TextStyle(fontSize: 10))),
         ],
       ));
       return;
@@ -229,11 +235,12 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
       setState(() => _bgServiceRunning = true);
     } catch (e) {
       debugPrint('startNativeService failed: $e');
+      final l10n = AppLocalizations.of(context)!;
       await showDialog<void>(context: context, builder: (c) => AlertDialog(
-        title: const Text('Native service failed', style: TextStyle(fontSize: 12)),
-        content: const Text('Could not start the native BLE foreground service. Please ensure the app has the required permissions.', style: TextStyle(fontSize: 10)),
+        title: Text(l10n.nativeServiceFailed, style: const TextStyle(fontSize: 12)),
+        content: Text(l10n.nativeServiceFailedDesc, style: const TextStyle(fontSize: 10)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(c).pop(), child: const Text('OK', style: TextStyle(fontSize: 10))),
+          TextButton(onPressed: () => Navigator.of(c).pop(), child: Text(l10n.ok, style: const TextStyle(fontSize: 10))),
         ],
       ));
     }
@@ -276,6 +283,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final stats = widget.game?.getStatValues();
     final hunger = stats?['hunger'] ?? 0.0;
     final happiness = stats?['happiness'] ?? 0.0;
@@ -302,10 +310,10 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
             ),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'SETTINGS',
-                    style: TextStyle(fontSize: 14, fontFamily: 'Monocraft', fontWeight: FontWeight.bold),
+                    l10n.settingsTitle,
+                    style: const TextStyle(fontSize: 14, fontFamily: 'Monocraft', fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
@@ -334,6 +342,40 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                 ),
                 
                 const SizedBox(height: 12),
+
+                // Language Picker
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 2, color: Colors.black),
+                    color: const Color(0xFFF5F5F5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.language, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildLanguageFlag(
+                            assetPath: 'assets/images/UK.png',
+                            locale: const Locale('en'),
+                            isSelected: LocaleService().locale.languageCode == 'en',
+                          ),
+                          const SizedBox(width: 16),
+                          _buildLanguageFlag(
+                            assetPath: 'assets/images/Chile.png',
+                            locale: const Locale('es'),
+                            isSelected: LocaleService().locale.languageCode == 'es',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
                 
                 // Action Buttons
                 ElevatedButton(
@@ -343,7 +385,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                     side: const BorderSide(width: 2, color: Colors.black),
                   ),
                   onPressed: _openScanner,
-                  child: const Text('SCAN FOR DEVICES', style: TextStyle(fontSize: 10)),
+                  child: Text(l10n.scanForDevices, style: const TextStyle(fontSize: 10)),
                 ),
                 
                 const SizedBox(height: 8),
@@ -362,7 +404,7 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                       _notifySyncStatus(_isConnected);
                     });
                   }),
-                  child: const Text('ADVANCED SETTINGS', style: TextStyle(fontSize: 10)),
+                  child: Text(l10n.advancedSettings, style: const TextStyle(fontSize: 10)),
                 ),
                 
                 if (_isConnected) ...[ 
@@ -374,13 +416,47 @@ class _DevToolsSettingsState extends State<DevToolsSettings> {
                       side: const BorderSide(width: 2, color: Colors.black),
                     ),
                     onPressed: _forget,
-                    child: const Text('DISCONNECT & FORGET', style: TextStyle(fontSize: 10)),
+                    child: Text(l10n.disconnectAndForget, style: const TextStyle(fontSize: 10)),
                   ),
                 ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageFlag({
+    required String assetPath,
+    required Locale locale,
+    required bool isSelected,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        LocaleService().setLocale(locale);
+        setState(() {});
+      },
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          border: Border.all(
+            width: isSelected ? 3 : 1,
+            color: isSelected ? Colors.blue : Colors.grey,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? Colors.blue.withAlpha(25) : Colors.transparent,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Image.asset(
+            assetPath,
+            width: 48,
+            height: 32,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.none,
+          ),
+        ),
       ),
     );
   }
