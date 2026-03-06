@@ -175,8 +175,8 @@ flutter run -d <device-id>
 
 ## Development Status
 
-### Current Stage: Stage 5 — Multilingual Support
-*Objective: Add Spanish as a supported language. The app must recognize the device's system language to adapt itself accordingly.*
+### Current Stage: Stage 5 — Multilingual Support ✅
+*Completed: Added English and Spanish localization with automatic device language detection and manual language switching via flag buttons in Settings.*
 
 ### Stage History
 | Stage | Focus | Status |
@@ -185,7 +185,7 @@ flutter run -d <device-id>
 | 2 | **Virtual Pet Base** — Hunger, Happiness, Currency | ✅ Complete |
 | 3 | **Telemetry Minigames** — Motion-controlled games | ✅ Accomplished |
 | 4 | **Cloud Connectivity** — Mission system + cloud sync | ✅ Accomplished |
-| 5 | **Multilingual Support** — Adding Spanish and system language recognition | 🚧 In Progress |
+| 5 | **Multilingual Support** — English + Spanish with device language detection | ✅ Complete |
 
 ## Configuration
 
