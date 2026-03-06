@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../services/cloud/cloud_service.dart';
 
 /// Cloud Sync settings section.
@@ -32,8 +33,8 @@ class CloudSyncSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('CLOUD SYNC', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              Text('${cloud.pendingEventCount} pending', 
+              Text(AppLocalizations.of(context)!.cloudSync, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(AppLocalizations.of(context)!.pending(cloud.pendingEventCount), 
                 style: const TextStyle(fontSize: 9, color: Colors.grey)),
             ],
           ),
@@ -48,14 +49,14 @@ class CloudSyncSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Base URL:', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                Text(baseUrl.isEmpty ? '(not set)' : baseUrl,
+                Text(AppLocalizations.of(context)!.baseUrlLabel, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                Text(baseUrl.isEmpty ? AppLocalizations.of(context)!.notSet : baseUrl,
                   style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                const Text('Device Token:', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                Text(deviceToken.isEmpty ? '(not set)' : deviceToken,
+                Text(AppLocalizations.of(context)!.deviceTokenLabel, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                Text(deviceToken.isEmpty ? AppLocalizations.of(context)!.notSet : deviceToken,
                   style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -74,7 +75,7 @@ class CloudSyncSection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                   ),
                   onPressed: onConfigure,
-                  child: const Text('CONFIGURE', style: TextStyle(fontSize: 9)),
+                  child: Text(AppLocalizations.of(context)!.configure, style: const TextStyle(fontSize: 9)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -87,7 +88,7 @@ class CloudSyncSection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                   ),
                   onPressed: onFlushQueue,
-                  child: const Text('FLUSH QUEUE', style: TextStyle(fontSize: 9)),
+                  child: Text(AppLocalizations.of(context)!.flushQueue, style: const TextStyle(fontSize: 9)),
                 ),
               ),
             ],

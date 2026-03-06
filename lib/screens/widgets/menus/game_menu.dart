@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 
 /// Data class for game items in the menu
 class GameMenuItem {
@@ -73,9 +74,9 @@ class GameMenu extends StatelessWidget {
               // Header
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'GAMES',
+                      AppLocalizations.of(context)!.games,
                       style: TextStyle(
                         fontFamily: 'Monocraft',
                         fontSize: 18,

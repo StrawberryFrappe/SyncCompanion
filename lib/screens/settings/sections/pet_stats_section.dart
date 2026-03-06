@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 
 /// Section widget displaying pet stats with manipulation controls.
 class PetStatsSection extends StatelessWidget {
@@ -29,17 +30,17 @@ class PetStatsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('PET STATS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.petStats, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          _buildStatBar('Hunger', hunger, Colors.orange),
+          _buildStatBar(AppLocalizations.of(context)!.hunger, hunger, Colors.orange),
           const SizedBox(height: 4),
-          _buildStatBar('Happiness', happiness, Colors.pink),
+          _buildStatBar(AppLocalizations.of(context)!.happiness, happiness, Colors.pink),
           const SizedBox(height: 4),
-          _buildStatBar('Wellbeing', wellbeing, Colors.green),
+          _buildStatBar(AppLocalizations.of(context)!.wellbeing, wellbeing, Colors.green),
           const SizedBox(height: 8),
           
           // Money Debug Controls
-          const Text('ECONOMY (DEBUG)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.economyDebug, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -52,7 +53,7 @@ class PetStatsSection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                   ),
                   onPressed: onAddGold,
-                  child: const Text('+100 GOLD', style: TextStyle(fontSize: 9)),
+                  child: Text(AppLocalizations.of(context)!.addGold, style: const TextStyle(fontSize: 9)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -65,7 +66,7 @@ class PetStatsSection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                   ),
                   onPressed: onAddSilver,
-                  child: const Text('+100 SILVER', style: TextStyle(fontSize: 9)),
+                  child: Text(AppLocalizations.of(context)!.addSilver, style: const TextStyle(fontSize: 9)),
                 ),
               ),
             ],

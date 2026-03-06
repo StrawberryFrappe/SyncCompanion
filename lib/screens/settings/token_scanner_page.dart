@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class TokenScannerPage extends StatefulWidget {
@@ -45,12 +46,12 @@ class _TokenScannerPageState extends State<TokenScannerPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Token Detected'),
+        title: Text(AppLocalizations.of(context)!.tokenDetected),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Is this the correct token?'),
+            Text(AppLocalizations.of(context)!.isCorrectToken),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(8),
@@ -70,13 +71,13 @@ class _TokenScannerPageState extends State<TokenScannerPage> {
             onPressed: () {
               Navigator.of(ctx).pop(false);
             },
-            child: const Text('CANCEL'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.of(ctx).pop(true);
             },
-            child: const Text('CONFIRM'),
+            child: Text(AppLocalizations.of(context)!.confirm),
           ),
         ],
       ),
@@ -159,8 +160,8 @@ class _TokenScannerPageState extends State<TokenScannerPage> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Align QR code within the frame',
+                child: Text(
+                  AppLocalizations.of(context)!.alignQrCode,
                   style: TextStyle(color: Colors.white, fontSize: 14),
                 ),
               ),

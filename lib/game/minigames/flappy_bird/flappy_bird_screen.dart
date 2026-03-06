@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../screens/minigame_screen.dart';
@@ -76,16 +77,16 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(width: 4, color: Colors.black),
         ),
-        title: const Text(
-          'GAME OVER',
+        title: Text(
+          AppLocalizations.of(context)!.gameOver,
           style: TextStyle(fontFamily: 'Monocraft', fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Score: $score',
+             Text(
+              AppLocalizations.of(context)!.scoreLabel(score),
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -101,7 +102,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
                   children: [
                     const Icon(Icons.monetization_on, color: Colors.grey),
                     const SizedBox(width: 4),
-                    Text('+$coins Silver', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(AppLocalizations.of(context)!.silverReward(coins), style: const TextStyle(fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -113,14 +114,14 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
               Navigator.of(context).pop(); // Close dialog
               _startGame(); // Restart
             },
-            child: const Text('RETRY'),
+            child: Text(AppLocalizations.of(context)!.retry),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // Close dialog
               Navigator.of(context).pop(); // Exit game
             },
-            child: const Text('EXIT'),
+            child: Text(AppLocalizations.of(context)!.exit),
           ),
         ],
       ),
@@ -157,8 +158,8 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'FLAPPY BOB',
+              Text(
+                AppLocalizations.of(context)!.flappyBobTitle,
                 style: TextStyle(
                   fontFamily: 'Monocraft',
                   fontSize: 28,
@@ -168,18 +169,18 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
               const SizedBox(height: 8),
               Text(
                 widget.isDeviceConnected 
-                    ? 'Shake to flap!'
-                    : 'Tap to flap (No device)',
+                    ? AppLocalizations.of(context)!.shakeToFlap
+                    : AppLocalizations.of(context)!.tapToFlap,
                 style: TextStyle(
                   fontSize: 14,
                   color: widget.isDeviceConnected ? Colors.green : Colors.orange,
                 ),
               ),
               if (!widget.isDeviceConnected)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    '(You get a food sprite!)',
+                    AppLocalizations.of(context)!.foodSpriteHint,
                     style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                   ),
                 ),
@@ -188,10 +189,10 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
               
               // Jump threshold slider (only when connected)
               if (widget.isDeviceConnected) ...[
-                const Text('Jump Sensitivity', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(AppLocalizations.of(context)!.jumpSensitivity, style: const TextStyle(fontWeight: FontWeight.bold)),
                 Row(
                   children: [
-                    const Text('High'),
+                    Text(AppLocalizations.of(context)!.high),
                     Expanded(
                       child: Slider(
                         value: _jumpThreshold,
@@ -205,7 +206,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
                         },
                       ),
                     ),
-                    const Text('Low'),
+                    Text(AppLocalizations.of(context)!.low),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -220,8 +221,8 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
                   side: const BorderSide(width: 2, color: Colors.black),
                 ),
                 onPressed: _startGame,
-                child: const Text(
-                  'START',
+                child: Text(
+                  AppLocalizations.of(context)!.start,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -230,7 +231,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
               
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Back'),
+                child: Text(AppLocalizations.of(context)!.back),
               ),
             ],
           ),

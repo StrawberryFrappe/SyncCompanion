@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 
 /// Connection status indicator section.
 class ConnectionStatusSection extends StatelessWidget {
@@ -34,8 +35,8 @@ class ConnectionStatusSection extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(isConnected 
-                  ? 'SYNCED' 
-                  : (nativeStatusReceived ? 'SEARCHING' : 'LOADING'), 
+                  ? AppLocalizations.of(context)!.statusSynced 
+                  : (nativeStatusReceived ? AppLocalizations.of(context)!.statusSearching : AppLocalizations.of(context)!.statusLoading), 
                   style: const TextStyle(fontSize: 10)),
             ],
           ),

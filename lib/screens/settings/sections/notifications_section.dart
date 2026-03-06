@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../widgets/settings_inputs.dart';
 
 /// Notifications settings section.
@@ -23,16 +24,16 @@ class NotificationsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('NOTIFICATIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.notifications, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           ThresholdInput(
-            label: 'Low Wellbeing Alert Threshold',
+            label: AppLocalizations.of(context)!.lowWellbeingAlertThreshold,
             currentThreshold: lowWellbeingThreshold,
             onApply: onThresholdChanged,
           ),
           const SizedBox(height: 4),
           Text(
-            'Notify when wellbeing drops to ${(lowWellbeingThreshold * 100).toStringAsFixed(0)}% or below',
+            AppLocalizations.of(context)!.notifyWhenWellbeingDrops((lowWellbeingThreshold * 100).toStringAsFixed(0)),
             style: const TextStyle(fontSize: 9, color: Colors.grey),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../game/missions/mission_service.dart';
 
 /// Debug settings section (Fake Sync, Missions Reset, Debug Info).
@@ -29,7 +30,7 @@ class DebugSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('DEBUG: FAKE SYNC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(AppLocalizations.of(context)!.debugFakeSync, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -38,7 +39,7 @@ class DebugSection extends StatelessWidget {
                     onChanged: onFakeSyncEnabledChanged,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  const Text('Override Sync Status', style: TextStyle(fontSize: 10)),
+                  Text(AppLocalizations.of(context)!.overrideSyncStatus, style: const TextStyle(fontSize: 10)),
                 ],
               ),
               if (fakeSyncEnabled) ...[
@@ -47,14 +48,14 @@ class DebugSection extends StatelessWidget {
                   children: [
                     const SizedBox(width: 16),
                     SegmentedButton<bool>(
-                      segments: const [
+                      segments: [
                         ButtonSegment<bool>(
                           value: true,
-                          label: Text('SYNCED', style: TextStyle(fontSize: 9)),
+                          label: Text(AppLocalizations.of(context)!.synced, style: const TextStyle(fontSize: 9)),
                         ),
                         ButtonSegment<bool>(
                           value: false,
-                          label: Text('NOT SYNCED', style: TextStyle(fontSize: 9)),
+                          label: Text(AppLocalizations.of(context)!.notSynced, style: const TextStyle(fontSize: 9)),
                         ),
                       ],
                       selected: {fakeSyncValue},
@@ -86,7 +87,7 @@ class DebugSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('DEBUG: MISSIONS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(AppLocalizations.of(context)!.debugMissions, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -98,15 +99,15 @@ class DebugSection extends StatelessWidget {
                   await MissionService().forceResetMissions();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Daily missions reset!'), duration: Duration(seconds: 2)),
+                      SnackBar(content: Text(AppLocalizations.of(context)!.dailyMissionsReset), duration: const Duration(seconds: 2)),
                     );
                   }
                 },
-                child: const Text('RESET DAILY MISSIONS', style: TextStyle(fontSize: 10)),
+                child: Text(AppLocalizations.of(context)!.resetDailyMissions, style: const TextStyle(fontSize: 10)),
               ),
               const SizedBox(height: 4),
-              const Text('Force regenerate all daily missions (clears progress)', 
-                style: TextStyle(fontSize: 9, color: Colors.grey)),
+              Text(AppLocalizations.of(context)!.forceRegenMissions, 
+                style: const TextStyle(fontSize: 9, color: Colors.grey)),
             ],
           ),
         ),
