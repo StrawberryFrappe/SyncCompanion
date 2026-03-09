@@ -34,6 +34,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   bool hasStarted = false;
   int _scoreMultiplier = 1; // Progressive scoring for motion controls
   double currentSpeedMultiplier = 1.0; // Progressive speed
+  double? _lastGapY; // For gap generation constraints
   
   // Components
   late dynamic _player; // FlappyPet or FlappyFood
@@ -138,6 +139,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     hasStarted = true;
     _player.velocity = 0.0;
     currentSpeedMultiplier = 1.0; // Reset speed
+    _lastGapY = null; // Reset gap tracking
     
     // Start spawning pipes
     _spawnPipe();
@@ -163,7 +165,17 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     final random = Random();
     final minY = size.y * 0.2;
     final maxY = size.y * 0.7 - groundHeight;
-    final gapY = minY + random.nextDouble() * (maxY - minY);
+    
+    double gapY;
+    if (_lastGapY == null) {
+      gapY = minY + random.nextDouble() * (maxY - minY);
+    } else {
+      final maxDev = size.y * difficultyConfig.maxGapYDeviation;
+      final devMin = max(minY, _lastGapY! - maxDev);
+      final devMax = min(maxY, _lastGapY! + maxDev);
+      gapY = devMin + random.nextDouble() * (devMax - devMin);
+    }
+    _lastGapY = gapY;
     
     add(PipePair(
       gapY: gapY,
@@ -171,8 +183,9 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
       groundHeight: groundHeight,
       onScore: () {
         if (!isGameOver) {
-          // Increase speed based on difficulty ramp
-          currentSpeedMultiplier *= difficultyConfig.speedRamp;
+          // Increase speed based on difficulty ramp, capped to max multiplier
+          currentSpeedMultiplier = (currentSpeedMultiplier * difficultyConfig.speedRamp)
+              .clamp(1.0, difficultyConfig.maxSpeedMultiplier);
           
           // Progressive scoring for motion controls
           if (isDeviceConnected) {

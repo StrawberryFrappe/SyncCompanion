@@ -51,6 +51,13 @@ class GameMenu extends StatelessWidget {
       icon: Icons.donut_large,
       color: Color(0xFFE91E63),
     ),
+    GameMenuItem(
+      id: 'sbr',
+      name: 'SBR',
+      description: 'Breakout with a twist',
+      icon: Icons.view_comfy_alt,
+      color: Color(0xFFFF9800),
+    ),
   ];
 
   @override

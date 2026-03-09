@@ -216,18 +216,41 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
 
               // Difficulty selector
               Text(
-                AppLocalizations.of(context)!.difficultyLabel,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                _difficultyLabel(_selectedDifficulty),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
               SegmentedButton<FlappyDifficulty>(
-                segments: FlappyDifficulty.values.map((d) => ButtonSegment<FlappyDifficulty>(
-                  value: d,
-                  label: Text(
-                    _difficultyLabel(d),
-                    style: const TextStyle(fontSize: 11),
+                segments: const [
+                  ButtonSegment<FlappyDifficulty>(
+                    value: FlappyDifficulty.easy,
+                    icon: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Icon(Icons.star, size: 16),
+                    ),
                   ),
-                )).toList(),
+                  ButtonSegment<FlappyDifficulty>(
+                    value: FlappyDifficulty.medium,
+                    icon: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star, size: 16), Icon(Icons.star, size: 16)]),
+                    ),
+                  ),
+                  ButtonSegment<FlappyDifficulty>(
+                    value: FlappyDifficulty.hard,
+                    icon: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star, size: 16), Icon(Icons.star, size: 16), Icon(Icons.star, size: 16)]),
+                    ),
+                  ),
+                  ButtonSegment<FlappyDifficulty>(
+                    value: FlappyDifficulty.extreme,
+                    icon: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 0),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.dangerous, size: 16), Icon(Icons.dangerous, size: 16), Icon(Icons.dangerous, size: 16), Icon(Icons.dangerous, size: 16)]),
+                    ),
+                  ),
+                ],
                 selected: {_selectedDifficulty},
                 onSelectionChanged: (selection) {
                   setState(() => _selectedDifficulty = selection.first);
@@ -236,7 +259,9 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
                 style: ButtonStyle(
                   visualDensity: VisualDensity.compact,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: WidgetStateProperty.all(EdgeInsets.zero),
                 ),
+                showSelectedIcon: false,
               ),
 
               const SizedBox(height: 16),

@@ -120,13 +120,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get gameOrchestra => 'Orquesta';
 
   @override
-  String get gameOrchestraDesc => '¡Haz cantar a tus mascotas!';
+  String get gameOrchestraDesc => 'Make your pets sing!';
 
   @override
   String get gameDonut => 'donut.dart';
 
   @override
   String get gameDonutDesc => 'Pastelería sin gravedad';
+
+  @override
+  String get gameSbr => 'SBR';
+
+  @override
+  String get gameSbrDesc => 'Breakout con un giro';
 
   @override
   String get wardrobe => 'VESTUARIO';

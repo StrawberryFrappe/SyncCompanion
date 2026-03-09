@@ -49,6 +49,8 @@
   "gameOrchestraDesc": "Make your pets sing!",
   "gameDonut": "donut.dart",
   "gameDonutDesc": "Zero gravity pastry",
+  "gameSbr": "SBR",
+  "gameSbrDesc": "Breakout with a twist",
 
   "wardrobe": "WARDROBE",
   "goldCurrency": "{amount} GOLD",

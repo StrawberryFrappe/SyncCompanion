@@ -129,6 +129,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gameDonutDesc => 'Zero gravity pastry';
 
   @override
+  String get gameSbr => 'SBR';
+
+  @override
+  String get gameSbrDesc => 'Breakout with a twist';
+
+  @override
   String get wardrobe => 'WARDROBE';
 
   @override

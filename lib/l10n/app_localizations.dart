@@ -314,6 +314,18 @@ abstract class AppLocalizations {
   /// **'Zero gravity pastry'**
   String get gameDonutDesc;
 
+  /// No description provided for @gameSbr.
+  ///
+  /// In en, this message translates to:
+  /// **'SBR'**
+  String get gameSbr;
+
+  /// No description provided for @gameSbrDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Breakout with a twist'**
+  String get gameSbrDesc;
+
   /// No description provided for @wardrobe.
   ///
   /// In en, this message translates to:

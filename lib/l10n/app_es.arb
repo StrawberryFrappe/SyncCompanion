@@ -40,9 +40,9 @@
   "gameFlappyBob": "Flappy Bob",
   "gameFlappyBobDesc": "¡Sacude o toca para volar!",
   "gameOrchestra": "Orquesta",
-  "gameOrchestraDesc": "¡Haz cantar a tus mascotas!",
-  "gameDonut": "donut.dart",
   "gameDonutDesc": "Pastelería sin gravedad",
+  "gameSbr": "SBR",
+  "gameSbrDesc": "Breakout con un giro",
 
   "wardrobe": "VESTUARIO",
   "goldCurrency": "{amount} ORO",

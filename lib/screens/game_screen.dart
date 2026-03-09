@@ -15,6 +15,7 @@ import 'widgets/hud/game_hud.dart';
 import '../game/minigames/flappy_bird/flappy_bird_screen.dart';
 import '../game/minigames/orchestra/orchestra_screen.dart';
 import '../game/minigames/donut/donut_screen.dart';
+import '../game/minigames/sbr/sbr_screen.dart';
 
 import '../game/items/food_item.dart';
 import 'widgets/menus/food_menu.dart'; // Is now FoodStore inside
@@ -470,6 +471,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ),
             ).then((_) {
               MissionService().update(MissionContext(minigameId: 'donut'));
+            });
+          } else if (gameId == 'sbr') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SBRScreen(
+                  deviceService: _deviceService,
+                  petStats: _game.currentPet.stats,
+                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced,
+                  onGameOver: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ).then((_) {
+              MissionService().update(MissionContext(minigameId: 'sbr'));
+              // Refresh stats
+              _saveStats();
+              setState(() {});
             });
           }
         },
