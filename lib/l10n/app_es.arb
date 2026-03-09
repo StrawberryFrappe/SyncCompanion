@@ -113,10 +113,11 @@
   "addGold": "+100 ORO",
   "addSilver": "+100 PLATA",
 
-  "flappyBobGame": "JUEGO FLAPPY BOB",
-  "coinMultiplier": "Multiplicador de Monedas",
-  "silverFormula": "Plata = Puntaje * Multiplicador",
-  "scoreExample": "Puntaje 10 = {coins} monedas de plata",
+  "difficultyLabel": "Dificultad",
+  "difficultyEasy": "Fácil",
+  "difficultyMedium": "Medio",
+  "difficultyHard": "Difícil",
+  "difficultyExtreme": "Extremo",
 
   "scanForDevicesTitle": "Buscar Dispositivos",
   "disconnectForget": "Desconectar y Olvidar",

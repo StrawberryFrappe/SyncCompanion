@@ -7,6 +7,7 @@ import '../../../screens/minigame_screen.dart';
 import '../../../services/device/device_service.dart';
 import '../../pets/pet_stats.dart';
 import 'flappy_bird_game.dart';
+import 'flappy_difficulty.dart';
 
 /// Screen that hosts the Flappy Bird game with title overlay and game over dialog.
 class FlappyBirdScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
   FlappyBirdGame? _game;
   bool _showTitleScreen = true;
   double _jumpThreshold = 1.5;
-  double _coinMultiplier = 1.0;
+  FlappyDifficulty _selectedDifficulty = FlappyDifficulty.medium;
   
   @override
   void initState() {
@@ -41,7 +42,11 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _jumpThreshold = prefs.getDouble('flappy_jump_threshold') ?? 1.5;
-      _coinMultiplier = prefs.getDouble('flappy_coin_multiplier') ?? 1.0;
+      final savedDifficulty = prefs.getString('flappy_difficulty') ?? 'medium';
+      _selectedDifficulty = FlappyDifficulty.values.firstWhere(
+        (d) => d.name == savedDifficulty,
+        orElse: () => FlappyDifficulty.medium,
+      );
     });
   }
   
@@ -49,6 +54,14 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('flappy_jump_threshold', value);
   }
+
+  Future<void> _saveDifficulty(FlappyDifficulty difficulty) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('flappy_difficulty', difficulty.name);
+  }
+
+  FlappyDifficultyConfig get _config =>
+      FlappyDifficultyConfig.presets[_selectedDifficulty]!;
 
   void _startGame() {
     setState(() {
@@ -58,7 +71,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
         petStats: widget.petStats,
         isDeviceConnected: widget.isDeviceConnected,
         jumpThreshold: _jumpThreshold,
-        coinRewardMultiplier: _coinMultiplier,
+        difficultyConfig: _config,
         onGameOver: _onGameOver,
       );
     });
@@ -66,7 +79,7 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
   
   void _onGameOver() {
     final score = _game?.score ?? 0;
-    final coins = (score * _coinMultiplier).toInt();
+    final coins = (score * _config.coinMultiplier).toInt();
     
     showDialog(
       context: context,
@@ -142,6 +155,20 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
     );
   }
   
+  String _difficultyLabel(FlappyDifficulty d) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (d) {
+      case FlappyDifficulty.easy:
+        return l10n.difficultyEasy;
+      case FlappyDifficulty.medium:
+        return l10n.difficultyMedium;
+      case FlappyDifficulty.hard:
+        return l10n.difficultyHard;
+      case FlappyDifficulty.extreme:
+        return l10n.difficultyExtreme;
+    }
+  }
+
   Widget _buildTitleScreen() {
     return Container(
       color: Colors.black54,
@@ -185,7 +212,34 @@ class _FlappyBirdScreenState extends State<FlappyBirdScreen> {
                   ),
                 ),
               
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Difficulty selector
+              Text(
+                AppLocalizations.of(context)!.difficultyLabel,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<FlappyDifficulty>(
+                segments: FlappyDifficulty.values.map((d) => ButtonSegment<FlappyDifficulty>(
+                  value: d,
+                  label: Text(
+                    _difficultyLabel(d),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                )).toList(),
+                selected: {_selectedDifficulty},
+                onSelectionChanged: (selection) {
+                  setState(() => _selectedDifficulty = selection.first);
+                  _saveDifficulty(selection.first);
+                },
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+
+              const SizedBox(height: 16),
               
               // Jump threshold slider (only when connected)
               if (widget.isDeviceConnected) ...[

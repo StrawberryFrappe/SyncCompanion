@@ -9,6 +9,7 @@ import 'package:flutter/painting.dart';
 import '../../../services/device/device_service.dart';
 
 import '../../pets/pet_stats.dart';
+import 'flappy_difficulty.dart';
 import 'flappy_pet.dart';
 import 'flappy_food.dart';
 import 'pipe_pair.dart';
@@ -19,12 +20,10 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   final DeviceService deviceService;
   final PetStats petStats;
   final VoidCallback onGameOver;
+  final FlappyDifficultyConfig difficultyConfig;
   
   /// Jump threshold - now handled in DeviceService, but we can set it
   double jumpThreshold;
-  
-  /// Coin multiplier (silver coins = score * multiplier)
-  final double coinRewardMultiplier;
   
   /// Whether device is connected (determines pet vs food sprite)
   bool isDeviceConnected;
@@ -45,24 +44,22 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   // These getters compute values based on actual screen size
   double get gravity => size.y * 1.2; // Falls across screen in ~1.3s
   double get flapVelocity => size.y * -0.45; // Jumps about 45% of screen height
-  double get pipeSpeed => (size.x * 0.17) * currentSpeedMultiplier; // Crosses screen in ~6s (starts normal, gets faster)
-  static const double pipeSpawnInterval = 3.5; // Seconds between pipes (more spread out)
+  double get pipeSpeed => (size.x * difficultyConfig.pipeSpeedFactor) * currentSpeedMultiplier;
   
   // Screen-relative layout
   double get groundHeight => size.y * 0.06; // 6% of screen height
-  double get pipeGap => size.y * 0.28; // 28% of screen height for gap
+  double get pipeGap => size.y * difficultyConfig.pipeGap;
   double get playerSize => size.y * 0.08; // 8% of screen height
   
   // Debounce for motion input
   DateTime? _lastFlapTime;
-  static const Duration flapCooldown = Duration(milliseconds: 300);
 
   FlappyBirdGame({
     required this.deviceService,
     required this.petStats,
     required this.onGameOver,
+    required this.difficultyConfig,
     this.jumpThreshold = 1.5,
-    this.coinRewardMultiplier = 1.0,
     this.isDeviceConnected = false,
   });
 
@@ -117,7 +114,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   
   void _tryFlap() {
     final now = DateTime.now();
-    if (_lastFlapTime != null && now.difference(_lastFlapTime!) < flapCooldown) {
+    if (_lastFlapTime != null && now.difference(_lastFlapTime!) < difficultyConfig.flapCooldown) {
       return; // Debounce
     }
     _lastFlapTime = now;
@@ -152,7 +149,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     // Calculate dynamic interval
     // Reduce interval slightly as speed increases to make game harder
     // factor 0.25 ensures we "undercompensate" the speed increase (so gaps still grow, but slower)
-    final adjustedInterval = pipeSpawnInterval / pow(currentSpeedMultiplier, 0.25);
+    final adjustedInterval = difficultyConfig.spawnInterval / pow(currentSpeedMultiplier, 0.25);
     
     _pipeSpawnTimer = Timer(
       Duration(milliseconds: (adjustedInterval * 1000).toInt()),
@@ -174,8 +171,8 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
       groundHeight: groundHeight,
       onScore: () {
         if (!isGameOver) {
-          // Increase speed by 5%
-          currentSpeedMultiplier *= 1.05;
+          // Increase speed based on difficulty ramp
+          currentSpeedMultiplier *= difficultyConfig.speedRamp;
           
           // Progressive scoring for motion controls
           if (isDeviceConnected) {
@@ -199,7 +196,7 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
     _eventSub?.cancel();
     
     // Award silver coins
-    final coins = (score * coinRewardMultiplier).toInt();
+    final coins = (score * difficultyConfig.coinMultiplier).toInt();
     if (coins > 0) {
       petStats.addSilver(coins);
     }
