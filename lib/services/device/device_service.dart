@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -86,8 +87,8 @@ class DeviceService {
     }
   }
   
-  // Grace period for sync status (2 seconds)
-  static const Duration _syncGracePeriod = Duration(seconds: 2);
+  // Grace period for sync status (12 seconds to accommodate 10s barrage OFF phase)
+  static const Duration _syncGracePeriod = Duration(seconds: 12);
   Timer? _syncGraceTimer;
   bool _inSyncGracePeriod = false;
   bool _wasHumanDetected = false;
@@ -99,6 +100,10 @@ class DeviceService {
   // Liveness tracking - require recent telemetry data to consider "connected"
   static const Duration _livenessTimeout = Duration(seconds: 3);
   DateTime? _lastTelemetryTime;
+  
+  // Barrage active time sliding window (60 seconds)
+  final Queue<bool> _humanDetectionHistory = Queue<bool>();
+  Timer? _historyTimer;
   
   /// Check if we have received telemetry data recently (liveness check).
   bool get _hasRecentTelemetry {
@@ -118,7 +123,18 @@ class DeviceService {
       // We have recent data - check if human is detected via appropriate sensor
       // Grace period only applies if we previously had REAL synced status with actual data
       final humanDetected = _isHumanDetected();
-      if (humanDetected || (_inSyncGracePeriod && _wasHumanDetected)) {
+      
+      // Calculate active time in the last 60 seconds
+      int activeSeconds = _humanDetectionHistory.where((detected) => detected).length;
+      
+      // We expect up to 30s of active time in a full 60s window (due to 10s ON / 10s OFF).
+      // If the window is still filling (length < 60), we scale the requirement.
+      // Require 33% active time over the trailing window to provide proper leeway.
+      int windowSize = _humanDetectionHistory.length;
+      int requiredSeconds = windowSize > 0 ? (windowSize * 0.33).round() : 0;
+      bool barrageMet = activeSeconds >= requiredSeconds;
+      
+      if (barrageMet && (humanDetected || (_inSyncGracePeriod && _wasHumanDetected))) {
         return DeviceDisplayStatus.synced;
       }
       return DeviceDisplayStatus.connected;
@@ -238,6 +254,20 @@ class DeviceService {
       _handleHumanDetectionChange(tempData.humanDetected);
     });
     
+    // Initialize barrage evaluation timer
+    _historyTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_currentState == DeviceConnectionState.connected && _hasRecentTelemetry) {
+        _humanDetectionHistory.addLast(_isHumanDetected());
+        if (_humanDetectionHistory.length > 60) {
+          _humanDetectionHistory.removeFirst(); // maintain 60-second window
+        }
+        _emitDisplayStatus(currentDisplayStatus);
+      } else if (_humanDetectionHistory.isNotEmpty) {
+        // clear history on disconnect
+        _humanDetectionHistory.clear();
+      }
+    });
+    
     // Initial emission
     _emitDisplayStatus(currentDisplayStatus);
   }
@@ -350,6 +380,7 @@ class DeviceService {
     _bioSub?.cancel();
     _tempSub?.cancel();
     _syncGraceTimer?.cancel();
+    _historyTimer?.cancel();
     _bioProcessor.dispose();
     _tempProcessor.dispose();
     _connectionStateController.close();

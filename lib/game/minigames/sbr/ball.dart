@@ -19,7 +19,7 @@ class Ball extends PositionComponent with CollisionCallbacks {
   
   Vector2 velocity = Vector2.zero();
   double speed = 300; // base speed
-  double radius = 10;
+  double radius = 12.5;
   
   BallState state = BallState.normal;
   bool isRainbowTrail = false;

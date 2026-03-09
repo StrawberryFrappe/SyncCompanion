@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../../services/device/device_service.dart';
 import '../../pets/pet_stats.dart';
 
+import 'calibration_overlay.dart';
+import 'motion_calibrator.dart';
 import 'sbr_game.dart';
 
 class SBRScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class SBRScreen extends StatefulWidget {
 
 class _SBRScreenState extends State<SBRScreen> {
   SBRGame? _game;
+  bool _calibrated = false;
 
   @override
   void didChangeDependencies() {
@@ -38,15 +41,37 @@ class _SBRScreenState extends State<SBRScreen> {
         isDeviceConnected: widget.isDeviceConnected,
         onGameOver: widget.onGameOver,
         onStateChanged: () {
-          if (mounted) setState(() {});
+          Future.microtask(() {
+            if (mounted) setState(() {});
+          });
         },
       );
+
+      // If no device connected, skip calibration
+      if (!widget.isDeviceConnected) {
+        _calibrated = true;
+      }
     }
+  }
+
+  void _onCalibrationComplete(MotionCalibrator calibrator) {
+    setState(() {
+      _calibrated = true;
+      _game!.calibrator = calibrator;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     if (_game == null) return const Center(child: CircularProgressIndicator());
+
+    // Show calibration overlay before the game if device is connected
+    if (!_calibrated) {
+      return CalibrationOverlay(
+        deviceService: widget.deviceService,
+        onCalibrationComplete: _onCalibrationComplete,
+      );
+    }
     
     return Stack(
       children: [

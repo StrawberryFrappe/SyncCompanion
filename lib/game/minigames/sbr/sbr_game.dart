@@ -11,6 +11,7 @@ import '../../pets/pet_stats.dart';
 import 'ball.dart';
 import 'brick.dart';
 import 'bumper.dart';
+import 'motion_calibrator.dart';
 import 'power_up.dart';
 
 /// SBR minigame main Game class.
@@ -36,6 +37,10 @@ class SBRGame extends FlameGame with HasCollisionDetection, TapCallbacks, DragCa
   int destructibleBricksCount = 0;
 
   StreamSubscription<DeviceEvent>? _eventSub;
+  StreamSubscription<TelemetryData>? _telemetrySub;
+
+  /// Set after calibration completes. Null when no device or not yet calibrated.
+  MotionCalibrator? calibrator;
   
   SBRGame({
     required this.deviceService,
@@ -57,6 +62,7 @@ class SBRGame extends FlameGame with HasCollisionDetection, TapCallbacks, DragCa
     
     if (isDeviceConnected) {
       _eventSub = deviceService.events$.listen(_onDeviceEvent);
+      _telemetrySub = deviceService.telemetry$.listen(_onTelemetry);
       deviceService.requestNativeStatus(); // trigger stream update
     }
   }
@@ -71,10 +77,17 @@ class SBRGame extends FlameGame with HasCollisionDetection, TapCallbacks, DragCa
   }
 
   void _onDeviceEvent(DeviceEvent event) {
-    if (event is ShakeEvent) {
-      // TODO: Implement tilt-to-move when AngleEvent is added to DeviceService.
-      // For now, shake has no effect on the bumper.
-    }
+    // ShakeEvent currently unused in SBR; reserved for future power-ups.
+  }
+
+  /// Processes raw IMU data to drive the bumper via calibrated tilt.
+  void _onTelemetry(TelemetryData data) {
+    if (calibrator == null || calibrator!.state != CalibrationState.done) return;
+    if (!hasStarted || isGameOver) return;
+
+    final roll = MotionCalibrator.rollFromTelemetry(data);
+    final screenX = calibrator!.mapAngleToScreenX(roll, size.x);
+    bumper.setPositionX(screenX);
   }
 
   @override
@@ -142,7 +155,7 @@ class SBRGame extends FlameGame with HasCollisionDetection, TapCallbacks, DragCa
 
   void onBrickDestroyed() {
     destructibleBricksCount--;
-    if (destructibleBricksCount <= 0) {
+    if (destructibleBricksCount == 0) {
       _levelComplete();
     }
   }
@@ -219,6 +232,7 @@ class SBRGame extends FlameGame with HasCollisionDetection, TapCallbacks, DragCa
   @override
   void onRemove() {
     _eventSub?.cancel();
+    _telemetrySub?.cancel();
     super.onRemove();
   }
 }

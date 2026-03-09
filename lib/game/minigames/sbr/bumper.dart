@@ -34,6 +34,13 @@ class Bumper extends PositionComponent with CollisionCallbacks {
     velocityX = tiltMultiplier * maxSpeed;
   }
 
+  /// Sets bumper X position directly (with clamping to screen bounds).
+  /// Used by calibrated motion controls for absolute position mapping.
+  void setPositionX(double x) {
+    final halfWidth = size.x / 2;
+    position.x = x.clamp(halfWidth, game.size.x - halfWidth);
+  }
+
   void expand(double multiplier) {
     size.x *= multiplier;
     

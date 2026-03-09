@@ -14,11 +14,11 @@ class CurrencyDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCurrencyPill('GOLD', gold, Colors.amber),
-        const SizedBox(height: 4),
         _buildCurrencyPill('SILVER', silver, Colors.blueGrey.shade200),
+        const SizedBox(height: 4),
+        _buildCurrencyPill('GOLD', gold, Colors.amber),
       ],
     );
   }

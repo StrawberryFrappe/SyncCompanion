@@ -214,7 +214,12 @@ void loop() {
 
     // 2. Read GY-906 (Software I2C)
     if (sensorFound) {
-        readTempSensor();
+        bool vitalsActive = (millis() % 20000) < 10000;
+        if (vitalsActive) {
+            readTempSensor();
+        } else {
+            global_rawTemp = 0; // Signals rest phase
+        }
     }
 
     // 3. Pack Payload for Flutter
