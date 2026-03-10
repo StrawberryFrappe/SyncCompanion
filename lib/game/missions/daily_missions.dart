@@ -30,12 +30,39 @@ class SyncDurationMission extends Mission {
   String get description => 'Stay synced for ${(targetDuration / 60).ceil()} minutes today.';
 
   @override
+  num get currentValue => (_currentDuration / 60).floor();
+
+  @override
+  num get targetValue => (targetDuration / 60).ceil();
+
+  @override
+  String get valueUnit => 'min';
+
+  @override
   bool update(MissionContext ctx) {
     if (isCompleted || ctx.isDeviceSynced != true || ctx.dt == null) return false;
 
+    double previousDuration = _currentDuration;
     _currentDuration += ctx.dt!;
-    progress = (_currentDuration / targetDuration).clamp(0.0, 1.0);
-    return isCompleted;
+    
+    int prevMinutes = (previousDuration / 60).floor();
+    int currMinutes = (_currentDuration / 60).floor();
+    
+    if (currMinutes > prevMinutes || _currentDuration >= targetDuration) {
+      if (_currentDuration >= targetDuration) {
+          progress = 1.0;
+      } else {
+          progress = (currMinutes / targetValue).clamp(0.0, 1.0);
+      }
+      return isCompleted && previousDuration < targetDuration;
+    }
+    
+    // Also handle initial state loading or restoration where it should be updated but isn't passing a minute boundary
+    if (progress == 0 && _currentDuration > 0) {
+      progress = (currMinutes / targetValue).clamp(0.0, 1.0);
+    }
+
+    return false;
   }
 
   @override
@@ -60,6 +87,8 @@ class SyncDurationMission extends Mission {
       (json['progress'] as num?)?.toDouble() ?? 0.0,
       json['claimed'] as bool? ?? false,
     );
+    // Ensure progress is synced with minute logic on load
+    mission.progress = (mission.currentValue / mission.targetValue).clamp(0.0, 1.0);
     return mission;
   }
 }
@@ -90,6 +119,12 @@ class MinigamePlayMission extends Mission {
 
   @override
   String get description => 'Play any minigame $targetPlays time(s).';
+
+  @override
+  num get currentValue => _currentPlays;
+
+  @override
+  num get targetValue => targetPlays;
 
   @override
   bool update(MissionContext ctx) {
@@ -156,6 +191,12 @@ class FeedPetMission extends Mission {
 
   @override
   String get description => 'Feed your pet $targetFeeds times.';
+
+  @override
+  num get currentValue => _currentFeeds;
+
+  @override
+  num get targetValue => targetFeeds;
 
   @override
   bool update(MissionContext ctx) {

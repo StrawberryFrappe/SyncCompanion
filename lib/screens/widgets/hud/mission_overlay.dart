@@ -280,14 +280,24 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
           }),
           const SizedBox(height: 6),
           if (!mission.isCompleted)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: mission.progress,
-                backgroundColor: Colors.grey[300],
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                minHeight: 6,
-              ),
+             Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${mission.currentValue} / ${mission.targetValue} ${mission.valueUnit}'.trim(),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: mission.progress,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
             ),
         ],
       ),

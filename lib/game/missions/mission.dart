@@ -37,6 +37,11 @@ abstract class Mission {
   bool _isClaimed = false;
   bool get isClaimed => _isClaimed;
 
+  /// For numeric progress display
+  num get currentValue;
+  num get targetValue;
+  String get valueUnit => '';
+
   /// Update mission progress based on context.
   /// Returns check if mission just completed (true only on the frame it completes).
   bool update(MissionContext ctx);
