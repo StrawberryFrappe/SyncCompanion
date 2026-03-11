@@ -56,7 +56,7 @@ class UpdateService {
         if (tagName.isNotEmpty && downloadUrl.isNotEmpty) {
           final releaseVersion = tagName.replaceAll('v', '');
           
-          if (_isNewerVersion(currentVersion, packageInfo.buildNumber, releaseVersion)) {
+          if (_isNewerVersion(currentVersion, releaseVersion)) {
             updateUrlNotifier.value = downloadUrl;
           }
         }
@@ -107,13 +107,7 @@ class UpdateService {
     }
   }
 
-  bool _isNewerVersion(String current, String currentBuild, String release) {
-    if (!release.contains('.')) {
-      int releaseBuild = int.tryParse(release) ?? 0;
-      int currentB = int.tryParse(currentBuild) ?? 0;
-      return releaseBuild > currentB;
-    }
-
+  bool _isNewerVersion(String current, String release) {
     List<int> currentParts = current.split('.').map((s) => int.tryParse(s) ?? 0).toList();
     List<int> releaseParts = release.split('.').map((s) => int.tryParse(s) ?? 0).toList();
 
