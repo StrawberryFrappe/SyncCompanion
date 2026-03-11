@@ -1,0 +1,51 @@
+name: Bump Version on Tag
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+
+      - name: Setup Dart/Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Extract Tag Version
+        id: extract_version
+        run: |
+          # Remove the 'v' prefix from the tag (e.g., v1.0.1 -> 1.0.1)
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$TAG_VERSION" >> $GITHUB_ENV
+          echo "Extracted version: $TAG_VERSION"
+
+      - name: Update pubspec.yaml version
+        run: |
+          # Use the github run number as the build number (guaranteed to be incrementing)
+          NEW_VERSION="${{ env.version }}+${{ github.run_number }}"
+          echo "Setting version to: $NEW_VERSION"
+          
+          # Replace the version line in pubspec.yaml
+          sed -i "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump version to ${{ env.version }}+${{ github.run_number }} [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi
