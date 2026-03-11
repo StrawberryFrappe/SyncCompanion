@@ -108,6 +108,9 @@ class UpdateService {
   }
 
   bool _isNewerVersion(String current, String release) {
+    // Ignore legacy integer-only tags (e.g., '15' from 'v15') when migrating to semantic versioning.
+    if (!release.contains('.')) return false;
+
     List<int> currentParts = current.split('.').map((s) => int.tryParse(s) ?? 0).toList();
     List<int> releaseParts = release.split('.').map((s) => int.tryParse(s) ?? 0).toList();
 
