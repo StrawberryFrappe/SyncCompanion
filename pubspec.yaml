@@ -28,6 +28,9 @@ dependencies:
   provider: ^6.1.5+1
   url_launcher: ^6.3.2
   package_info_plus: ^9.0.0
+  dio: ^5.9.2
+  path_provider: ^2.1.5
+  open_filex: ^4.7.0
   # permission_handler removed due to Android embedding compatibility; runtime
   # permissions are requested via platform prompts where possible.
   # google_fonts removed in favor of bundled Monocraft.ttf

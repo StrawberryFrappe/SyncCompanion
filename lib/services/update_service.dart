@@ -1,14 +1,25 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 class UpdateService {
   static final UpdateService _instance = UpdateService._internal();
   factory UpdateService() => _instance;
   UpdateService._internal();
 
+  // URL to the .apk file or the release page as fallback
   final ValueNotifier<String?> updateUrlNotifier = ValueNotifier(null);
+  
+  // Progress tracker (0.0 to 1.0)
+  final ValueNotifier<double> downloadProgressNotifier = ValueNotifier(0.0);
+  
+  // State tracker for UI changes
+  final ValueNotifier<bool> isDownloadingNotifier = ValueNotifier(false);
+
   bool _hasChecked = false;
 
   Future<void> checkForUpdates() async {
@@ -24,19 +35,75 @@ class UpdateService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final String tagName = data['tag_name'] ?? '';
-        final String htmlUrl = data['html_url'] ?? '';
+        
+        // Find the APK download URL from the assets array
+        String downloadUrl = '';
+        if (data['assets'] != null) {
+          for (var asset in data['assets']) {
+            final name = asset['name']?.toString().toLowerCase() ?? '';
+            if (name.endsWith('.apk')) {
+              downloadUrl = asset['browser_download_url'] ?? '';
+              break;
+            }
+          }
+        }
+        
+        // Fallback to the release page if no APK asset is found
+        if (downloadUrl.isEmpty) {
+          downloadUrl = data['html_url'] ?? '';
+        }
 
-        if (tagName.isNotEmpty && htmlUrl.isNotEmpty) {
+        if (tagName.isNotEmpty && downloadUrl.isNotEmpty) {
           final releaseVersion = tagName.replaceAll('v', '');
           
           if (_isNewerVersion(currentVersion, packageInfo.buildNumber, releaseVersion)) {
-            updateUrlNotifier.value = htmlUrl;
+            updateUrlNotifier.value = downloadUrl;
           }
         }
       }
     } catch (e) {
       debugPrint('Error checking for updates: $e');
       _hasChecked = false; // Allow retrying if it failed
+    }
+  }
+
+  Future<void> downloadAndInstallUpdate(String url) async {
+    if (isDownloadingNotifier.value) return;
+
+    // If it's not an APK file, it's the fallback html_url, we can't download it
+    if (!url.toLowerCase().endsWith('.apk')) {
+      debugPrint('Update URL is not an APK. Cannot download and install.');
+      return;
+    }
+
+    try {
+      isDownloadingNotifier.value = true;
+      downloadProgressNotifier.value = 0.0;
+
+      final directory = await getTemporaryDirectory();
+      final filePath = '${directory.path}/update.apk';
+
+      final dio = Dio();
+      await dio.download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            downloadProgressNotifier.value = received / total;
+          }
+        },
+      );
+
+      // Trigger the installation
+      final result = await OpenFilex.open(filePath);
+      if (result.type != ResultType.done) {
+        debugPrint('Failed to open APK: ${result.message}');
+      }
+    } catch (e) {
+      debugPrint('Error downloading update: $e');
+    } finally {
+      isDownloadingNotifier.value = false;
+      downloadProgressNotifier.value = 0.0;
     }
   }
 

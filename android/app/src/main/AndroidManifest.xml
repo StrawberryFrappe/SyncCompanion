@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Android 13+ requires runtime notification permission to post notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Optional: if you plan to scan in background without a foreground service you may need background location on some API levels -->

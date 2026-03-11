@@ -25,13 +25,18 @@ class _UpdateIconState extends State<UpdateIcon> {
 
         return GestureDetector(
           onTap: () async {
-            final uri = Uri.parse(updateUrl);
-            try {
-              if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-                debugPrint('Could not launch $uri');
+            if (updateUrl.toLowerCase().endsWith('.apk')) {
+              await UpdateService().downloadAndInstallUpdate(updateUrl);
+            } else {
+              // Fallback to old behavior if not an APK
+              final uri = Uri.parse(updateUrl);
+              try {
+                if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                  debugPrint('Could not launch $uri');
+                }
+              } catch (e) {
+                debugPrint('Could not launch $uri: $e');
               }
-            } catch (e) {
-              debugPrint('Could not launch $uri: $e');
             }
           },
           child: Container(
@@ -43,16 +48,47 @@ class _UpdateIconState extends State<UpdateIcon> {
               border: Border.all(width: 2, color: Colors.black),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
               ]
             ),
-            child: const Icon(
-              Icons.system_update,
-              color: Colors.white,
-              size: 24,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: UpdateService().isDownloadingNotifier,
+              builder: (context, isDownloading, child) {
+                if (isDownloading) {
+                  return ValueListenableBuilder<double>(
+                    valueListenable: UpdateService().downloadProgressNotifier,
+                    builder: (context, progress, child) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: progress > 0 ? progress : null,
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                          Text(
+                            '${(progress * 100).toInt()}%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                }
+                
+                return const Icon(
+                  Icons.system_update,
+                  color: Colors.white,
+                  size: 24,
+                );
+              },
             ),
           ),
         );
