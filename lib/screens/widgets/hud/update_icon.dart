@@ -26,8 +26,12 @@ class _UpdateIconState extends State<UpdateIcon> {
         return GestureDetector(
           onTap: () async {
             final uri = Uri.parse(updateUrl);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            try {
+              if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                debugPrint('Could not launch $uri');
+              }
+            } catch (e) {
+              debugPrint('Could not launch $uri: $e');
             }
           },
           child: Container(
