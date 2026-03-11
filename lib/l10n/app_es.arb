@@ -27,7 +27,7 @@
 
   "foodStore": "TIENDA DE COMIDA",
   "silverCurrency": "{amount} Plata",
-  "buyButton": "Comprar {cost} P",
+  "buyButton": "Comprar",
 
   "foodApple": "Manzana",
   "foodBurger": "Hamburguesa",

@@ -85,9 +85,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String buyButton(int cost) {
-    return 'Buy $cost S';
-  }
+  String get buyButton => 'Buy';
 
   @override
   String get foodApple => 'Apple';

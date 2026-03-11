@@ -32,8 +32,7 @@
   "foodStore": "FOOD STORE",
   "silverCurrency": "{amount} Silver",
   "@silverCurrency": { "placeholders": { "amount": { "type": "int" } } },
-  "buyButton": "Buy {cost} S",
-  "@buyButton": { "placeholders": { "cost": { "type": "int" } } },
+  "buyButton": "Buy",
 
   "foodApple": "Apple",
   "foodBurger": "Burger",

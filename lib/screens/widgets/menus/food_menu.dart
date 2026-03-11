@@ -119,7 +119,35 @@ class FoodStore extends StatelessWidget {
                                     onBuy(item);
                                   } 
                                 : null,
-                            child: Text(AppLocalizations.of(context)!.buyButton(item.cost)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(AppLocalizations.of(context)!.buyButton),
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: canAfford ? Colors.green.shade800 : Colors.grey.shade600,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '${item.cost}',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      const Text(
+                                        'P', // or Silver symbol/icon
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

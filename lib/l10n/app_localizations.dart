@@ -233,8 +233,8 @@ abstract class AppLocalizations {
   /// No description provided for @buyButton.
   ///
   /// In en, this message translates to:
-  /// **'Buy {cost} S'**
-  String buyButton(int cost);
+  /// **'Buy'**
+  String get buyButton;
 
   /// No description provided for @foodApple.
   ///
