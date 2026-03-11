@@ -1,7 +1,6 @@
-// dart:math is unused
-
 import 'package:flutter/material.dart';
 import 'package:Therapets/l10n/app_localizations.dart';
+import '../../../game/missions/daily_missions.dart';
 import '../../../game/missions/mission.dart';
 import '../../../game/missions/mission_service.dart';
 
@@ -48,9 +47,37 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
     });
   }
 
+  /// Returns the localized title for a mission based on its id.
+  String _missionTitle(AppLocalizations l10n, Mission mission) {
+    switch (mission.id) {
+      case 'mission_sync_duration':
+        return l10n.missionSyncMasterTitle;
+      case 'mission_minigame_play':
+        return l10n.missionGameTimeTitle;
+      case 'mission_feed_pet':
+        return l10n.missionYummyTimeTitle;
+      default:
+        return mission.title;
+    }
+  }
+
+  /// Returns the localized description for a mission based on its id.
+  String _missionDesc(AppLocalizations l10n, Mission mission) {
+    if (mission is SyncDurationMission) {
+      final minutes = (mission.targetDuration / 60).ceil();
+      return l10n.missionSyncMasterDesc(minutes);
+    } else if (mission is MinigamePlayMission) {
+      return l10n.missionGameTimeDesc(mission.targetPlays);
+    } else if (mission is FeedPetMission) {
+      return l10n.missionYummyTimeDesc(mission.targetFeeds);
+    }
+    return mission.description;
+  }
+
   void _showCompletionBanner(Mission mission) {
     if (!mounted) return;
-    
+    final l10n = AppLocalizations.of(context)!;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -62,12 +89,12 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(AppLocalizations.of(context)!.missionCompleted, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(mission.title),
+                  Text(l10n.missionCompleted, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(_missionTitle(l10n, mission)),
                 ],
               ),
             ),
-            Text(AppLocalizations.of(context)!.goldReward(mission.goldReward), style: const TextStyle(color: Colors.amber)),
+            Text(l10n.goldReward(mission.goldReward), style: const TextStyle(color: Colors.amber)),
           ],
         ),
         behavior: SnackBarBehavior.floating,
@@ -216,14 +243,17 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  mission.title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    decoration: mission.isCompleted ? TextDecoration.lineThrough : null,
-                    color: mission.isCompleted ? Colors.grey : Colors.black,
-                  ),
-                ),
+                child: Builder(builder: (context) {
+                  final l10n = AppLocalizations.of(context)!;
+                  return Text(
+                    _missionTitle(l10n, mission),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      decoration: mission.isCompleted ? TextDecoration.lineThrough : null,
+                      color: mission.isCompleted ? Colors.grey : Colors.black,
+                    ),
+                  );
+                }),
               ),
               if (!mission.isCompleted)
                 Container(
@@ -244,17 +274,30 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
             ],
           ),
           const SizedBox(height: 4),
-          Text(mission.description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Builder(builder: (context) {
+            final l10n = AppLocalizations.of(context)!;
+            return Text(_missionDesc(l10n, mission), style: const TextStyle(fontSize: 12, color: Colors.grey));
+          }),
           const SizedBox(height: 6),
           if (!mission.isCompleted)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: mission.progress,
-                backgroundColor: Colors.grey[300],
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                minHeight: 6,
-              ),
+             Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${mission.currentValue} / ${mission.targetValue} ${mission.valueUnit}'.trim(),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: mission.progress,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
             ),
         ],
       ),

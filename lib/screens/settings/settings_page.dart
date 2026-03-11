@@ -12,7 +12,6 @@ import 'token_scanner_page.dart';
 
 import 'sections/stat_rates_section.dart';
 import 'sections/notifications_section.dart';
-import 'sections/flappy_game_section.dart';
 import 'sections/cloud_sync_section.dart';
 import 'sections/debug_section.dart';
 import 'widgets/telemetry_terminal.dart';
@@ -36,7 +35,6 @@ class _SettingsPageState extends State<SettingsPage> {
   double _happinessGainRate = 0.0001389;
   double _happinessDecayRate = 0.0000463;
   double _lowWellbeingThreshold = 0.25;
-  double _flappyCoinMultiplier = 1.0;
   
   // Debug: Fake sync
   bool _fakeSyncEnabled = false;
@@ -100,7 +98,6 @@ class _SettingsPageState extends State<SettingsPage> {
       _happinessGainRate = prefs.getDouble('pet_happiness_gain_rate') ?? 0.0001389;
       _happinessDecayRate = prefs.getDouble('pet_happiness_decay_rate') ?? 0.0000463;
       _lowWellbeingThreshold = prefs.getDouble('pet_low_wellbeing_threshold') ?? 0.25;
-      _flappyCoinMultiplier = prefs.getDouble('flappy_coin_multiplier') ?? 1.0;
     });
   }
   
@@ -110,7 +107,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.setDouble('pet_happiness_gain_rate', _happinessGainRate);
     await prefs.setDouble('pet_happiness_decay_rate', _happinessDecayRate);
     await prefs.setDouble('pet_low_wellbeing_threshold', _lowWellbeingThreshold);
-    await prefs.setDouble('flappy_coin_multiplier', _flappyCoinMultiplier);
   }
   
   Future<void> _loadFakeSyncSettings() async {
@@ -281,17 +277,6 @@ class _SettingsPageState extends State<SettingsPage> {
             onThresholdChanged: (threshold) {
               setState(() => _lowWellbeingThreshold = threshold);
               widget.game?.currentPet.stats.lowWellbeingThreshold = threshold;
-              _saveRates();
-            },
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Flappy Bob Game
-          FlappyGameSection(
-            coinMultiplier: _flappyCoinMultiplier,
-            onMultiplierChanged: (val) {
-              setState(() => _flappyCoinMultiplier = val);
               _saveRates();
             },
           ),

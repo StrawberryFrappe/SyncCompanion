@@ -49,6 +49,8 @@
   "gameOrchestraDesc": "Make your pets sing!",
   "gameDonut": "donut.dart",
   "gameDonutDesc": "Zero gravity pastry",
+  "gameSbr": "SBR",
+  "gameSbrDesc": "Breakout with a twist",
 
   "wardrobe": "WARDROBE",
   "goldCurrency": "{amount} GOLD",
@@ -124,11 +126,11 @@
   "addGold": "+100 GOLD",
   "addSilver": "+100 SILVER",
 
-  "flappyBobGame": "FLAPPY BOB GAME",
-  "coinMultiplier": "Coin Multiplier",
-  "silverFormula": "Silver = Score * Multiplier",
-  "scoreExample": "Score 10 = {coins} silver coins",
-  "@scoreExample": { "placeholders": { "coins": { "type": "int" } } },
+  "difficultyLabel": "Difficulty",
+  "difficultyEasy": "Easy",
+  "difficultyMedium": "Medium",
+  "difficultyHard": "Hard",
+  "difficultyExtreme": "Extreme",
 
   "scanForDevicesTitle": "Scan for Devices",
   "disconnectForget": "Disconnect & Forget",

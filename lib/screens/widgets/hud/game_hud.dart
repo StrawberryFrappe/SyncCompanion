@@ -4,6 +4,7 @@ import '../../../services/device/device_service.dart';
 import 'currency_display.dart';
 import 'mission_overlay.dart';
 import 'stat_indicator.dart';
+import 'update_icon.dart';
 
 class GameHud extends StatelessWidget {
   final double hunger;
@@ -106,6 +107,7 @@ class GameHud extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   const MissionOverlay(),
+                  const UpdateIcon(),
                 ],
               ),
             ),

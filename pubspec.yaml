@@ -25,6 +25,9 @@ dependencies:
   http: ^1.1.0
   connectivity_plus: ^5.0.2
   mobile_scanner: ^6.0.1
+  provider: ^6.1.5+1
+  url_launcher: ^6.3.2
+  package_info_plus: ^9.0.0
   # permission_handler removed due to Android embedding compatibility; runtime
   # permissions are requested via platform prompts where possible.
   # google_fonts removed in favor of bundled Monocraft.ttf
