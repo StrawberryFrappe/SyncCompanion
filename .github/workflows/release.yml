@@ -12,10 +12,36 @@ jobs:
   build_and_release:
     name: Build and Release
     runs-on: ubuntu-latest
+    # Skip version-bump commits to avoid infinite loops
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump Version
+        id: version
+        run: |
+          # Read current version from pubspec.yaml (e.g., "1.0.0+1")
+          CURRENT=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          BASE_VERSION=$(echo "$CURRENT" | cut -d'+' -f1)
+
+          MAJOR=$(echo "$BASE_VERSION" | cut -d'.' -f1)
+          MINOR=$(echo "$BASE_VERSION" | cut -d'.' -f2)
+          PATCH=$(echo "$BASE_VERSION" | cut -d'.' -f3)
+
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          NEW_FULL_VERSION="$NEW_VERSION+${{ github.run_number }}"
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_full_version=$NEW_FULL_VERSION" >> $GITHUB_OUTPUT
+
+          # Update pubspec.yaml
+          sed -i "s/^version: .*/version: $NEW_FULL_VERSION/" pubspec.yaml
+          echo "Bumped version to $NEW_FULL_VERSION"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -27,7 +53,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -51,11 +77,22 @@ jobs:
       - name: Build Android APK
         run: flutter build apk --release
 
+      - name: Commit Version Bump
+        id: commit
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_full_version }} [skip ci]"
+          git push
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.new_version }}
+          name: Release v${{ steps.version.outputs.new_version }}
+          target_commitish: ${{ steps.commit.outputs.sha }}
           draft: false
           prerelease: false
           files: |
