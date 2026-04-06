@@ -141,7 +141,9 @@ class DeviceService {
       
       // We have recent data - check if human is detected via appropriate sensor
       // Grace period only applies if we previously had REAL synced status with actual data
-      final humanDetected = _isHumanDetected();
+      final humanDetectedReal = _isHumanDetected();
+      final isDebouncing = _wasHumanDetected && !_inSyncGracePeriod && _consecutiveNoHumanSamples < _noHumanDebounceThreshold;
+      final humanDetected = humanDetectedReal || isDebouncing;
       
       // Calculate active time in the last 60 seconds
       int activeSeconds = _humanDetectionHistory.where((detected) => detected).length;

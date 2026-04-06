@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../game/virtual_pet_game.dart';
 import '../services/device/device_service.dart';
 import '../services/notifications/pet_notification_service.dart';
+import '../services/cloud/cloud_service.dart';
 import '../game/missions/mission_service.dart';
 import '../game/missions/mission.dart';
 
@@ -47,6 +48,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   // For UI updates
   Timer? _uiUpdateTimer;
   
+  // For background usage tracking
+  bool _isPaused = false;
+  int _backgroundSyncSeconds = 0;
+  DateTime? _backgroundSyncStartTime;
+  Timer? _backgroundTicker;
+  
   // Group ID for Fridge TapRegion to allow button clicks to be ignored
   final _fridgeGroupId = Object();
 
@@ -75,10 +82,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         setState(() {});
       }
     });
+
+    // Accurate background tracking ticker
+    _backgroundTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_isPaused && _game.isReady) {
+        final isSynced = _connectionStatus == DeviceDisplayStatus.synced;
+        
+        // Advance the math live manually while UI/Flame is frozen
+        _game.currentPet.stats.update(1.0, isDeviceSynced: isSynced);
+        
+        if (isSynced) {
+          if (_backgroundSyncSeconds == 0) {
+            _backgroundSyncStartTime = DateTime.now();
+          }
+          _backgroundSyncSeconds++;
+        } else {
+          if (_backgroundSyncSeconds > 0) {
+            CloudService().logSyncSession(
+              duration: Duration(seconds: _backgroundSyncSeconds),
+              startTime: _backgroundSyncStartTime!,
+            );
+            _backgroundSyncSeconds = 0;
+          }
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _backgroundTicker?.cancel();
     _uiUpdateTimer?.cancel();
     _autoSaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -94,12 +127,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     
     switch (state) {
       case AppLifecycleState.paused:
+        _isPaused = true;
         // App fully backgrounded - save current state with timestamp
         // NOTE: Only save on 'paused', not 'inactive'/'hidden' which also fire when RETURNING
         print('[GameScreen] Saving stats (app paused/backgrounded)');
         _saveStats();
         break;
       case AppLifecycleState.resumed:
+        _isPaused = false;
+        // Push any remaining tracked session immediately
+        if (_backgroundSyncSeconds > 0) {
+          CloudService().logSyncSession(
+            duration: Duration(seconds: _backgroundSyncSeconds),
+            startTime: _backgroundSyncStartTime!,
+          );
+          _backgroundSyncSeconds = 0;
+        }
         // App returning to foreground - restore and apply background updates
         print('[GameScreen] Restoring stats (returning to foreground)');
         _restoreStats();
@@ -162,7 +205,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _restoreStats() async {
     try {
-      await _game.loadPetStats(isDeviceSynced: _connectionStatus == DeviceDisplayStatus.synced);
+      // Offline/killed recovery: if the OS completely suspended or killed the app,
+      // the background ticker couldn't run. Because the BLE radio connection drops 
+      // when the app is suspended/killed, the device could not possibly be "synced".
+      // Therefore, we jump the missing time defaulting to `false`.
+      await _game.loadPetStats(isDeviceSynced: false);
     } catch (e) {
       print('Error restoring pet stats: $e');
     }
