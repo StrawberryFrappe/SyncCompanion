@@ -440,7 +440,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (_) => FlappyBirdScreen(
                   deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
-                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced,
+                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced || _connectionStatus == DeviceDisplayStatus.connected,
                 ),
               ),
             ).then((_) {
@@ -455,7 +455,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (_) => OrchestraScreen(
                   deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
-                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced,
+                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced || _connectionStatus == DeviceDisplayStatus.connected,
                 ),
               ),
             ).then((_) {
@@ -478,7 +478,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 builder: (_) => SBRScreen(
                   deviceService: _deviceService,
                   petStats: _game.currentPet.stats,
-                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced,
+                  isDeviceConnected: _connectionStatus == DeviceDisplayStatus.synced || _connectionStatus == DeviceDisplayStatus.connected,
                   onGameOver: () => Navigator.of(context).pop(),
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import '../services/device/device_service.dart';
 
 /// Configuration for a minigame screen.
 class MinigameConfig {
@@ -41,11 +42,9 @@ class _MinigameScreenState extends State<MinigameScreen> {
   @override
   void initState() {
     super.initState();
-    
-    // Keep screen on if configured
-    if (widget.config.keepScreenOn) {
-      WakelockPlus.enable();
-    }
+    // Always keep screen on for minigames
+    WakelockPlus.enable();
+    DeviceService().registerMinigameStart();
     
     // Lock orientation if specified
     if (widget.config.forcedOrientations != null) {
@@ -55,10 +54,9 @@ class _MinigameScreenState extends State<MinigameScreen> {
 
   @override
   void dispose() {
-    // Disable wakelock
-    if (widget.config.keepScreenOn) {
-      WakelockPlus.disable();
-    }
+    // Disable wakelock and unregister minigame
+    WakelockPlus.disable();
+    DeviceService().registerMinigameEnd();
     
     // Restore all orientations
     if (widget.config.forcedOrientations != null) {

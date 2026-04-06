@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../services/device/device_service.dart';
 import '../../pets/pet_stats.dart';
@@ -29,6 +30,20 @@ class SBRScreen extends StatefulWidget {
 class _SBRScreenState extends State<SBRScreen> {
   SBRGame? _game;
   bool _calibrated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();
+    DeviceService().registerMinigameStart();
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    DeviceService().registerMinigameEnd();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {

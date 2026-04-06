@@ -86,6 +86,25 @@ class DeviceService {
       _displayStatusController.add(status);
     }
   }
+
+  int _activeMinigames = 0;
+  bool get _isMinigameRunning => _activeMinigames > 0;
+
+  void registerMinigameStart() {
+    _activeMinigames++;
+    if (_currentState == DeviceConnectionState.connected) {
+      _emitDisplayStatus(currentDisplayStatus);
+    }
+  }
+
+  void registerMinigameEnd() {
+    if (_activeMinigames > 0) {
+      _activeMinigames--;
+      if (_currentState == DeviceConnectionState.connected) {
+        _emitDisplayStatus(currentDisplayStatus);
+      }
+    }
+  }
   
   // Grace period for sync status (12 seconds to accommodate 10s barrage OFF phase)
   static const Duration _syncGracePeriod = Duration(seconds: 12);
@@ -134,7 +153,7 @@ class DeviceService {
       int requiredSeconds = windowSize > 0 ? (windowSize * 0.33).round() : 0;
       bool barrageMet = activeSeconds >= requiredSeconds;
       
-      if (barrageMet && (humanDetected || (_inSyncGracePeriod && _wasHumanDetected))) {
+      if (_isMinigameRunning || (barrageMet && (humanDetected || (_inSyncGracePeriod && _wasHumanDetected)))) {
         return DeviceDisplayStatus.synced;
       }
       return DeviceDisplayStatus.connected;
