@@ -173,5 +173,16 @@
   "deviceSynced": "Your device is synced",
 
   "connectionStatusDevice": "Device: {deviceId}",
-  "@connectionStatusDevice": { "placeholders": { "deviceId": { "type": "String" } } }
+  "@connectionStatusDevice": { "placeholders": { "deviceId": { "type": "String" } } },
+  
+  "sbrTapToStart": "Tap to Start!",
+  "sbrCombo": "Combo: {amount}",
+  "@sbrCombo": { "placeholders": { "amount": { "type": "int" } } },
+  "sbrLevel": "Level: {level}",
+  "@sbrLevel": { "placeholders": { "level": { "type": "int" } } },
+  "sbrLives": "Lives: {lives}",
+  "@sbrLives": { "placeholders": { "lives": { "type": "int" } } },
+  "sbrCalibrationCenter": "Hold arm straight and tap to confirm",
+  "sbrCalibrationLeft": "Turn wrist max left and tap to confirm",
+  "sbrCalibrationRight": "Turn wrist max right and tap to confirm"
 }

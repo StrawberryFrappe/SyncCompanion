@@ -157,5 +157,13 @@
   "petWellbeingDropped": "El bienestar de tu mascota ha bajado. ¡Es hora de revisarla!",
   "deviceSynced": "Tu dispositivo está sincronizado",
 
-  "connectionStatusDevice": "Dispositivo: {deviceId}"
+  "connectionStatusDevice": "Dispositivo: {deviceId}",
+
+  "sbrTapToStart": "¡Toca para empezar!",
+  "sbrCombo": "Combo: {amount}",
+  "sbrLevel": "Nivel: {level}",
+  "sbrLives": "Vidas: {lives}",
+  "sbrCalibrationCenter": "Mantén el brazo recto y toca para confirmar",
+  "sbrCalibrationLeft": "Gira la muñeca a la izquierda al máximo y toca para confirmar",
+  "sbrCalibrationRight": "Gira la muñeca a la derecha al máximo y toca para confirmar"
 }

@@ -6,7 +6,8 @@ import '../../../services/device/device_service.dart';
 enum CalibrationState {
   idle,
   calibratingCenter,
-  calibratingRange,
+  calibratingLeft,
+  calibratingRight,
   done,
 }
 
@@ -23,15 +24,8 @@ enum CalibrationState {
 class MotionCalibrator {
   CalibrationState state = CalibrationState.idle;
 
-  // --- Center phase ---
-  final List<double> _centerSamples = [];
-
   /// The neutral roll angle (degrees) when the user holds still.
   double centerAngle = 0.0;
-
-  // --- Range phase ---
-  double _minAngle = double.infinity;
-  double _maxAngle = double.negativeInfinity;
 
   /// How far left (negative offset from center, in degrees) the user tilted.
   double leftExtent = 0.0;
@@ -56,50 +50,26 @@ class MotionCalibrator {
 
   void startCenterPhase() {
     state = CalibrationState.calibratingCenter;
-    _centerSamples.clear();
   }
 
-  void startRangePhase() {
-    // Compute center from collected samples
-    if (_centerSamples.isNotEmpty) {
-      centerAngle =
-          _centerSamples.reduce((a, b) => a + b) / _centerSamples.length;
-    }
-
-    // Initialise range tracking relative to center
-    _minAngle = centerAngle;
-    _maxAngle = centerAngle;
-
-    state = CalibrationState.calibratingRange;
+  void confirmCenter(double roll) {
+    centerAngle = roll;
+    state = CalibrationState.calibratingLeft;
   }
 
-  void finish() {
-    leftExtent = (centerAngle - _minAngle).abs();
-    rightExtent = (_maxAngle - centerAngle).abs();
+  void confirmLeft(double roll) {
+    leftExtent = (centerAngle - roll).abs();
+    state = CalibrationState.calibratingRight;
+  }
+
+  void confirmRight(double roll) {
+    rightExtent = (roll - centerAngle).abs();
 
     // Ensure a minimum range so division-by-zero can't happen
     if (leftExtent < 5.0) leftExtent = 5.0;
     if (rightExtent < 5.0) rightExtent = 5.0;
 
     state = CalibrationState.done;
-  }
-
-  // --- Sample ingestion ---
-
-  void addSample(TelemetryData data) {
-    final roll = rollFromTelemetry(data);
-
-    switch (state) {
-      case CalibrationState.calibratingCenter:
-        _centerSamples.add(roll);
-        break;
-      case CalibrationState.calibratingRange:
-        if (roll < _minAngle) _minAngle = roll;
-        if (roll > _maxAngle) _maxAngle = roll;
-        break;
-      default:
-        break;
-    }
   }
 
   // --- Mapping ---

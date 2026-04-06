@@ -1,3 +1,4 @@
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -108,10 +109,10 @@ class _SBRScreenState extends State<SBRScreen> {
                   ValueListenableBuilder<int>(
                     valueListenable: ValueNotifier(_game!.combo), // Need to notify this properly, use stream or rebuild
                     builder: (context, combo, child) {
-                      return Text('Combo: ${_game!.combo}', style: _hudStyle());
+                      return Text(AppLocalizations.of(context)!.sbrCombo(_game!.combo), style: _hudStyle());
                     },
                   ),
-                  Text('Level: ${_game!.currentLevel}', style: _hudStyle()),
+                  Text(AppLocalizations.of(context)!.sbrLevel(_game!.currentLevel), style: _hudStyle()),
                 ],
               ),
               
@@ -119,8 +120,8 @@ class _SBRScreenState extends State<SBRScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('Score: ${_game!.score}', style: _hudStyle()),
-                  Text('Lives: ${_game!.lives}', style: _hudStyle(color: Colors.redAccent)),
+                  Text(AppLocalizations.of(context)!.scoreLabel(_game!.score), style: _hudStyle()),
+                  Text(AppLocalizations.of(context)!.sbrLives(_game!.lives), style: _hudStyle(color: Colors.redAccent)),
                 ],
               ),
             ],
@@ -131,7 +132,7 @@ class _SBRScreenState extends State<SBRScreen> {
         if (!_game!.hasStarted && !_game!.isGameOver)
           Center(
             child: Text(
-              'Tap to Start!',
+              AppLocalizations.of(context)!.sbrTapToStart,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 32,
@@ -147,9 +148,9 @@ class _SBRScreenState extends State<SBRScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'GAME OVER',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.gameOver,
+                  style: const TextStyle(
                     color: Colors.red,
                     fontSize: 48,
                     fontWeight: FontWeight.bold,
@@ -158,7 +159,7 @@ class _SBRScreenState extends State<SBRScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Score: ${_game!.score}',
+                  AppLocalizations.of(context)!.scoreLabel(_game!.score),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
