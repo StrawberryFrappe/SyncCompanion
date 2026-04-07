@@ -251,6 +251,17 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          // Nightly Updates (top of Advanced Settings for easy access)
+          AppUpdatesSection(
+            nightlyEnabled: _nightlyUpdatesEnabled,
+            onNightlyChanged: (val) {
+              setState(() => _nightlyUpdatesEnabled = val);
+              _saveNightlyUpdates(val);
+            },
+          ),
+          
+          const SizedBox(height: 12),
+          
           // Stat Rate Controls
           StatRatesSection(
             hungerDecayRate: _hungerDecayRate,
@@ -294,17 +305,6 @@ class _SettingsPageState extends State<SettingsPage> {
               setState(() => _lowWellbeingThreshold = threshold);
               widget.game?.currentPet.stats.lowWellbeingThreshold = threshold;
               _saveRates();
-            },
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // App Updates
-          AppUpdatesSection(
-            nightlyEnabled: _nightlyUpdatesEnabled,
-            onNightlyChanged: (val) {
-              setState(() => _nightlyUpdatesEnabled = val);
-              _saveNightlyUpdates(val);
             },
           ),
           
