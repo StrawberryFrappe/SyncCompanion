@@ -30,10 +30,27 @@ class UpdateService {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version; // e.g., "1.0.0"
 
-      final response = await http.get(Uri.parse('https://api.github.com/repos/StrawberryFrappe/SyncCompanion/releases/latest'));
+      final prefs = await SharedPreferences.getInstance();
+      final isNightlyEnabled = prefs.getBool('nightly_updates_enabled') ?? false;
+
+      final url = isNightlyEnabled
+          ? 'https://api.github.com/repos/StrawberryFrappe/SyncCompanion/releases'
+          : 'https://api.github.com/repos/StrawberryFrappe/SyncCompanion/releases/latest';
+
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final rawData = jsonDecode(response.body);
+        final Map<String, dynamic> data;
+
+        if (isNightlyEnabled && rawData is List && rawData.isNotEmpty) {
+          data = rawData.first;
+        } else if (!isNightlyEnabled && rawData is Map<String, dynamic>) {
+          data = rawData;
+        } else {
+          return;
+        }
+
         final String tagName = data['tag_name'] ?? '';
         
         // Find the APK download URL from the assets array
@@ -108,18 +125,52 @@ class UpdateService {
   }
 
   bool _isNewerVersion(String current, String release) {
-    // Ignore legacy integer-only tags (e.g., '15' from 'v15') when migrating to semantic versioning.
-    if (!release.contains('.')) return false;
-
-    List<int> currentParts = current.split('.').map((s) => int.tryParse(s) ?? 0).toList();
-    List<int> releaseParts = release.split('.').map((s) => int.tryParse(s) ?? 0).toList();
-
-    for (int i = 0; i < releaseParts.length; i++) {
-        int c = i < currentParts.length ? currentParts[i] : 0;
-        int r = releaseParts[i];
-        if (r > c) return true;
-        if (r < c) return false;
+    final regex = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:-nightly\.(\d+))?');
+    
+    final currentMatch = regex.firstMatch(current);
+    final releaseMatch = regex.firstMatch(release);
+    
+    if (currentMatch == null || releaseMatch == null) {
+      // Fallback to simple split logic
+      if (!release.contains('.')) return false;
+      List<int> currentParts = current.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+      List<int> releaseParts = release.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+      for (int i = 0; i < releaseParts.length; i++) {
+          int c = i < currentParts.length ? currentParts[i] : 0;
+          int r = releaseParts[i];
+          if (r > c) return true;
+          if (r < c) return false;
+      }
+      return false;
     }
-    return false;
+    
+    // Compare major, minor, patch
+    for (int i = 1; i <= 3; i++) {
+      int c = int.parse(currentMatch.group(i) ?? '0');
+      int r = int.parse(releaseMatch.group(i) ?? '0');
+      if (r > c) return true;
+      if (r < c) return false;
+    }
+    
+    // Same base version. Check nightly numbers.
+    String? currentNightlyStr = currentMatch.group(4);
+    String? releaseNightlyStr = releaseMatch.group(4);
+    
+    // If one is stable and the other is nightly, the stable is newer
+    if (currentNightlyStr != null && releaseNightlyStr == null) {
+      return true; // Release is stable, current is nightly
+    }
+    if (currentNightlyStr == null && releaseNightlyStr != null) {
+      return false; // Current is stable, release is nightly
+    }
+    
+    // Both are nightly
+    if (currentNightlyStr != null && releaseNightlyStr != null) {
+      int cNightly = int.parse(currentNightlyStr);
+      int rNightly = int.parse(releaseNightlyStr);
+      return rNightly > cNightly; // True if release nightly number > current
+    }
+    
+    return false; // Identical
   }
 }

@@ -1,5 +1,0 @@
-# DEPRECATED: Version bumping is now handled by release.yml.
-# This file can be safely deleted.
-name: "[Deprecated] Bump Version on Tag"
-on:
-  workflow_dispatch:

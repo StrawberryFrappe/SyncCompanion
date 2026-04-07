@@ -13,6 +13,10 @@
   "disconnectAndForget": "DISCONNECT & FORGET",
   "language": "LANGUAGE",
 
+  "appUpdates": "APP UPDATES",
+  "nightlyUpdates": "Nightly Updates",
+  "nightlyUpdatesDesc": "Automatically detect and update to pre-release (dev) builds.",
+
   "dailyMissions": "Daily Missions",
   "missionCompleted": "Mission Completed!",
   "noMissionsAvailable": "No missions available today.",
