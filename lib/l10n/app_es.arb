@@ -13,6 +13,7 @@
   "disconnectAndForget": "DESCONECTAR Y OLVIDAR",
   "language": "IDIOMA",
 
+  "appVersion": "Versión de la App",
   "appUpdates": "ACTUALIZACIONES DE LA APLICACIÓN",
   "nightlyUpdates": "Actualizaciones Nocturnas (Nightly)",
   "nightlyUpdatesDesc": "Detectar y actualizar automáticamente a compilaciones preliminares (dev).",
