@@ -16,6 +16,7 @@ import 'sections/notifications_section.dart';
 import 'sections/cloud_sync_section.dart';
 import 'sections/debug_section.dart';
 import 'sections/app_updates_section.dart';
+import '../../services/update_service.dart';
 import 'widgets/telemetry_terminal.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -137,6 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveNightlyUpdates(bool val) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('nightly_updates_enabled', val);
+    UpdateService().checkForUpdates();
   }
   
   void _loadCloudConfig() {
