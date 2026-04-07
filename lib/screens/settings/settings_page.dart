@@ -14,6 +14,7 @@ import 'sections/stat_rates_section.dart';
 import 'sections/notifications_section.dart';
 import 'sections/cloud_sync_section.dart';
 import 'sections/debug_section.dart';
+import 'sections/app_updates_section.dart';
 import 'widgets/telemetry_terminal.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -44,6 +45,9 @@ class _SettingsPageState extends State<SettingsPage> {
   final CloudService _cloud = CloudService();
   String _cloudBaseUrl = '';
   String _cloudDeviceToken = '';
+  
+  // App Updates
+  bool _nightlyUpdatesEnabled = false;
   
   Timer? _statDisplayTimer;
   StreamSubscription<DeviceConnectionState>? _nativeConnSub;
@@ -87,6 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
       if (id != null) {
         _isConnected = true;
       }
+      _nightlyUpdatesEnabled = prefs.getBool('nightly_updates_enabled') ?? false;
       _loading = false;
     });
   }
@@ -121,6 +126,11 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('debug_fake_sync_enabled', _fakeSyncEnabled);
     await prefs.setBool('debug_fake_sync_value', _fakeSyncValue);
+  }
+  
+  Future<void> _saveNightlyUpdates(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('nightly_updates_enabled', val);
   }
   
   void _loadCloudConfig() {
@@ -278,6 +288,17 @@ class _SettingsPageState extends State<SettingsPage> {
               setState(() => _lowWellbeingThreshold = threshold);
               widget.game?.currentPet.stats.lowWellbeingThreshold = threshold;
               _saveRates();
+            },
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // App Updates
+          AppUpdatesSection(
+            nightlyEnabled: _nightlyUpdatesEnabled,
+            onNightlyChanged: (val) {
+              setState(() => _nightlyUpdatesEnabled = val);
+              _saveNightlyUpdates(val);
             },
           ),
           
