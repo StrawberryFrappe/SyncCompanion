@@ -913,6 +913,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Device: {deviceId}'**
   String connectionStatusDevice(String deviceId);
+
+  /// No description provided for @sbrTapToStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to Start!'**
+  String get sbrTapToStart;
+
+  /// No description provided for @sbrCombo.
+  ///
+  /// In en, this message translates to:
+  /// **'Combo: {amount}'**
+  String sbrCombo(int amount);
+
+  /// No description provided for @sbrLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level: {level}'**
+  String sbrLevel(int level);
+
+  /// No description provided for @sbrLives.
+  ///
+  /// In en, this message translates to:
+  /// **'Lives: {lives}'**
+  String sbrLives(int lives);
+
+  /// No description provided for @sbrCalibrationCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold arm straight and tap to confirm'**
+  String get sbrCalibrationCenter;
+
+  /// No description provided for @sbrCalibrationLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn wrist max left and tap to confirm'**
+  String get sbrCalibrationLeft;
+
+  /// No description provided for @sbrCalibrationRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn wrist max right and tap to confirm'**
+  String get sbrCalibrationRight;
 }
 
 class _AppLocalizationsDelegate

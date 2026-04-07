@@ -452,4 +452,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String connectionStatusDevice(String deviceId) {
     return 'Device: $deviceId';
   }
+
+  @override
+  String get sbrTapToStart => 'Tap to Start!';
+
+  @override
+  String sbrCombo(int amount) {
+    return 'Combo: $amount';
+  }
+
+  @override
+  String sbrLevel(int level) {
+    return 'Level: $level';
+  }
+
+  @override
+  String sbrLives(int lives) {
+    return 'Lives: $lives';
+  }
+
+  @override
+  String get sbrCalibrationCenter => 'Hold arm straight and tap to confirm';
+
+  @override
+  String get sbrCalibrationLeft => 'Turn wrist max left and tap to confirm';
+
+  @override
+  String get sbrCalibrationRight => 'Turn wrist max right and tap to confirm';
 }
