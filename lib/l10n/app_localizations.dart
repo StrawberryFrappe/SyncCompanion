@@ -158,6 +158,24 @@ abstract class AppLocalizations {
   /// **'LANGUAGE'**
   String get language;
 
+  /// No description provided for @appUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'APP UPDATES'**
+  String get appUpdates;
+
+  /// No description provided for @nightlyUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Nightly Updates'**
+  String get nightlyUpdates;
+
+  /// No description provided for @nightlyUpdatesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically detect and update to pre-release (dev) builds.'**
+  String get nightlyUpdatesDesc;
+
   /// No description provided for @dailyMissions.
   ///
   /// In en, this message translates to:
