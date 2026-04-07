@@ -26,10 +26,11 @@ jobs:
         run: |
           CURRENT=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           BASE_VERSION=$(echo "$CURRENT" | cut -d'+' -f1)
+          CLEAN_VERSION=$(echo "$BASE_VERSION" | cut -d'-' -f1)
 
-          MAJOR=$(echo "$BASE_VERSION" | cut -d'.' -f1)
-          MINOR=$(echo "$BASE_VERSION" | cut -d'.' -f2)
-          PATCH=$(echo "$BASE_VERSION" | cut -d'.' -f3)
+          MAJOR=$(echo "$CLEAN_VERSION" | cut -d'.' -f1)
+          MINOR=$(echo "$CLEAN_VERSION" | cut -d'.' -f2)
+          PATCH=$(echo "$CLEAN_VERSION" | cut -d'.' -f3)
 
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             NEW_PATCH=$((PATCH + 1))
