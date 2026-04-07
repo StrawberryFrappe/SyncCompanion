@@ -22,17 +22,24 @@ class UpdateService {
   final ValueNotifier<bool> isDownloadingNotifier = ValueNotifier(false);
 
   bool _hasChecked = false;
+  bool _lastNightlyState = false;
 
   Future<void> checkForUpdates() async {
-    if (_hasChecked) return;
-    _hasChecked = true;
-
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version; // e.g., "1.0.0"
 
       final prefs = await SharedPreferences.getInstance();
       final isNightlyEnabled = prefs.getBool('nightly_updates_enabled') ?? false;
+
+      // If the nightly preference changed since last check, allow re-checking
+      if (_hasChecked && isNightlyEnabled != _lastNightlyState) {
+        _hasChecked = false;
+        updateUrlNotifier.value = null;
+      }
+      if (_hasChecked) return;
+      _hasChecked = true;
+      _lastNightlyState = isNightlyEnabled;
 
       final url = isNightlyEnabled
           ? 'https://api.github.com/repos/StrawberryFrappe/SyncCompanion/releases'
@@ -45,7 +52,14 @@ class UpdateService {
         final Map<String, dynamic> data;
 
         if (isNightlyEnabled && rawData is List && rawData.isNotEmpty) {
-          data = rawData.first;
+          // GitHub's /releases endpoint sorts stable releases before
+          // prereleases. Find the latest prerelease entry.
+          final nightlyEntry = rawData.firstWhere(
+            (r) => r['prerelease'] == true,
+            orElse: () => null,
+          );
+          if (nightlyEntry == null) return;
+          data = nightlyEntry;
         } else if (!isNightlyEnabled && rawData is Map<String, dynamic>) {
           data = rawData;
         } else {
