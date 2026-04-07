@@ -74,7 +74,7 @@ class UpdateService {
         if (tagName.isNotEmpty && downloadUrl.isNotEmpty) {
           final releaseVersion = tagName.replaceAll('v', '');
           
-          if (_isNewerVersion(currentVersion, releaseVersion)) {
+          if (_isNewerVersion(currentVersion, releaseVersion, isNightlyEnabled: isNightlyEnabled)) {
             updateUrlNotifier.value = downloadUrl;
           }
         }
@@ -125,7 +125,7 @@ class UpdateService {
     }
   }
 
-  bool _isNewerVersion(String current, String release) {
+  bool _isNewerVersion(String current, String release, {bool isNightlyEnabled = false}) {
     final regex = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:-nightly\.(\d+))?');
     
     final currentMatch = regex.firstMatch(current);
@@ -145,6 +145,17 @@ class UpdateService {
       return false;
     }
     
+    // When the user opted into nightly updates, any nightly release is always
+    // considered newer than the current stable build — dev is always ahead of
+    // main. This check runs before the base-version comparison so that the
+    // version skew between branches (e.g. 1.0.1-nightly vs 1.0.2) can't
+    // cause a false negative.
+    final releaseIsNightly = releaseMatch.group(4) != null;
+    final currentIsStable = currentMatch.group(4) == null;
+    if (isNightlyEnabled && releaseIsNightly && currentIsStable) {
+      return true;
+    }
+
     // Compare major, minor, patch
     for (int i = 1; i <= 3; i++) {
       int c = int.parse(currentMatch.group(i) ?? '0');
@@ -159,10 +170,11 @@ class UpdateService {
     
     // If one is stable and the other is nightly, the stable is newer
     if (currentNightlyStr != null && releaseNightlyStr == null) {
-      return true; // Release is stable, current is nightly
+      return true; // Release is stable, current is nightly → upgrade
     }
     if (currentNightlyStr == null && releaseNightlyStr != null) {
-      return false; // Current is stable, release is nightly
+      // Current is stable, release is nightly → only upgrade if user opted in
+      return isNightlyEnabled;
     }
     
     // Both are nightly
