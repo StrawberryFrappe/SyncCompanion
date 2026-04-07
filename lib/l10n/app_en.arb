@@ -13,6 +13,7 @@
   "disconnectAndForget": "DISCONNECT & FORGET",
   "language": "LANGUAGE",
 
+  "appVersion": "App Version",
   "appUpdates": "APP UPDATES",
   "nightlyUpdates": "Nightly Updates",
   "nightlyUpdatesDesc": "Automatically detect and update to pre-release (dev) builds.",

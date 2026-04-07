@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:Therapets/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/device/device_service.dart';
 import '../../services/cloud/cloud_service.dart';
 import '../../game/virtual_pet_game.dart';
@@ -30,6 +31,9 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _loading = true;
   bool _isConnected = false;
+  
+  // App version
+  String _appVersion = '';
   
   // Stat rates (defaults: 6h decay, 2h gain)
   double _hungerDecayRate = 0.0000463;
@@ -87,10 +91,12 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getString('saved_device_id');
+    final packageInfo = await PackageInfo.fromPlatform();
     setState(() {
       if (id != null) {
         _isConnected = true;
       }
+      _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
       _nightlyUpdatesEnabled = prefs.getBool('nightly_updates_enabled') ?? false;
       _loading = false;
     });
@@ -426,6 +432,15 @@ class _SettingsPageState extends State<SettingsPage> {
             },
             icon: const Icon(Icons.restart_alt),
             label: Text(AppLocalizations.of(context)!.resetStats, style: const TextStyle(fontSize: 12, fontFamily: 'Monocraft', fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 24),
+
+          // App Version Footer
+          Center(
+            child: Text(
+              '${AppLocalizations.of(context)!.appVersion}: $_appVersion',
+              style: const TextStyle(fontSize: 10, color: Colors.grey, fontFamily: 'Monocraft'),
+            ),
           ),
           const SizedBox(height: 24),
 
