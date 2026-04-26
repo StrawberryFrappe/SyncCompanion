@@ -143,6 +143,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           );
           _backgroundSyncSeconds = 0;
         }
+        // Re-attach native event bridge and reset stale Dart state
+        _deviceService.onAppResumed();
         // App returning to foreground - restore and apply background updates
         print('[GameScreen] Restoring stats (returning to foreground)');
         _restoreStats();
