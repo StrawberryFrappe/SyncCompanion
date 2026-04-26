@@ -288,28 +288,33 @@ class PetStats {
 
   // ============ PERSISTENCE ============
 
-  /// Save current state to SharedPreferences
+  /// Save current state to SharedPreferences.
+  /// Coins and inventory are written first so the most critical data
+  /// survives even if the save is interrupted mid-way (e.g. the Flutter
+  /// engine is torn down while the process is being killed).
   Future<void> saveToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     _lastUpdateTime = DateTime.now();
-    
-    await prefs.setDouble('pet_hunger', _hunger);
-    await prefs.setDouble('pet_happiness', _happiness);
-    await prefs.setDouble('pet_happiness_buffer', _happinessBuffer);
+
+    // Write currency first — most critical, must survive an interrupted save.
     await prefs.setInt('pet_gold_coins', _goldCoins);
     await prefs.setInt('pet_silver_coins', _silverCoins);
+
+    // Inventory and clothing.
+    final inventoryList = _foodInventory.entries.map((e) => '${e.key}:${e.value}').toList();
+    await prefs.setStringList('pet_food_inventory', inventoryList);
     await prefs.setStringList('pet_unlocked_clothing', _unlockedClothingIds);
     final equippedList = _equippedClothing.entries.map((e) => '${e.key}:${e.value}').toList();
     await prefs.setStringList('pet_equipped_clothing', equippedList);
-    
-    // Save inventory
-    final inventoryList = _foodInventory.entries.map((e) => '${e.key}:${e.value}').toList();
-    await prefs.setStringList('pet_food_inventory', inventoryList);
-    
+
+    // Stats and timestamp (can be recalculated / less critical).
+    await prefs.setDouble('pet_hunger', _hunger);
+    await prefs.setDouble('pet_happiness', _happiness);
+    await prefs.setDouble('pet_happiness_buffer', _happinessBuffer);
     await prefs.setInt('pet_last_update', _lastUpdateTime.millisecondsSinceEpoch);
-    
-    // Persist rates and threshold so native service can compute decay independently
+
+    // Persist rates and threshold so the native service can compute decay independently.
     await prefs.setDouble('pet_hunger_decay_rate', hungerDecayRate);
     await prefs.setDouble('pet_happiness_gain_rate', happinessGainRate);
     await prefs.setDouble('pet_happiness_decay_rate', happinessDecayRate);
