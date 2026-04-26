@@ -1,10 +1,13 @@
 package com.strawberryFrappe.sync_companion
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.Context
 import android.os.IBinder
 import android.os.Build
+import android.os.SystemClock
 import android.app.NotificationManager
 import android.app.NotificationChannel
 import androidx.core.app.NotificationCompat
@@ -21,6 +24,7 @@ import android.util.Log
 import android.util.Base64
 import android.os.Handler
 import android.os.Looper
+import kotlin.math.max
 
 class BleForegroundService : Service() {
     companion object {
@@ -36,6 +40,9 @@ class BleForegroundService : Service() {
         val CCC_UUID = java.util.UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         // Set to true when debugging raw notify payloads; keep false for normal runs.
         const val DATA_LOG = false
+        const val PET_ALERTS_CHANNEL = "pet_alerts"
+        const val PET_CARE_INTERVAL_MS = 60_000L  // check every 60 seconds
+        const val PET_ALERT_COOLDOWN_MS = 30 * 60_000L  // 30 min between alerts
     }
 
     private var adapter: BluetoothAdapter? = null
@@ -48,12 +55,15 @@ class BleForegroundService : Service() {
     // awaiting ACK from Dart when we emit cached status/lastBytes
     private var awaitingAck: Boolean = false
     private var ackClearRunnable: Runnable? = null
+    // Pet care periodic checker
+    private var petCareRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         adapter = BluetoothAdapter.getDefaultAdapter()
         createNotificationChannel()
+        createPetAlertsChannel()
         startForeground(2001, buildNotification("Initializing BLE service"))
         // Do not clear the persisted connected flag here — keep the last known
         // native state so UI can display it immediately. The service will update
@@ -63,6 +73,8 @@ class BleForegroundService : Service() {
         if (did != null) {
             handler.postDelayed({ connectToDevice(did) }, 2000)
         }
+        // Start periodic pet care checker
+        startPetCareTimer()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -133,8 +145,30 @@ class BleForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        petCareRunnable?.let { handler.removeCallbacks(it) }
+        petCareRunnable = null
         disconnectGatt()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Schedule a restart via AlarmManager if the user swipes the app away
+        try {
+            val restartIntent = Intent(this, BleForegroundService::class.java)
+            val pendingIntent = PendingIntent.getService(
+                this, 1, restartIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            am.set(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + 5000,
+                pendingIntent
+            )
+        } catch (e: Exception) {
+            Log.w("BleForegroundService", "onTaskRemoved: failed to schedule restart: $e")
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     private fun createNotificationChannel() {
@@ -142,6 +176,117 @@ class BleForegroundService : Service() {
             val nm = getSystemService(NotificationManager::class.java)
             val ch = NotificationChannel(CHANNEL_ID, "Therapets", NotificationManager.IMPORTANCE_LOW)
             nm.createNotificationChannel(ch)
+        }
+    }
+
+    private fun createPetAlertsChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = getSystemService(NotificationManager::class.java)
+            val ch = NotificationChannel(
+                PET_ALERTS_CHANNEL,
+                "Pet Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications about your pet's wellbeing"
+                enableVibration(true)
+            }
+            nm.createNotificationChannel(ch)
+        }
+    }
+
+    // ============ PET CARE TIMER ============
+
+    private fun startPetCareTimer() {
+        petCareRunnable?.let { handler.removeCallbacks(it) }
+        petCareRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    checkPetCare()
+                } catch (e: Exception) {
+                    Log.w("BleForegroundService", "petCare error: $e")
+                }
+                handler.postDelayed(this, PET_CARE_INTERVAL_MS)
+            }
+        }
+        handler.postDelayed(petCareRunnable!!, PET_CARE_INTERVAL_MS)
+    }
+
+    /**
+     * Compute pet stat decay using the same formula as Dart's PetStats.update().
+     * Reads current values from SharedPreferences, applies elapsed decay,
+     * writes updated values back, and fires a notification if wellbeing is low.
+     */
+    private fun checkPetCare() {
+        val p = prefs ?: return
+
+        val lastUpdateMs = p.getInt("pet_last_update", 0).toLong()
+            .takeIf { it > 0 }
+            ?: p.getLong("pet_last_update", 0L)
+                .takeIf { it > 0 }
+            ?: return  // no pet data saved yet
+
+        val now = System.currentTimeMillis()
+        val elapsedSec = (now - lastUpdateMs) / 1000.0
+        if (elapsedSec <= 0) return
+
+        // Read current stats
+        var hunger = p.getFloat("pet_hunger", 1.0f).toDouble()
+        var happiness = p.getFloat("pet_happiness", 1.0f).toDouble()
+
+        // SharedPreferences stores doubles via putFloat for Dart's setDouble
+        // which actually uses putFloat under the hood on Android.
+        val hungerDecayRate = p.getFloat("pet_hunger_decay_rate", 0.0000463f).toDouble()
+        val happinessDecayRate = p.getFloat("pet_happiness_decay_rate", 0.0000463f).toDouble()
+        val happinessGainRate = p.getFloat("pet_happiness_gain_rate", 0.0001389f).toDouble()
+        val threshold = p.getFloat("pet_low_wellbeing_threshold", 0.25f).toDouble()
+
+        // Determine if currently synced (native BLE connected)
+        val isSynced = p.getBoolean(PREF_CONNECTED, false)
+
+        // Apply decay (same logic as PetStats.update)
+        hunger = max(0.0, hunger - hungerDecayRate * elapsedSec)
+        if (isSynced && hunger >= 0.25) {
+            happiness = (happiness + happinessGainRate * elapsedSec).coerceAtMost(1.0)
+        } else {
+            happiness = max(0.0, happiness - happinessDecayRate * elapsedSec)
+        }
+
+        // Write updated values back
+        try {
+            p.edit()
+                .putFloat("pet_hunger", hunger.toFloat())
+                .putFloat("pet_happiness", happiness.toFloat())
+                .putLong("pet_last_update", now)
+                .apply()
+        } catch (e: Exception) {
+            Log.w("BleForegroundService", "failed to write pet stats: $e")
+        }
+
+        // Check wellbeing
+        val wellbeing = (hunger + happiness) / 2.0
+        if (wellbeing <= threshold) {
+            firePetAlertIfCooldownPassed(p, now)
+        }
+    }
+
+    private fun firePetAlertIfCooldownPassed(p: SharedPreferences, now: Long) {
+        val lastAlert = p.getLong("last_pet_alert_timestamp", 0L)
+        if (now - lastAlert < PET_ALERT_COOLDOWN_MS) return
+
+        p.edit().putLong("last_pet_alert_timestamp", now).apply()
+
+        try {
+            val notification = NotificationCompat.Builder(this, PET_ALERTS_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle("Your pet needs attention!")
+                .setContentText("Your pet's wellbeing has dropped. Time to check on them!")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.notify(3001, notification)
+        } catch (e: Exception) {
+            Log.w("BleForegroundService", "failed to show pet alert: $e")
         }
     }
 

@@ -155,6 +155,14 @@ class BluetoothService {
     } catch (_) {}
   }
 
+  /// Re-attach the native event stream and request fresh status.
+  /// Should be called when the app returns from background to recover
+  /// the severed EventChannel bridge.
+  Future<void> reattachNativeEventStream() async {
+    _attachNativeEventStream();
+    await requestNativeStatus();
+  }
+
   void _attachNativeEventStream() {
     // If already attached, cancel and re-attach to ensure fresh connection
     // This fixes issues where the native side might have dropped the receiver but we still think we are attached.

@@ -18,6 +18,9 @@ import android.content.IntentFilter
 import android.preference.PreferenceManager
 import android.util.Base64
 import android.util.Log
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -227,6 +230,21 @@ class MainActivity : FlutterActivity() {
 						result.success(true)
 					} catch (e: Exception) {
 						result.error("pet_alert_failed", e.toString(), null)
+					}
+				}
+				"requestBatteryOptimization" -> {
+					try {
+						val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+						if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+							val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+							intent.data = Uri.parse("package:$packageName")
+							startActivity(intent)
+							result.success(false) // requested, not yet granted
+						} else {
+							result.success(true) // already exempted
+						}
+					} catch (e: Exception) {
+						result.error("battery_opt_failed", e.toString(), null)
 					}
 				}
 				else -> result.notImplemented()

@@ -313,6 +313,12 @@ class PetStats {
     await prefs.setDouble('pet_happiness', _happiness);
     await prefs.setDouble('pet_happiness_buffer', _happinessBuffer);
     await prefs.setInt('pet_last_update', _lastUpdateTime.millisecondsSinceEpoch);
+    
+    // Persist rates and threshold so native service can compute decay independently
+    await prefs.setDouble('pet_hunger_decay_rate', hungerDecayRate);
+    await prefs.setDouble('pet_happiness_gain_rate', happinessGainRate);
+    await prefs.setDouble('pet_happiness_decay_rate', happinessDecayRate);
+    await prefs.setDouble('pet_low_wellbeing_threshold', lowWellbeingThreshold);
   }
 
   /// Load state from SharedPreferences and apply background updates
