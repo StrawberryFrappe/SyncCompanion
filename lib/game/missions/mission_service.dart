@@ -154,15 +154,19 @@ class MissionService {
     }
   }
 
+  /// Public entry-point so that callers (e.g. the app lifecycle handler) can
+  /// explicitly flush mission state to disk without going through an update cycle.
+  Future<void> save() => _saveProgress();
+
   Future<void> _saveProgress() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Save last reset date
-    await prefs.setInt(_lastResetKey, _lastResetDate.millisecondsSinceEpoch);
-    
-    // Serialize and save all missions
+    // Serialize and save all missions first — most critical.
     final missionList = _activeMissions.map((m) => m.toJson()).toList();
     await prefs.setString(_missionDataKey, jsonEncode(missionList));
+
+    // Save last reset date.
+    await prefs.setInt(_lastResetKey, _lastResetDate.millisecondsSinceEpoch);
   }
 
   void _notifyListeners() {

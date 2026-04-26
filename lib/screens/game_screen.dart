@@ -116,7 +116,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _autoSaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _syncSub?.cancel();
-    _saveStats(); // Save on dispose
+    unawaited(_saveStats()); // Save on dispose
     super.dispose();
   }
 
@@ -128,10 +128,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.paused:
         _isPaused = true;
-        // App fully backgrounded - save current state with timestamp
-        // NOTE: Only save on 'paused', not 'inactive'/'hidden' which also fire when RETURNING
+        // App fully backgrounded - save current state with timestamp.
+        // NOTE: Only save on 'paused', not 'inactive'/'hidden' which also fire when RETURNING.
+        // didChangeAppLifecycleState returns void so we can't await — fire-and-forget is intentional.
         print('[GameScreen] Saving stats (app paused/backgrounded)');
-        _saveStats();
+        unawaited(_saveStats());
         break;
       case AppLifecycleState.resumed:
         _isPaused = false;
@@ -149,9 +150,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
-      case AppLifecycleState.detached:
-        // These states happen both when leaving AND returning - don't save here
+        // These states fire both when leaving AND when returning to the
+        // foreground — don't save here to avoid redundant writes.
         print('[GameScreen] Lifecycle transition state: $state (no action)');
+        break;
+      case AppLifecycleState.detached:
+        // Fired only when the app is being destroyed (e.g. swiped from recents
+        // while in the foreground).  This is the last chance to flush data
+        // before the process is killed, so save everything.
+        // didChangeAppLifecycleState returns void so we can't await — fire-and-forget is intentional.
+        print('[GameScreen] Saving stats (app detached/being destroyed)');
+        unawaited(_saveStats());
         break;
     }
   }
@@ -200,6 +209,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       await _game.savePetStats();
     } catch (e) {
       print('Error saving pet stats: $e');
+    }
+    try {
+      await MissionService().save();
+    } catch (e) {
+      print('Error saving missions: $e');
     }
   }
 
