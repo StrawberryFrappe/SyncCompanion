@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Optional: if you plan to scan in background without a foreground service you may need background location on some API levels -->
     <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
+    <!-- Required for requesting battery optimization exemption on aggressive OEMs -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <application
         android:label="Therapets"
         android:name="${applicationName}"
@@ -53,7 +55,7 @@
         <!-- Foreground service required by flutter_foreground_task plugin. Keeps a persistent notification while service runs. -->
         <service android:name="com.pravera.flutter_foreground_task.service.ForegroundService" android:exported="false" android:foregroundServiceType="connectedDevice" />
         <!-- Native BLE foreground service implemented in Kotlin -->
-        <service android:name=".BleForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <service android:name=".BleForegroundService" android:exported="false" android:foregroundServiceType="dataSync" android:stopWithTask="false" />
 
         <receiver android:name=".BootReceiver" android:enabled="true" android:exported="true">
             <intent-filter>

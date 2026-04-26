@@ -393,6 +393,24 @@ class DeviceService {
   Future<bool> performRequestPermissions() => _bluetooth.performRequestPermissions();
   Map<String, bool> get permissionStatuses => _bluetooth.permissionStatuses;
 
+  /// Called when the app returns from background/lock screen.
+  /// Re-attaches the severed EventChannel and resets stale Dart state
+  /// so the monitoring pipeline recovers immediately.
+  Future<void> onAppResumed() async {
+    // Reset liveness so we don't report stale "connected" until fresh packets arrive
+    _lastTelemetryTime = null;
+    // Clear stale barrage window data
+    _humanDetectionHistory.clear();
+    _inSyncGracePeriod = false;
+    _wasHumanDetected = false;
+    _syncGraceTimer?.cancel();
+    _consecutiveNoHumanSamples = 0;
+    // Emit current display status (will be waiting/searching until data flows)
+    _emitDisplayStatus(currentDisplayStatus);
+    // Re-attach native event stream and request fresh status from native service
+    await _bluetooth.reattachNativeEventStream();
+  }
+
 
   void dispose() {
     _rawSub?.cancel();
