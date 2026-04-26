@@ -216,13 +216,20 @@ class BleForegroundService : Service() {
      * Reads current values from SharedPreferences, applies elapsed decay,
      * writes updated values back, and fires a notification if wellbeing is low.
      */
+    private fun readPetLastUpdateMillis(p: SharedPreferences): Long? {
+        val value = p.all["pet_last_update"] ?: return null
+        return when (value) {
+            is Long -> value.takeIf { it > 0L }
+            is Int -> value.toLong().takeIf { it > 0L }
+            is Number -> value.toLong().takeIf { it > 0L }
+            else -> null
+        }
+    }
+
     private fun checkPetCare() {
         val p = prefs ?: return
 
-        val lastUpdateMs = p.getInt("pet_last_update", 0).toLong()
-            .takeIf { it > 0 }
-            ?: p.getLong("pet_last_update", 0L)
-                .takeIf { it > 0 }
+        val lastUpdateMs = readPetLastUpdateMillis(p)
             ?: return  // no pet data saved yet
 
         val now = System.currentTimeMillis()
