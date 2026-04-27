@@ -39,6 +39,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get language => 'IDIOMA';
 
   @override
+  String get appVersion => 'Versión de la App';
+
+  @override
   String get appUpdates => 'ACTUALIZACIONES DE LA APLICACIÓN';
 
   @override

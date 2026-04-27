@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
-
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages the hunger and happiness stats for a pet.
@@ -42,6 +42,9 @@ class PetStats {
   
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+
+  // Fail-safe to prevent overwriting SharedPreferences if load fails
+  bool _canSave = false;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -189,6 +192,7 @@ class PetStats {
     _happiness = 1.0;
     _happinessBuffer = 0.0;
     _lastUpdateTime = DateTime.now();
+    _canSave = true; // Safe to save now
     saveToPrefs();
   }
 
@@ -398,7 +402,7 @@ class PetStats {
   /// Enqueue a save. Concurrent callers are serialised — each waits for the
   /// previous save to finish before starting its own write.
   Future<void> saveToPrefs() {
-    if (!_isInitialized) return Future.value();
+    if (!_isInitialized || !_canSave) return Future.value();
     _saveLock =
         _saveLock.catchError((_) {}).then((_) => _doSave());
     return _saveLock;
@@ -444,16 +448,19 @@ class PetStats {
         try {
           hadSavedState = _fromJson(
               jsonDecode(bundleJson) as Map<String, dynamic>);
+          _canSave = hadSavedState;
           debugPrint('[PetStats] LOAD - Found bundle data');
-        } catch (e, st) {
+        } catch (e) {
           debugPrint('[PetStats] Bundle parse error — falling back to legacy keys: $e');
           hadSavedState = _loadLegacyKeys(prefs);
           wasLegacy = hadSavedState;
+          _canSave = hadSavedState;
         }
       } else {
         // First launch after update: migrate from old individual keys.
         hadSavedState = _loadLegacyKeys(prefs);
         wasLegacy = hadSavedState;
+        _canSave = hadSavedState;
         if (hadSavedState) debugPrint('[PetStats] LOAD - Found legacy data for migration');
       }
 
@@ -462,6 +469,7 @@ class PetStats {
         if (isDeviceSynced) applyHappinessBuffer();
       } else {
         debugPrint('[PetStats] LOAD - No saved state found, using defaults');
+        _canSave = true; // Safe to save defaults for new user
       }
       
       _isInitialized = true;

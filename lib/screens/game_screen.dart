@@ -2,12 +2,9 @@ import 'dart:async';
 
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/virtual_pet_game.dart';
 import '../services/device/device_service.dart';
-import '../services/notifications/pet_notification_service.dart';
-import '../services/cloud/cloud_service.dart';
 import '../game/missions/mission_service.dart';
 import '../game/missions/mission.dart';
 
@@ -22,6 +19,7 @@ import '../game/items/food_item.dart';
 import 'widgets/menus/food_menu.dart'; // Is now FoodStore inside
 import 'widgets/menus/game_menu.dart';
 import 'widgets/menus/fridge_widget.dart';
+import 'widgets/menus/wardrobe_menu.dart';
 import 'controllers/game_screen_controller.dart';
 
 /// GameScreen - The main screen of the app.

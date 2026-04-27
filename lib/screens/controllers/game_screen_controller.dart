@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../game/virtual_pet_game.dart';
-import '../services/device/device_service.dart';
-import '../services/cloud/cloud_service.dart';
-import '../game/missions/mission_service.dart';
-import '../services/notifications/pet_notification_service.dart';
+import '../../game/virtual_pet_game.dart';
+import '../../services/device/device_service.dart';
+import '../../services/cloud/cloud_service.dart';
+import '../../game/missions/mission_service.dart';
+import '../../game/missions/mission.dart';
+import '../../services/notifications/pet_notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GameScreenController extends ChangeNotifier {
