@@ -7,6 +7,7 @@ import 'device_service.dart';
 /// Handles grace periods, debouncing, and human detection history.
 class DeviceStatusAggregator {
   final DeviceDisplayStatus Function() _baseStatusProvider;
+  final DeviceDisplayStatus Function() _staleStatusProvider;
   final bool Function() _isHumanDetectedProvider;
   final bool Function() _isMinigameRunningProvider;
   final bool Function() _hasRecentTelemetryProvider;
@@ -30,10 +31,12 @@ class DeviceStatusAggregator {
 
   DeviceStatusAggregator({
     required DeviceDisplayStatus Function() baseStatusProvider,
+    required DeviceDisplayStatus Function() staleStatusProvider,
     required bool Function() isHumanDetectedProvider,
     required bool Function() isMinigameRunningProvider,
     required bool Function() hasRecentTelemetryProvider,
   })  : _baseStatusProvider = baseStatusProvider,
+        _staleStatusProvider = staleStatusProvider,
         _isHumanDetectedProvider = isHumanDetectedProvider,
         _isMinigameRunningProvider = isMinigameRunningProvider,
         _hasRecentTelemetryProvider = hasRecentTelemetryProvider {
@@ -61,7 +64,7 @@ class DeviceStatusAggregator {
     }
 
     if (!_hasRecentTelemetryProvider()) {
-      return base; // Typically waiting/searching
+      return _staleStatusProvider();
     }
 
     final humanDetectedReal = _isHumanDetectedProvider();

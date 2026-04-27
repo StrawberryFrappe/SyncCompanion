@@ -104,22 +104,32 @@ class DeviceService {
   // Liveness tracking - require recent telemetry data to consider "connected"
   static const Duration _livenessTimeout = Duration(seconds: 3);
   DateTime? _lastTelemetryTime;
+  bool _awaitingFreshTelemetry = true;
 
   /// Check if we have received telemetry data recently (liveness check).
   bool get _hasRecentTelemetry {
     if (_lastTelemetryTime == null) return false;
     return DateTime.now().difference(_lastTelemetryTime!) < _livenessTimeout;
   }
+
+  DeviceDisplayStatus _staleDisplayStatus() {
+    final hasSaved = _bluetooth.getSavedDeviceId() != null;
+    return hasSaved ? DeviceDisplayStatus.waiting : DeviceDisplayStatus.searching;
+  }
+
+  bool get _hasFreshTelemetryForUi {
+    return !_awaitingFreshTelemetry && _hasRecentTelemetry;
+  }
   
   late final DeviceStatusAggregator _statusAggregator = DeviceStatusAggregator(
     baseStatusProvider: () {
       if (_currentState == DeviceConnectionState.connected) return DeviceDisplayStatus.connected;
-      final hasSaved = _bluetooth.getSavedDeviceId() != null;
-      return hasSaved ? DeviceDisplayStatus.waiting : DeviceDisplayStatus.searching;
+      return _staleDisplayStatus();
     },
+    staleStatusProvider: _staleDisplayStatus,
     isHumanDetectedProvider: _isHumanDetected,
     isMinigameRunningProvider: () => _activeMinigames > 0,
-    hasRecentTelemetryProvider: () => _hasRecentTelemetry,
+    hasRecentTelemetryProvider: () => _hasFreshTelemetryForUi,
   );
 
   DeviceDisplayStatus get currentDisplayStatus => _statusAggregator.currentDisplayStatus;
@@ -202,6 +212,7 @@ class DeviceService {
            _tempProcessor.reset();
            // Reset liveness and grace period state
            _lastTelemetryTime = null;
+           _awaitingFreshTelemetry = true;
            _statusAggregator.reset();
          }
        }
@@ -218,6 +229,7 @@ class DeviceService {
       if (data != null) {
         // Update liveness timestamp on every valid packet (IMU data = device alive)
         _lastTelemetryTime = DateTime.now();
+        _awaitingFreshTelemetry = false;
         
         _telemetryController.add(data);
         _checkForHighLevelEvents(data);
@@ -346,6 +358,7 @@ class DeviceService {
   Future<void> onAppResumed() async {
     // Reset liveness so we don't report stale "connected" until fresh packets arrive
     _lastTelemetryTime = null;
+    _awaitingFreshTelemetry = true;
     _statusAggregator.reset();
     // Emit current display status (will be waiting/searching until data flows)
     _emitDisplayStatus(currentDisplayStatus);
