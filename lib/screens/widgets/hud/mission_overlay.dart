@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../game/missions/daily_missions.dart';
 import '../../../game/missions/mission.dart';
@@ -12,7 +13,7 @@ class MissionOverlay extends StatefulWidget {
 }
 
 class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProviderStateMixin {
-  final MissionService _service = MissionService();
+  late MissionService _service;
   bool _isExpanded = false;
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -25,7 +26,12 @@ class _MissionOverlayState extends State<MissionOverlay> with SingleTickerProvid
       duration: const Duration(milliseconds: 200),
     );
     _scaleAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
-    
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _service = context.read<MissionService>();
     // Listen for completion events to show banners
     _service.missionCompletions.listen(_showCompletionBanner);
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive/hive.dart';
 import 'mission.dart';
 import 'daily_missions.dart';
 import '../pets/pet_stats.dart';
@@ -10,12 +11,11 @@ import '../../services/cloud/cloud_service.dart';
 
 /// Service to manage daily missions.
 class MissionService {
-  static final MissionService _instance = MissionService._internal();
-  factory MissionService() => _instance;
-  MissionService._internal();
+  final CloudService _cloudService;
+  PetStats? _petStats;
 
-  static const String _missionDataKey = 'daily_missions_data';
-  static const String _lastResetKey = 'last_mission_reset';
+  MissionService({required CloudService cloudService}) : _cloudService = cloudService;
+
   // Atomic bundle key — replaces the two individual keys above.
   static const String _bundleKey = 'mission_bundle';
 
@@ -44,11 +44,12 @@ class MissionService {
   // Save lock — serialises concurrent save calls so writes never interleave.
   Future<void> _saveLock = Future.value();
 
-  PetStats? _petStats;
+  late Box _box;
 
-  /// Initialize with PetStats reference
-  Future<void> init(PetStats stats) async {
+  /// Initialize with PetStats reference and Hive box
+  Future<void> init(PetStats stats, Box box) async {
     _petStats = stats;
+    _box = box;
     await _loadMissions();
     await _checkDailyReset();
   }
@@ -84,7 +85,7 @@ class MissionService {
     }
     
     // Log to cloud - await to ensure it's sent
-    await CloudService().logMissionCompleted(
+    await _cloudService.logMissionCompleted(
       timestamp: DateTime.now(),
       missionId: mission.id,
     );
@@ -107,9 +108,9 @@ class MissionService {
     debugPrint('[MissionService] Generating fresh daily missions');
     // Generate 3 random missions for the day
     final missions = <Mission>[
-      SyncDurationMission(targetDuration: 120 * 60, rewardGold: 50), // 2 hours
-      MinigamePlayMission(targetPlays: 3, rewardGold: 30),
-      FeedPetMission(targetFeeds: 3, rewardGold: 20),
+      SyncDurationMission(targetDuration: 120 * 60, goldReward: 50), // 2 hours
+      MinigamePlayMission(targetPlays: 3, goldReward: 30),
+      FeedPetMission(targetFeeds: 3, goldReward: 20),
     ];
     
     _activeMissions = missions;
@@ -131,13 +132,28 @@ class MissionService {
       return;
     }
     
-    debugPrint('[MissionService] LOAD START');
+    debugPrint('[MissionService] LOAD START (Hive)');
     _isLoading = true;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      if (_box.isNotEmpty) {
+        final lastResetMs = _box.get('lastResetMs') as int?;
+        if (lastResetMs != null) {
+          _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+        }
+        final missions = _box.get('missions') as List?;
+        if (missions != null) {
+          _activeMissions = List<Mission>.from(missions);
+          _isInitialized = true;
+          _canSave = true;
+          _notifyListeners();
+          debugPrint('[MissionService] LOAD SUCCESS (Hive) - ${_activeMissions.length} missions');
+          return;
+        }
+      }
 
-      // Try reading the atomic bundle first.
+      // Legacy Migration from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
       final bundleJson = prefs.getString(_bundleKey);
       if (bundleJson != null) {
         try {
@@ -154,48 +170,21 @@ class MissionService {
                 .whereType<Mission>()
                 .toList();
             if (_activeMissions.isNotEmpty) {
-              debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in bundle');
+              debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in bundle (migrating)');
               _isInitialized = true;
-              _canSave = true; // Safe to save loaded missions
+              _canSave = true; 
               _notifyListeners();
+              await save(); // Save to Hive
               return;
             }
           }
         } catch (e) {
-          debugPrint('[MissionService] Bundle parse error — falling back to legacy keys: $e');
+          debugPrint('[MissionService] Bundle parse error during migration: $e');
         }
       }
 
-      // Legacy key fallback (users upgrading from earlier versions).
-      final lastResetMs = prefs.getInt(_lastResetKey);
-      if (lastResetMs != null) {
-        _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
-      }
-      final missionJson = prefs.getString(_missionDataKey);
-      if (missionJson != null) {
-        try {
-          final List<dynamic> missionList = jsonDecode(missionJson);
-          _activeMissions = missionList
-              .map((j) => _missionFromJson(j as Map<String, dynamic>))
-              .whereType<Mission>()
-              .toList();
-          if (_activeMissions.isNotEmpty) {
-            debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in legacy keys');
-            _isInitialized = true;
-            _canSave = true; // Safe to save migrated missions
-            _notifyListeners();
-            // Migrate to bundle on next save
-            await save();
-            return;
-          }
-        } catch (e) {
-          debugPrint('[MissionService] Legacy parse error: $e');
-        }
-      }
-
-      // Nothing usable found — generate fresh missions.
+      // If nothing found, generate fresh
       await _generateDailyMissions();
-      _canSave = true; // Safe to save fresh missions
       debugPrint('[MissionService] LOAD COMPLETE - Fresh missions generated');
     } finally {
       _isLoading = false;
@@ -232,19 +221,13 @@ class MissionService {
   }
 
   Future<void> _doSave() async {
-    debugPrint('[MissionService] SAVE START');
-    final prefs = await SharedPreferences.getInstance();
-    // Single atomic key: both fields live or die together.
-    final bundle = jsonEncode({
-      'lastResetMs': _lastResetDate.millisecondsSinceEpoch,
-      // Nest missions as a pre-encoded string so jsonEncode errors are isolated.
-      'missions': jsonEncode(_activeMissions.map((m) => m.toJson()).toList()),
-    });
-    final success = await prefs.setString(_bundleKey, bundle);
-    if (success) {
-      debugPrint('[MissionService] SAVE SUCCESS');
-    } else {
-      debugPrint('[MissionService] SAVE FAILED!');
+    debugPrint('[MissionService] SAVE START (Hive)');
+    try {
+      await _box.put('lastResetMs', _lastResetDate.millisecondsSinceEpoch);
+      await _box.put('missions', _activeMissions);
+      debugPrint('[MissionService] SAVE SUCCESS (Hive)');
+    } catch (e) {
+      debugPrint('[MissionService] SAVE FAILED (Hive): $e');
     }
   }
 

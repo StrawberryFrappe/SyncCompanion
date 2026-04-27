@@ -12,12 +12,14 @@ import 'cloud_service.dart';
 /// Supports both MAX30100 (bio sensor) and GY906 (temperature sensor) devices.
 /// Sends appropriate vitals based on detected device type.
 class TelemetryTracker {
-  static final TelemetryTracker _instance = TelemetryTracker._internal();
-  factory TelemetryTracker() => _instance;
-  TelemetryTracker._internal();
+  final DeviceService _deviceService;
+  final CloudService _cloudService;
 
-  final DeviceService _deviceService = DeviceService();
-  final CloudService _cloudService = CloudService();
+  TelemetryTracker({
+    required DeviceService deviceService,
+    required CloudService cloudService,
+  })  : _deviceService = deviceService,
+        _cloudService = cloudService;
 
   // Subscriptions
   StreamSubscription? _displayStatusSub;

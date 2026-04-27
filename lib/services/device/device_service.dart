@@ -47,11 +47,7 @@ class ShakeEvent extends DeviceEvent {}
 /// Consumes low-level [BluetoothService] and exposes high-level domain objects
 /// (TelemetryData, ConnectionState) to the rest of the application.
 class DeviceService {
-  static final DeviceService _instance = DeviceService._internal();
-
-  factory DeviceService() => _instance;
-
-  DeviceService._internal();
+  DeviceService();
 
   final BluetoothService _bluetooth = BluetoothService();
 

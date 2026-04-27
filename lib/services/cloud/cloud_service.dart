@@ -9,9 +9,7 @@ import 'event_queue.dart';
 /// Service for sending events to ThingsBoard cloud.
 /// Events are queued locally and flushed when connectivity is available.
 class CloudService {
-  static final CloudService _instance = CloudService._internal();
-  factory CloudService() => _instance;
-  CloudService._internal();
+  CloudService();
 
   final EventQueue _queue = EventQueue();
   final Connectivity _connectivity = Connectivity();

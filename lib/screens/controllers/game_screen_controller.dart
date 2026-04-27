@@ -11,6 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 class GameScreenController extends ChangeNotifier {
   final VirtualPetGame game;
   final DeviceService deviceService;
+  final MissionService missionService;
+  final CloudService cloudService;
+  final PetNotificationService notificationService;
   
   bool _isPaused = false;
   int _backgroundSyncSeconds = 0;
@@ -26,6 +29,9 @@ class GameScreenController extends ChangeNotifier {
   GameScreenController({
     required this.game,
     required this.deviceService,
+    required this.missionService,
+    required this.cloudService,
+    required this.notificationService,
   }) {
     _init();
   }
@@ -41,7 +47,7 @@ class GameScreenController extends ChangeNotifier {
     _autoSaveTimer = Timer.periodic(const Duration(seconds: 15), (_) => saveStats());
 
     _uiUpdateTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      MissionService().update(MissionContext(
+      missionService.update(MissionContext(
         dt: 1.0,
         isDeviceSynced: connectionStatus == DeviceDisplayStatus.synced,
       ));
@@ -74,9 +80,8 @@ class GameScreenController extends ChangeNotifier {
     try {
       debugPrint('[Controller] INIT START');
       await loadPersistedRates();
-      await restoreStats();
+      // Stats are now loaded by AppBootstrapper, so we just ensure they are ready
       await game.initialized;
-      await MissionService().init(game.currentPet.stats);
       debugPrint('[Controller] INIT COMPLETE');
     } finally {
       _isInitializing = false;
@@ -99,17 +104,13 @@ class GameScreenController extends ChangeNotifier {
     await game.initialized;
     game.currentPet.stats.lowWellbeingThreshold = lowWellbeingThreshold;
     game.currentPet.stats.onLowWellbeing = () {
-      PetNotificationService().showLowWellbeingNotification();
+      notificationService.showLowWellbeingNotification();
     };
-  }
-
-  Future<void> restoreStats() async {
-    await game.loadPetStats(isDeviceSynced: false);
   }
 
   void _flushBackgroundSession() {
     if (_backgroundSyncSeconds > 0 && _backgroundSyncStartTime != null) {
-      CloudService().logSyncSession(
+      cloudService.logSyncSession(
         duration: Duration(seconds: _backgroundSyncSeconds),
         startTime: _backgroundSyncStartTime!,
       );
@@ -121,14 +122,14 @@ class GameScreenController extends ChangeNotifier {
   Future<void> saveStats() async {
     try {
       await game.savePetStats();
-      await MissionService().save();
+      await missionService.save();
     } catch (e) {
       debugPrint('Error saving stats: $e');
     }
   }
 
   Future<void> handleLifecycleChange(AppLifecycleState state) async {
-    debugPrint('[Controller] LIFECYCLE: $state');
+    debugPrint('[Controller] LIFECYCLE (Screen): $state');
     switch (state) {
       case AppLifecycleState.paused:
         _isPaused = true;
@@ -137,11 +138,7 @@ class GameScreenController extends ChangeNotifier {
       case AppLifecycleState.resumed:
         _isPaused = false;
         _flushBackgroundSession();
-        deviceService.onAppResumed();
-        // Only reload if we are NOT currently initializing to avoid races
-        if (!_isInitializing) {
-          await game.loadPetStats(isDeviceSynced: false);
-        }
+        // AppLifecycleManager already calls deviceService.onAppResumed()
         break;
       case AppLifecycleState.detached:
         await saveStats();

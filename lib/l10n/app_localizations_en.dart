@@ -52,6 +52,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Automatically detect and update to pre-release (dev) builds.';
 
   @override
+  String get unstableUpdates => 'Unstable Builds';
+
+  @override
+  String get unstableUpdatesDesc =>
+      'Also allow automatic updates for experimental (unstable) builds.';
+
+  @override
   String get dailyMissions => 'Daily Missions';
 
   @override

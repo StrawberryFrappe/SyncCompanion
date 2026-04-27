@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:Therapets/l10n/app_localizations.dart';
 import '../../../game/missions/mission_service.dart';
 
@@ -96,7 +97,7 @@ class DebugSection extends StatelessWidget {
                   side: const BorderSide(width: 1, color: Colors.black),
                 ),
                 onPressed: () async {
-                  await MissionService().forceResetMissions();
+                  await context.read<MissionService>().forceResetMissions();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(AppLocalizations.of(context)!.dailyMissionsReset), duration: const Duration(seconds: 2)),

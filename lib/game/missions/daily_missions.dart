@@ -1,27 +1,51 @@
+import 'package:hive/hive.dart';
 import 'mission.dart';
 
+part 'daily_missions.g.dart';
+
 /// Mission: Stay synced for a specific duration (in seconds).
+@HiveType(typeId: 2)
 class SyncDurationMission extends Mission {
   @override
   final String id = 'mission_sync_duration';
   
+  @HiveField(0)
   final double targetDuration; // seconds
+  @HiveField(1)
   double _currentDuration = 0.0;
 
   SyncDurationMission({
-    required this.targetDuration,
-    required int rewardGold,
-    double rewardHappiness = 0.05,
-  }) : _goldReward = rewardGold, _happinessReward = rewardHappiness;
-
-  final int _goldReward;
-  final double _happinessReward;
+    @HiveField(0) required this.targetDuration,
+    @HiveField(2) required this.goldReward,
+    @HiveField(3) this.happinessReward = 0.05,
+  });
 
   @override
-  int get goldReward => _goldReward;
+  @HiveField(2)
+  final int goldReward;
+  @override
+  @HiveField(3)
+  final double happinessReward;
+  @HiveField(4)
+  double _progress = 0.0;
+  @HiveField(5)
+  bool _isClaimed = false;
 
   @override
-  double get happinessReward => _happinessReward;
+  double get progress => _progress;
+  @override
+  set progress(double value) => _progress = value;
+  @override
+  bool get isClaimed => _isClaimed;
+  @override
+  void markClaimed() => _isClaimed = true;
+  @override
+  void reset() {
+    _progress = 0.0;
+    _isClaimed = false;
+    _currentDuration = 0.0;
+  }
+
 
   @override
   String get title => 'Sync Master';
@@ -70,8 +94,8 @@ class SyncDurationMission extends Mission {
     'type': 'sync_duration',
     'targetDuration': targetDuration,
     'currentDuration': _currentDuration,
-    'rewardGold': _goldReward,
-    'rewardHappiness': _happinessReward,
+    'rewardGold': goldReward,
+    'rewardHappiness': happinessReward,
     'progress': progress,
     'claimed': isClaimed,
   };
@@ -79,8 +103,8 @@ class SyncDurationMission extends Mission {
   factory SyncDurationMission.fromJson(Map<String, dynamic> json) {
     final mission = SyncDurationMission(
       targetDuration: (json['targetDuration'] as num).toDouble(),
-      rewardGold: json['rewardGold'] as int,
-      rewardHappiness: (json['rewardHappiness'] as num?)?.toDouble() ?? 0.05,
+      goldReward: json['rewardGold'] as int,
+      happinessReward: (json['rewardHappiness'] as num?)?.toDouble() ?? 0.05,
     );
     mission._currentDuration = (json['currentDuration'] as num?)?.toDouble() ?? 0.0;
     mission.restoreState(
@@ -94,22 +118,43 @@ class SyncDurationMission extends Mission {
 }
 
 /// Mission: Play any minigame.
+@HiveType(typeId: 3)
 class MinigamePlayMission extends Mission {
   @override
   final String id = 'mission_minigame_play';
   
+  @HiveField(0)
   final int targetPlays;
+  @HiveField(1)
   int _currentPlays = 0;
 
   MinigamePlayMission({
-    this.targetPlays = 1,
-    required int rewardGold,
-  }) : _goldReward = rewardGold;
-
-  final int _goldReward;
+    @HiveField(0) this.targetPlays = 1,
+    @HiveField(2) required this.goldReward,
+  });
 
   @override
-  int get goldReward => _goldReward;
+  @HiveField(2)
+  final int goldReward;
+  @HiveField(3)
+  double _progress = 0.0;
+  @HiveField(4)
+  bool _isClaimed = false;
+
+  @override
+  double get progress => _progress;
+  @override
+  set progress(double value) => _progress = value;
+  @override
+  bool get isClaimed => _isClaimed;
+  @override
+  void markClaimed() => _isClaimed = true;
+  @override
+  void reset() {
+    _progress = 0.0;
+    _isClaimed = false;
+    _currentPlays = 0;
+  }
 
   @override
   double get happinessReward => 0.1;
@@ -135,18 +180,13 @@ class MinigamePlayMission extends Mission {
     return isCompleted;
   }
   
-  @override
-  void reset() {
-    super.reset();
-    _currentPlays = 0;
-  }
 
   @override
   Map<String, dynamic> toJson() => {
     'type': 'minigame_play',
     'targetPlays': targetPlays,
     'currentPlays': _currentPlays,
-    'rewardGold': _goldReward,
+    'rewardGold': goldReward,
     'progress': progress,
     'claimed': isClaimed,
   };
@@ -154,7 +194,7 @@ class MinigamePlayMission extends Mission {
   factory MinigamePlayMission.fromJson(Map<String, dynamic> json) {
     final mission = MinigamePlayMission(
       targetPlays: json['targetPlays'] as int,
-      rewardGold: json['rewardGold'] as int,
+      goldReward: json['rewardGold'] as int,
     );
     mission._currentPlays = json['currentPlays'] as int? ?? 0;
     mission.restoreState(
@@ -166,22 +206,43 @@ class MinigamePlayMission extends Mission {
 }
 
 /// Mission: Feed the pet.
+@HiveType(typeId: 4)
 class FeedPetMission extends Mission {
   @override
   final String id = 'mission_feed_pet';
   
+  @HiveField(0)
   final int targetFeeds;
+  @HiveField(1)
   int _currentFeeds = 0;
 
   FeedPetMission({
-    this.targetFeeds = 3,
-    required int rewardGold,
-  }) : _goldReward = rewardGold;
-
-  final int _goldReward;
+    @HiveField(0) this.targetFeeds = 3,
+    @HiveField(2) required this.goldReward,
+  });
 
   @override
-  int get goldReward => _goldReward;
+  @HiveField(2)
+  final int goldReward;
+  @HiveField(3)
+  double _progress = 0.0;
+  @HiveField(4)
+  bool _isClaimed = false;
+
+  @override
+  double get progress => _progress;
+  @override
+  set progress(double value) => _progress = value;
+  @override
+  bool get isClaimed => _isClaimed;
+  @override
+  void markClaimed() => _isClaimed = true;
+  @override
+  void reset() {
+    _progress = 0.0;
+    _isClaimed = false;
+    _currentFeeds = 0;
+  }
 
   @override
   double get happinessReward => 0.05;
@@ -207,18 +268,13 @@ class FeedPetMission extends Mission {
     return isCompleted;
   }
   
-  @override
-  void reset() {
-    super.reset();
-    _currentFeeds = 0;
-  }
 
   @override
   Map<String, dynamic> toJson() => {
     'type': 'feed_pet',
     'targetFeeds': targetFeeds,
     'currentFeeds': _currentFeeds,
-    'rewardGold': _goldReward,
+    'rewardGold': goldReward,
     'progress': progress,
     'claimed': isClaimed,
   };
@@ -226,7 +282,7 @@ class FeedPetMission extends Mission {
   factory FeedPetMission.fromJson(Map<String, dynamic> json) {
     final mission = FeedPetMission(
       targetFeeds: json['targetFeeds'] as int,
-      rewardGold: json['rewardGold'] as int,
+      goldReward: json['rewardGold'] as int,
     );
     mission._currentFeeds = json['currentFeeds'] as int? ?? 0;
     mission.restoreState(

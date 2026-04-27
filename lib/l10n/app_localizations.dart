@@ -182,6 +182,18 @@ abstract class AppLocalizations {
   /// **'Automatically detect and update to pre-release (dev) builds.'**
   String get nightlyUpdatesDesc;
 
+  /// No description provided for @unstableUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Unstable Builds'**
+  String get unstableUpdates;
+
+  /// No description provided for @unstableUpdatesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Also allow automatic updates for experimental (unstable) builds.'**
+  String get unstableUpdatesDesc;
+
   /// No description provided for @dailyMissions.
   ///
   /// In en, this message translates to:

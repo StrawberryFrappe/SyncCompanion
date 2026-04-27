@@ -5,8 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../game/virtual_pet_game.dart';
 import '../services/device/device_service.dart';
+import '../services/notifications/pet_notification_service.dart';
 import '../game/missions/mission_service.dart';
 import '../game/missions/mission.dart';
+import '../game/pets/pet_stats.dart';
+import '../services/cloud/cloud_service.dart';
+import 'package:provider/provider.dart';
 
 import 'settings/dev_tools_settings.dart';
 import 'widgets/hud/game_hud.dart';
@@ -44,11 +48,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _game = VirtualPetGame();
-    _deviceService = DeviceService();
-    _deviceService.init();
+    _game = VirtualPetGame(petStats: context.read<PetStats>());
+    _deviceService = context.read<DeviceService>();
     
-    _controller = GameScreenController(game: _game, deviceService: _deviceService);
+    _controller = GameScreenController(
+      game: _game, 
+      deviceService: _deviceService,
+      missionService: context.read<MissionService>(),
+      cloudService: context.read<CloudService>(),
+      notificationService: context.read<PetNotificationService>(),
+    );
     _controller.addListener(() {
       if (mounted) setState(() {});
     });
@@ -118,7 +127,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 // Determine if successful
                 if (_game.currentPet.stats.removeFood(item.id)) {
                   _game.currentPet.eat(item);
-                  MissionService().update(MissionContext(foodId: item.id));
+                  context.read<MissionService>().update(MissionContext(foodId: item.id));
                   _saveStats();
                   setState(() {}); // Update Fridge UI
                 }
@@ -337,7 +346,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ).then((_) {
-              MissionService().update(MissionContext(minigameId: 'flappy_bird'));
+              context.read<MissionService>().update(MissionContext(minigameId: 'flappy_bird'));
               // Refresh stats after returning from game
               _saveStats();
               setState(() {});
@@ -352,7 +361,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ).then((_) {
-              MissionService().update(MissionContext(minigameId: 'orchestra'));
+              context.read<MissionService>().update(MissionContext(minigameId: 'orchestra'));
               setState(() {});
             });
           } else if (gameId == 'donut') {
@@ -363,7 +372,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ).then((_) {
-              MissionService().update(MissionContext(minigameId: 'donut'));
+              context.read<MissionService>().update(MissionContext(minigameId: 'donut'));
             });
           } else if (gameId == 'sbr') {
             Navigator.of(context).push(
@@ -376,7 +385,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ).then((_) {
-              MissionService().update(MissionContext(minigameId: 'sbr'));
+              context.read<MissionService>().update(MissionContext(minigameId: 'sbr'));
               // Refresh stats
               _saveStats();
               setState(() {});

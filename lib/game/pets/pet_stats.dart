@@ -2,36 +2,48 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive/hive.dart';
+
+part 'pet_stats.g.dart';
 
 /// Manages the hunger and happiness stats for a pet.
 /// Stats trickle over time based on configurable rates.
 /// Supports persistence for background stat updates.
-class PetStats {
+@HiveType(typeId: 0)
+class PetStats extends HiveObject {
   /// Hunger level: 0.0 (starving) to 1.0 (full)
+  @HiveField(0)
   double _hunger;
   
   /// Happiness level: 0.0 (miserable) to 1.0 (ecstatic)
+  @HiveField(1)
   double _happiness;
   
   /// Happiness buffer accumulated while app was in background and linked
+  @HiveField(2)
   double _happinessBuffer;
 
   /// Rate at which hunger decreases per second (always active)
+  @HiveField(3)
   double hungerDecayRate;
   
   /// Rate at which happiness increases per second (when device is synced)
+  @HiveField(4)
   double happinessGainRate;
   
   /// Rate at which happiness decreases per second (when device is NOT synced)
+  @HiveField(5)
   double happinessDecayRate;
   
   /// Timestamp of last update (for background calculations)
+  @HiveField(6)
   DateTime _lastUpdateTime;
   
   /// Callback triggered when wellbeing drops below threshold
   void Function()? onLowWellbeing;
   
   /// Threshold for low wellbeing notification (0.0 to 1.0)
+  @HiveField(7)
   double lowWellbeingThreshold;
   
   /// Whether low wellbeing notification was already sent (resets when recovered)
@@ -50,15 +62,19 @@ class PetStats {
   bool get isLoading => _isLoading;
 
   /// Gold coins (for clothing)
+  @HiveField(8)
   int _goldCoins = 0;
   
   /// Silver coins (for food)
+  @HiveField(9)
   int _silverCoins = 0;
 
   /// IDs of unlocked clothing items
+  @HiveField(10)
   List<String> _unlockedClothingIds = [];
 
   /// Map of slot name to clothing ID for equipped items
+  @HiveField(11)
   Map<String, String> _equippedClothing = {};
 
   PetStats({
@@ -183,7 +199,7 @@ class PetStats {
   /// Feed the pet - increases hunger by amount
   void feed({double amount = 0.25}) {
     _hunger = min(1.0, _hunger + amount);
-    saveToPrefs();
+    save();
   }
 
   /// Reset stats to full
@@ -193,7 +209,7 @@ class PetStats {
     _happinessBuffer = 0.0;
     _lastUpdateTime = DateTime.now();
     _canSave = true; // Safe to save now
-    saveToPrefs();
+    save();
   }
 
   // ============ MONEY METHODS ============
@@ -202,7 +218,7 @@ class PetStats {
   void addGold(int amount) {
     if (amount > 0) {
       _goldCoins += amount;
-      saveToPrefs();
+      save();
     }
   }
 
@@ -210,7 +226,7 @@ class PetStats {
   bool spendGold(int amount) {
     if (amount > 0 && _goldCoins >= amount) {
       _goldCoins -= amount;
-      saveToPrefs();
+      save();
       return true;
     }
     return false;
@@ -220,7 +236,7 @@ class PetStats {
   void addSilver(int amount) {
     if (amount > 0) {
       _silverCoins += amount;
-      saveToPrefs();
+      save();
     }
   }
 
@@ -228,7 +244,7 @@ class PetStats {
   bool spendSilver(int amount) {
     if (amount > 0 && _silverCoins >= amount) {
       _silverCoins -= amount;
-      saveToPrefs();
+      save();
       return true;
     }
     return false;
@@ -240,7 +256,7 @@ class PetStats {
   void unlockClothing(String id) {
     if (!_unlockedClothingIds.contains(id)) {
       _unlockedClothingIds.add(id);
-      saveToPrefs();
+      save();
     }
   }
 
@@ -250,13 +266,13 @@ class PetStats {
   /// Equip clothing item (replaces existing item in same slot)
   void equipClothing(String slotName, String id) {
     _equippedClothing[slotName] = id;
-    saveToPrefs();
+    save();
   }
 
   /// Unequip clothing from slot
   void unequipClothing(String slotName) {
     _equippedClothing.remove(slotName);
-    saveToPrefs();
+    save();
   }
 
 
@@ -264,12 +280,13 @@ class PetStats {
   void applyMissionReward(int gold, double happiness) {
     addGold(gold);
     _happiness = (_happiness + happiness).clamp(0.0, 1.0);
-    saveToPrefs();
+    save();
   }
 
   // ============ INVENTORY METHODS ============
 
   /// Map of food item ID to quantity owned
+  @HiveField(12)
   Map<String, int> _foodInventory = {};
 
   /// Get current food inventory
@@ -279,7 +296,7 @@ class PetStats {
   void addFood(String id, int quantity) {
     if (quantity > 0) {
       _foodInventory[id] = (_foodInventory[id] ?? 0) + quantity;
-      saveToPrefs();
+      save();
     }
   }
 
@@ -291,7 +308,7 @@ class PetStats {
       if (_foodInventory[id] == 0) {
         _foodInventory.remove(id);
       }
-      saveToPrefs();
+      save();
       return true;
     }
     return false;
@@ -307,23 +324,6 @@ class PetStats {
   // than 13 individual sequential writes.
   static const String _bundleKey = 'pet_stats_bundle';
 
-  /// Serialise current state to a JSON-compatible map.
-  Map<String, dynamic> _toJson() => {
-    'v': 1,
-    'hunger': _hunger,
-    'happiness': _happiness,
-    'happinessBuffer': _happinessBuffer,
-    'goldCoins': _goldCoins,
-    'silverCoins': _silverCoins,
-    'unlockedClothing': _unlockedClothingIds,
-    'equippedClothing': _equippedClothing,
-    'foodInventory': _foodInventory,
-    'lastUpdateMs': _lastUpdateTime.millisecondsSinceEpoch,
-    'hungerDecayRate': hungerDecayRate,
-    'happinessGainRate': happinessGainRate,
-    'happinessDecayRate': happinessDecayRate,
-    'lowWellbeingThreshold': lowWellbeingThreshold,
-  };
 
   /// Restore state from a decoded JSON map. Returns true if a saved
   /// timestamp was found (needed to decide whether to apply background updates).
@@ -401,7 +401,7 @@ class PetStats {
 
   /// Enqueue a save. Concurrent callers are serialised — each waits for the
   /// previous save to finish before starting its own write.
-  Future<void> saveToPrefs() {
+  Future<void> save() {
     if (!_isInitialized || !_canSave) return Future.value();
     _saveLock =
         _saveLock.catchError((_) {}).then((_) => _doSave());
@@ -411,18 +411,18 @@ class PetStats {
   Future<void> _doSave() async {
     final now = DateTime.now();
     _lastUpdateTime = now;
-    final bundle = _toJson();
-    final jsonString = jsonEncode(bundle);
     
-    debugPrint('[PetStats] SAVE START - Size: ${jsonString.length} bytes');
+    debugPrint('[PetStats] SAVE START (Hive)');
     
-    final prefs = await SharedPreferences.getInstance();
-    final success = await prefs.setString(_bundleKey, jsonString);
-    
-    if (success) {
-      debugPrint('[PetStats] SAVE SUCCESS - Timestamp: $now');
-    } else {
-      debugPrint('[PetStats] SAVE FAILED!');
+    try {
+      if (isInBox) {
+        await super.save();
+        debugPrint('[PetStats] SAVE SUCCESS (Hive) - Timestamp: $now');
+      } else {
+        debugPrint('[PetStats] SAVE FAILED - Not in a Hive box!');
+      }
+    } catch (e) {
+      debugPrint('[PetStats] SAVE ERROR: $e');
     }
   }
 
@@ -479,7 +479,7 @@ class PetStats {
       // which might race with other initializations.
       if (wasLegacy) {
         debugPrint('[PetStats] LOAD - Committing migrated legacy data to bundle');
-        await saveToPrefs();
+        await save();
       }
       
       debugPrint('[PetStats] LOAD COMPLETE - Hunger: ${_hunger.toStringAsFixed(2)}, Gold: $_goldCoins');
