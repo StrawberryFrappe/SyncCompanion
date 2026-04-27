@@ -116,7 +116,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _autoSaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _syncSub?.cancel();
-    _saveStats(); // Save on dispose
+    unawaited(_saveStats()); // Save on dispose
     super.dispose();
   }
 
@@ -151,9 +151,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
-      case AppLifecycleState.detached:
-        // These states happen both when leaving AND returning - don't save here
+        // These states fire both when leaving AND when returning to the
+        // foreground — don't save here to avoid redundant writes.
         print('[GameScreen] Lifecycle transition state: $state (no action)');
+        break;
+      case AppLifecycleState.detached:
+        // The engine/view is detaching from the Flutter activity. On Android
+        // this may be called when the app is terminating (e.g. swiped from
+        // recents), but the signal is platform-dependent and best-effort —
+        // do not rely on it as a guaranteed termination hook. Save anyway.
+        // didChangeAppLifecycleState returns void so we can't await — fire-and-forget is intentional.
+        print('[GameScreen] Saving stats (engine detached — best-effort flush)');
+        unawaited(_saveStats());
         break;
     }
   }
@@ -200,8 +209,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _saveStats() async {
     try {
       await _game.savePetStats();
-    } catch (e) {
-      print('Error saving pet stats: $e');
+    } catch (e, st) {
+      print('Error saving pet stats: $e\n$st');
+    }
+    try {
+      await MissionService().save();
+    } catch (e, st) {
+      print('Error saving missions: $e\n$st');
     }
   }
 
