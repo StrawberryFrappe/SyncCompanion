@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,6 +36,9 @@ class PetStats {
   
   /// Whether low wellbeing notification was already sent (resets when recovered)
   bool _lowWellbeingNotified = false;
+
+  // Save lock — ensures concurrent saveToPrefs() calls are serialised.
+  Future<void> _saveLock = Future.value();
 
   /// Gold coins (for clothing)
   int _goldCoins = 0;
@@ -288,80 +292,144 @@ class PetStats {
 
   // ============ PERSISTENCE ============
 
-  /// Save current state to SharedPreferences.
-  /// Coins and inventory are written first so the most critical data
-  /// survives even if the save is interrupted mid-way (e.g. the Flutter
-  /// engine is torn down while the process is being killed).
-  Future<void> saveToPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+  // Single SharedPreferences key for the entire stats snapshot.
+  // One atomic write is far less likely to be torn by a mid-save process kill
+  // than 13 individual sequential writes.
+  static const String _bundleKey = 'pet_stats_bundle';
 
-    _lastUpdateTime = DateTime.now();
+  /// Serialise current state to a JSON-compatible map.
+  Map<String, dynamic> _toJson() => {
+    'v': 1,
+    'hunger': _hunger,
+    'happiness': _happiness,
+    'happinessBuffer': _happinessBuffer,
+    'goldCoins': _goldCoins,
+    'silverCoins': _silverCoins,
+    'unlockedClothing': _unlockedClothingIds,
+    'equippedClothing': _equippedClothing,
+    'foodInventory': _foodInventory,
+    'lastUpdateMs': _lastUpdateTime.millisecondsSinceEpoch,
+    'hungerDecayRate': hungerDecayRate,
+    'happinessGainRate': happinessGainRate,
+    'happinessDecayRate': happinessDecayRate,
+    'lowWellbeingThreshold': lowWellbeingThreshold,
+  };
 
-    // Write currency first — most critical, must survive an interrupted save.
-    await prefs.setInt('pet_gold_coins', _goldCoins);
-    await prefs.setInt('pet_silver_coins', _silverCoins);
-
-    // Inventory and clothing.
-    final inventoryList = _foodInventory.entries.map((e) => '${e.key}:${e.value}').toList();
-    await prefs.setStringList('pet_food_inventory', inventoryList);
-    await prefs.setStringList('pet_unlocked_clothing', _unlockedClothingIds);
-    final equippedList = _equippedClothing.entries.map((e) => '${e.key}:${e.value}').toList();
-    await prefs.setStringList('pet_equipped_clothing', equippedList);
-
-    // Stats and timestamp (can be recalculated / less critical).
-    await prefs.setDouble('pet_hunger', _hunger);
-    await prefs.setDouble('pet_happiness', _happiness);
-    await prefs.setDouble('pet_happiness_buffer', _happinessBuffer);
-    await prefs.setInt('pet_last_update', _lastUpdateTime.millisecondsSinceEpoch);
-
-    // Persist rates and threshold so the native service can compute decay independently.
-    await prefs.setDouble('pet_hunger_decay_rate', hungerDecayRate);
-    await prefs.setDouble('pet_happiness_gain_rate', happinessGainRate);
-    await prefs.setDouble('pet_happiness_decay_rate', happinessDecayRate);
-    await prefs.setDouble('pet_low_wellbeing_threshold', lowWellbeingThreshold);
+  /// Restore state from a decoded JSON map. Returns true if a saved
+  /// timestamp was found (needed to decide whether to apply background updates).
+  bool _fromJson(Map<String, dynamic> json) {
+    _hunger = (json['hunger'] as num?)?.toDouble() ?? _hunger;
+    _happiness = (json['happiness'] as num?)?.toDouble() ?? _happiness;
+    _happinessBuffer = (json['happinessBuffer'] as num?)?.toDouble() ?? 0.0;
+    _goldCoins = (json['goldCoins'] as int?) ?? 0;
+    _silverCoins = (json['silverCoins'] as int?) ?? 0;
+    _unlockedClothingIds =
+        List<String>.from(json['unlockedClothing'] as List? ?? []);
+    _equippedClothing =
+        Map<String, String>.from(json['equippedClothing'] as Map? ?? {});
+    final inv = json['foodInventory'] as Map?;
+    _foodInventory = inv != null
+        ? inv.map((k, v) => MapEntry(k as String, (v as num).toInt()))
+        : {};
+    hungerDecayRate =
+        (json['hungerDecayRate'] as num?)?.toDouble() ?? hungerDecayRate;
+    happinessGainRate =
+        (json['happinessGainRate'] as num?)?.toDouble() ?? happinessGainRate;
+    happinessDecayRate =
+        (json['happinessDecayRate'] as num?)?.toDouble() ?? happinessDecayRate;
+    lowWellbeingThreshold =
+        (json['lowWellbeingThreshold'] as num?)?.toDouble() ??
+            lowWellbeingThreshold;
+    final lastMs = json['lastUpdateMs'] as int?;
+    if (lastMs != null) {
+      _lastUpdateTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
+      return true;
+    }
+    return false;
   }
 
-  /// Load state from SharedPreferences and apply background updates
-  Future<void> loadFromPrefs({required bool isDeviceSynced}) async {
-    final prefs = await SharedPreferences.getInstance();
-    
+  /// Read individual legacy SharedPreferences keys written before the bundle
+  /// format was introduced. Returns true if a saved timestamp was found.
+  bool _loadLegacyKeys(SharedPreferences prefs) {
     _hunger = prefs.getDouble('pet_hunger') ?? _hunger;
     _happiness = prefs.getDouble('pet_happiness') ?? _happiness;
     _happinessBuffer = prefs.getDouble('pet_happiness_buffer') ?? 0.0;
     _goldCoins = prefs.getInt('pet_gold_coins') ?? 0;
     _silverCoins = prefs.getInt('pet_silver_coins') ?? 0;
-    _unlockedClothingIds = prefs.getStringList('pet_unlocked_clothing') ?? [];
-    
+    _unlockedClothingIds =
+        prefs.getStringList('pet_unlocked_clothing') ?? [];
     final equippedList = prefs.getStringList('pet_equipped_clothing') ?? [];
     _equippedClothing.clear();
     for (final entry in equippedList) {
       final parts = entry.split(':');
-      if (parts.length == 2) {
-        _equippedClothing[parts[0]] = parts[1];
-      }
+      if (parts.length == 2) _equippedClothing[parts[0]] = parts[1];
     }
-    
-    // Load inventory
     final inventoryList = prefs.getStringList('pet_food_inventory') ?? [];
     _foodInventory.clear();
     for (final entry in inventoryList) {
       final parts = entry.split(':');
       if (parts.length == 2) {
         final qty = int.tryParse(parts[1]);
-        if (qty != null && qty > 0) {
-          _foodInventory[parts[0]] = qty;
-        }
+        if (qty != null && qty > 0) _foodInventory[parts[0]] = qty;
       }
     }
-    
-    final lastUpdateMs = prefs.getInt('pet_last_update');
-    
-    if (lastUpdateMs != null) {
-      _lastUpdateTime = DateTime.fromMillisecondsSinceEpoch(lastUpdateMs);
+    hungerDecayRate =
+        prefs.getDouble('pet_hunger_decay_rate') ?? hungerDecayRate;
+    happinessGainRate =
+        prefs.getDouble('pet_happiness_gain_rate') ?? happinessGainRate;
+    happinessDecayRate =
+        prefs.getDouble('pet_happiness_decay_rate') ?? happinessDecayRate;
+    lowWellbeingThreshold =
+        prefs.getDouble('pet_low_wellbeing_threshold') ?? lowWellbeingThreshold;
+    final lastMs = prefs.getInt('pet_last_update');
+    if (lastMs != null) {
+      _lastUpdateTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
+      return true;
+    }
+    return false;
+  }
+
+  /// Enqueue a save. Concurrent callers are serialised — each waits for the
+  /// previous save to finish before starting its own write.
+  Future<void> saveToPrefs() {
+    _saveLock =
+        _saveLock.catchError((_) {}).then((_) => _doSave());
+    return _saveLock;
+  }
+
+  Future<void> _doSave() async {
+    _lastUpdateTime = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_bundleKey, jsonEncode(_toJson()));
+  }
+
+  /// Load state from SharedPreferences and apply background updates.
+  /// Reads the atomic bundle key; falls back to legacy individual keys
+  /// for users upgrading from an earlier version.
+  Future<void> loadFromPrefs({required bool isDeviceSynced}) async {
+    final prefs = await SharedPreferences.getInstance();
+    bool hadSavedState = false;
+
+    final bundleJson = prefs.getString(_bundleKey);
+    if (bundleJson != null) {
+      try {
+        hadSavedState = _fromJson(
+            jsonDecode(bundleJson) as Map<String, dynamic>);
+      } catch (e, st) {
+        print('[PetStats] Bundle parse error — falling back to legacy keys: $e\n$st');
+        hadSavedState = _loadLegacyKeys(prefs);
+      }
+    } else {
+      // First launch after update: migrate from old individual keys.
+      hadSavedState = _loadLegacyKeys(prefs);
+    }
+
+    if (hadSavedState) {
       applyBackgroundUpdates(wasDeviceSynced: isDeviceSynced);
       if (isDeviceSynced) applyHappinessBuffer();
     }
-    
+
+    // Commit to bundle (also persists migrated data on first run).
     await saveToPrefs();
   }
 

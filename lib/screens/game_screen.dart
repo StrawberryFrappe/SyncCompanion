@@ -156,11 +156,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         print('[GameScreen] Lifecycle transition state: $state (no action)');
         break;
       case AppLifecycleState.detached:
-        // Fired only when the app is being destroyed (e.g. swiped from recents
-        // while in the foreground). This is the last chance to flush data
-        // before the process is killed, so save everything.
+        // The engine/view is detaching from the Flutter activity. On Android
+        // this may be called when the app is terminating (e.g. swiped from
+        // recents), but the signal is platform-dependent and best-effort —
+        // do not rely on it as a guaranteed termination hook. Save anyway.
         // didChangeAppLifecycleState returns void so we can't await — fire-and-forget is intentional.
-        print('[GameScreen] Saving stats (app detached/being destroyed)');
+        print('[GameScreen] Saving stats (engine detached — best-effort flush)');
         unawaited(_saveStats());
         break;
     }
@@ -208,13 +209,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _saveStats() async {
     try {
       await _game.savePetStats();
-    } catch (e) {
-      print('Error saving pet stats: $e');
+    } catch (e, st) {
+      print('Error saving pet stats: $e\n$st');
     }
     try {
       await MissionService().save();
-    } catch (e) {
-      print('Error saving missions: $e');
+    } catch (e, st) {
+      print('Error saving missions: $e\n$st');
     }
   }
 

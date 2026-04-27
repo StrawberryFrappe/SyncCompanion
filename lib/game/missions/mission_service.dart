@@ -15,6 +15,8 @@ class MissionService {
 
   static const String _missionDataKey = 'daily_missions_data';
   static const String _lastResetKey = 'last_mission_reset';
+  // Atomic bundle key — replaces the two individual keys above.
+  static const String _bundleKey = 'mission_bundle';
 
   List<Mission> _activeMissions = [];
   List<Mission> get activeMissions => List.unmodifiable(_activeMissions);
@@ -28,6 +30,9 @@ class MissionService {
   Stream<Mission> get missionCompletions => _completionController.stream;
 
   DateTime _lastResetDate = DateTime.now();
+
+  // Save lock — serialises concurrent save calls so writes never interleave.
+  Future<void> _saveLock = Future.value();
 
   PetStats? _petStats;
 
@@ -109,33 +114,56 @@ class MissionService {
 
   Future<void> _loadMissions() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Load last reset date
+
+    // Try reading the atomic bundle first.
+    final bundleJson = prefs.getString(_bundleKey);
+    if (bundleJson != null) {
+      try {
+        final bundle = jsonDecode(bundleJson) as Map<String, dynamic>;
+        final lastResetMs = bundle['lastResetMs'] as int?;
+        if (lastResetMs != null) {
+          _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+        }
+        final missionJson = bundle['missions'] as String?;
+        if (missionJson != null) {
+          final List<dynamic> missionList = jsonDecode(missionJson);
+          _activeMissions = missionList
+              .map((j) => _missionFromJson(j as Map<String, dynamic>))
+              .whereType<Mission>()
+              .toList();
+          if (_activeMissions.isNotEmpty) {
+            _notifyListeners();
+            return;
+          }
+        }
+      } catch (e, st) {
+        print('[MissionService] Bundle parse error — falling back to legacy keys: $e\n$st');
+      }
+    }
+
+    // Legacy key fallback (users upgrading from earlier versions).
     final lastResetMs = prefs.getInt(_lastResetKey);
     if (lastResetMs != null) {
       _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
     }
-    
-    // Load serialized missions
     final missionJson = prefs.getString(_missionDataKey);
     if (missionJson != null) {
       try {
         final List<dynamic> missionList = jsonDecode(missionJson);
         _activeMissions = missionList
-            .map((json) => _missionFromJson(json as Map<String, dynamic>))
+            .map((j) => _missionFromJson(j as Map<String, dynamic>))
             .whereType<Mission>()
             .toList();
-        
         if (_activeMissions.isNotEmpty) {
           _notifyListeners();
           return;
         }
-      } catch (e) {
-        print('[MissionService] Error loading missions: $e');
+      } catch (e, st) {
+        print('[MissionService] Legacy parse error: $e\n$st');
       }
     }
-    
-    // If we couldn't load, generate new missions
+
+    // Nothing usable found — generate fresh missions.
     await _generateDailyMissions();
   }
 
@@ -156,17 +184,26 @@ class MissionService {
 
   /// Public entry-point so callers (e.g. the app lifecycle handler) can
   /// explicitly flush mission state to disk without going through an update cycle.
-  Future<void> save() => _saveProgress();
+  Future<void> save() => _enqueueSave();
 
-  Future<void> _saveProgress() async {
+  Future<void> _saveProgress() => _enqueueSave();
+
+  /// Enqueue a save. Concurrent callers are serialised — each waits for the
+  /// previous save to finish before starting its own write.
+  Future<void> _enqueueSave() {
+    _saveLock = _saveLock.catchError((_) {}).then((_) => _doSave());
+    return _saveLock;
+  }
+
+  Future<void> _doSave() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Serialize and save all missions first — most critical data.
-    final missionList = _activeMissions.map((m) => m.toJson()).toList();
-    await prefs.setString(_missionDataKey, jsonEncode(missionList));
-
-    // Save last reset date.
-    await prefs.setInt(_lastResetKey, _lastResetDate.millisecondsSinceEpoch);
+    // Single atomic key: both fields live or die together.
+    final bundle = jsonEncode({
+      'lastResetMs': _lastResetDate.millisecondsSinceEpoch,
+      // Nest missions as a pre-encoded string so jsonEncode errors are isolated.
+      'missions': jsonEncode(_activeMissions.map((m) => m.toJson()).toList()),
+    });
+    await prefs.setString(_bundleKey, bundle);
   }
 
   void _notifyListeners() {
