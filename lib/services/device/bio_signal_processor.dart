@@ -195,6 +195,28 @@ class BioSignalProcessor {
   BioData _latestBioData = const BioData();
   BioData get latestBioData => _latestBioData;
   
+  // Last valid reading (persists during transmission pauses)
+  BioData? _lastValidBioData;
+  DateTime? _lastValidBioDataTimestamp;
+  
+  BioData? get lastValidBioData => _lastValidBioData;
+  DateTime? get lastValidBioDataTimestamp => _lastValidBioDataTimestamp;
+  
+  /// Check if last valid reading is still fresh (within timeout period).
+  /// Returns the last valid reading if available and fresh, otherwise null.
+  BioData? getFreshValidReading([Duration timeout = const Duration(seconds: 60)]) {
+    if (_lastValidBioData == null || _lastValidBioDataTimestamp == null) {
+      return null;
+    }
+    
+    final elapsedTime = DateTime.now().difference(_lastValidBioDataTimestamp!);
+    if (elapsedTime > timeout) {
+      return null;
+    }
+    
+    return _lastValidBioData;
+  }
+  
   /// Pre-seed the processor with values from native service to skip warm-up.
   void preSeed(int bpm, int spo2) {
     if (bpm == 0 || spo2 == 0) return;
@@ -219,6 +241,11 @@ class BioSignalProcessor {
       fingerDetected: true,
       humanDetected: true,
     );
+    
+    // Store as last valid reading with timestamp
+    _lastValidBioData = _latestBioData;
+    _lastValidBioDataTimestamp = DateTime.now();
+    
     _bioDataController.add(_latestBioData);
   }
   
@@ -403,6 +430,12 @@ class BioSignalProcessor {
       fingerDetected: fingerDetected, // Uses the robust raw check
       humanDetected: humanDetected,
     );
+    
+    // Store as last valid reading if human is detected or if we have valid vitals
+    if (humanDetected || (displayBpm > 0 && displaySpO2 > 0)) {
+      _lastValidBioData = _latestBioData;
+      _lastValidBioDataTimestamp = DateTime.now();
+    }
     
     _bioDataController.add(_latestBioData);
   }
@@ -624,6 +657,8 @@ class BioSignalProcessor {
     _sampleCount = 0;
     _resetOnNoFinger();
     _latestBioData = const BioData();
+    _lastValidBioData = null;
+    _lastValidBioDataTimestamp = null;
   }
   
   void dispose() {

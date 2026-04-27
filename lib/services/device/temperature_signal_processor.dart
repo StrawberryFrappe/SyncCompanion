@@ -60,6 +60,28 @@ class TemperatureSignalProcessor {
   TemperatureData _latestData = const TemperatureData();
   TemperatureData get latestData => _latestData;
   
+  // Last valid reading (persists during transmission pauses)
+  TemperatureData? _lastValidData;
+  DateTime? _lastValidDataTimestamp;
+  
+  TemperatureData? get lastValidData => _lastValidData;
+  DateTime? get lastValidDataTimestamp => _lastValidDataTimestamp;
+  
+  /// Check if last valid reading is still fresh (within timeout period).
+  /// Returns the last valid reading if available and fresh, otherwise null.
+  TemperatureData? getFreshValidReading([Duration timeout = const Duration(seconds: 60)]) {
+    if (_lastValidData == null || _lastValidDataTimestamp == null) {
+      return null;
+    }
+    
+    final elapsedTime = DateTime.now().difference(_lastValidDataTimestamp!);
+    if (elapsedTime > timeout) {
+      return null;
+    }
+    
+    return _lastValidData;
+  }
+  
   /// Convert raw sensor value to Celsius.
   /// Formula from GY906 datasheet: (rawValue * 0.02) - 273.15
   static double rawToCelsius(int raw) => (raw * 0.02) - 273.15;
@@ -112,6 +134,12 @@ class TemperatureSignalProcessor {
       humanDetected: humanDetected,
     );
     
+    // Store as last valid reading if human is detected or if in human range
+    if (humanDetected || inHumanRange) {
+      _lastValidData = _latestData;
+      _lastValidDataTimestamp = DateTime.now();
+    }
+    
     _dataController.add(_latestData);
   }
   
@@ -133,6 +161,8 @@ class TemperatureSignalProcessor {
     _tempHistory.clear();
     _consecutiveValidSamples = 0;
     _latestData = const TemperatureData();
+    _lastValidData = null;
+    _lastValidDataTimestamp = null;
   }
   
   void dispose() {

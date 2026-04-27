@@ -366,6 +366,33 @@ class DeviceService {
     await _bluetooth.reattachNativeEventStream();
   }
 
+  // --- Last Reading API (for display during transmission pauses) ---
+
+  /// Get the last valid bio reading (with BPM and SpO2 values).
+  /// Returns null if no valid reading is available.
+  BioData? get lastValidBioReading => _bioProcessor.lastValidBioData;
+  
+  /// Get the timestamp of the last valid bio reading.
+  DateTime? get lastValidBioReadingTime => _bioProcessor.lastValidBioDataTimestamp;
+  
+  /// Get the last valid temperature reading.
+  /// Returns null if no valid reading is available.
+  TemperatureData? get lastValidTemperatureReading => _tempProcessor.lastValidData;
+  
+  /// Get the timestamp of the last valid temperature reading.
+  DateTime? get lastValidTemperatureReadingTime => _tempProcessor.lastValidDataTimestamp;
+  
+  /// Check if bio reading is still fresh (within timeout).
+  /// Useful for determining if last reading should be displayed.
+  BioData? getFreshBioReading([Duration timeout = const Duration(seconds: 60)]) {
+    return _bioProcessor.getFreshValidReading(timeout);
+  }
+  
+  /// Check if temperature reading is still fresh (within timeout).
+  /// Useful for determining if last reading should be displayed.
+  TemperatureData? getFreshTemperatureReading([Duration timeout = const Duration(seconds: 60)]) {
+    return _tempProcessor.getFreshValidReading(timeout);
+  }
 
   void dispose() {
     _rawSub?.cancel();
