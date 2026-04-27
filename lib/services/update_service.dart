@@ -42,8 +42,8 @@ class UpdateService {
       _lastNightlyState = isNightlyEnabled;
 
       final url = isNightlyEnabled
-          ? 'https://api.github.com/repos/StrawberryFrappe/SyncCompanion/releases'
-          : 'https://api.github.com/repos/StrawberryFrappe/SyncCompanion/releases/latest';
+          ? 'https://api.github.com/repos/StrawberryFrappe/Therapets/releases'
+          : 'https://api.github.com/repos/StrawberryFrappe/Therapets/releases/latest';
 
       final response = await http.get(Uri.parse(url));
 

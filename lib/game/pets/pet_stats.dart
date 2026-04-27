@@ -39,6 +39,9 @@ class PetStats {
 
   // Save lock — ensures concurrent saveToPrefs() calls are serialised.
   Future<void> _saveLock = Future.value();
+  
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
 
   /// Gold coins (for clothing)
   int _goldCoins = 0;
@@ -392,6 +395,7 @@ class PetStats {
   /// Enqueue a save. Concurrent callers are serialised — each waits for the
   /// previous save to finish before starting its own write.
   Future<void> saveToPrefs() {
+    if (!_isInitialized) return Future.value();
     _saveLock =
         _saveLock.catchError((_) {}).then((_) => _doSave());
     return _saveLock;
@@ -428,7 +432,8 @@ class PetStats {
       applyBackgroundUpdates(wasDeviceSynced: isDeviceSynced);
       if (isDeviceSynced) applyHappinessBuffer();
     }
-
+    
+    _isInitialized = true;
     // Commit to bundle (also persists migrated data on first run).
     await saveToPrefs();
   }

@@ -33,7 +33,7 @@ Future<void> main() async {
   // Initialize the foreground task plugin with conservative options.
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
-      channelId: 'sync_companion_fg',
+      channelId: 'therapets_fg',
       channelName: 'Therapets Service',
       channelDescription: 'Foreground service for keeping BLE active',
       onlyAlertOnce: true,
@@ -51,11 +51,11 @@ Future<void> main() async {
     ),
   );
 
-  runApp(const SyncCompanionApp());
+  runApp(const TherapetsApp());
 }
 
-class SyncCompanionApp extends StatelessWidget {
-  const SyncCompanionApp({super.key});
+class TherapetsApp extends StatelessWidget {
+  const TherapetsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +100,7 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) => const SyncCompanionApp();
+  Widget build(BuildContext context) => const TherapetsApp();
 }
 
 // `HomePage` and its implementation are moved into `lib/home_page.dart`.

@@ -21,6 +21,9 @@ class MissionService {
   List<Mission> _activeMissions = [];
   List<Mission> get activeMissions => List.unmodifiable(_activeMissions);
 
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
   // Stream for UI updates
   final _missionUpdateController = StreamController<List<Mission>>.broadcast();
   Stream<List<Mission>> get missionUpdates => _missionUpdateController.stream;
@@ -45,6 +48,7 @@ class MissionService {
 
   /// Update all active missions with new context
   Future<void> update(MissionContext ctx) async {
+    if (!_isInitialized) return;
     bool stateChanged = false;
 
     for (final mission in _activeMissions) {
@@ -132,6 +136,7 @@ class MissionService {
               .whereType<Mission>()
               .toList();
           if (_activeMissions.isNotEmpty) {
+            _isInitialized = true;
             _notifyListeners();
             return;
           }
@@ -155,6 +160,7 @@ class MissionService {
             .whereType<Mission>()
             .toList();
         if (_activeMissions.isNotEmpty) {
+          _isInitialized = true;
           _notifyListeners();
           return;
         }
@@ -165,6 +171,7 @@ class MissionService {
 
     // Nothing usable found — generate fresh missions.
     await _generateDailyMissions();
+    _isInitialized = true;
   }
 
   Mission? _missionFromJson(Map<String, dynamic> json) {
@@ -191,6 +198,7 @@ class MissionService {
   /// Enqueue a save. Concurrent callers are serialised — each waits for the
   /// previous save to finish before starting its own write.
   Future<void> _enqueueSave() {
+    if (!_isInitialized) return Future.value();
     _saveLock = _saveLock.catchError((_) {}).then((_) => _doSave());
     return _saveLock;
   }
