@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import '../../pets/pet_stats.dart';
+import '../../game/game_settings.dart';
 import '../flappy_bird/flappy_pet.dart' as flappy_pet; // Reusing sprite logic
 import '../flappy_bird/flappy_food.dart' as flappy_food; // Reusing sprite logic
 
@@ -20,6 +21,7 @@ class Ball extends PositionComponent with CollisionCallbacks {
   Vector2 velocity = Vector2.zero();
   double speed = 300; // base speed
   double radius = 12.5;
+  // Upward speed multiplier is configurable via GameSettings
   
   BallState state = BallState.normal;
   bool isRainbowTrail = false;
@@ -61,6 +63,10 @@ class Ball extends PositionComponent with CollisionCallbacks {
     // Launch upwards with slightly random angle
     final angle = -pi / 2 + (Random().nextDouble() - 0.5) * 0.5; // -90 deg +/- 15 deg
     velocity = Vector2(cos(angle), sin(angle)) * speed;
+    // Make upward component faster using runtime setting
+    if (velocity.y < 0) {
+      velocity.y *= GameSettings.sbrUpwardSpeedMultiplier;
+    }
   }
 
   void split(int count) {
@@ -164,6 +170,10 @@ class Ball extends PositionComponent with CollisionCallbacks {
     // Velocity always points UP (-y) after hitting bumper
     final speed = velocity.length;
     velocity = Vector2(sin(bounceAngle), -cos(bounceAngle)) * speed;
+    // Make upward component faster after bumper bounce (uses GameSettings)
+    if (velocity.y < 0) {
+      velocity.y *= GameSettings.sbrUpwardSpeedMultiplier;
+    }
     
     // Reset combo
     game.resetCombo();
@@ -204,7 +214,8 @@ class Ball extends PositionComponent with CollisionCallbacks {
       velocity.x = dx > 0 ? velocity.x.abs() : -velocity.x.abs();
     } else {
       // Hit top or bottom
-      velocity.y = dy > 0 ? velocity.y.abs() : -velocity.y.abs();
+      final newY = dy > 0 ? velocity.y.abs() : -velocity.y.abs();
+      velocity.y = newY < 0 ? newY * GameSettings.sbrUpwardSpeedMultiplier : newY;
     }
   }
 
