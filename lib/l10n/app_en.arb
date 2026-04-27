@@ -17,6 +17,8 @@
   "appUpdates": "APP UPDATES",
   "nightlyUpdates": "Nightly Updates",
   "nightlyUpdatesDesc": "Automatically detect and update to pre-release (dev) builds.",
+  "unstableUpdates": "Unstable Builds",
+  "unstableUpdatesDesc": "Also allow automatic updates for experimental (unstable) builds.",
 
   "dailyMissions": "Daily Missions",
   "missionCompleted": "Mission Completed!",

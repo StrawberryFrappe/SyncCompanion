@@ -53,6 +53,7 @@ class _SettingsPageState extends State<SettingsPage> {
   
   // App Updates
   bool _nightlyUpdatesEnabled = false;
+  bool _unstableUpdatesEnabled = false;
   
   Timer? _statDisplayTimer;
   StreamSubscription<DeviceConnectionState>? _nativeConnSub;
@@ -99,6 +100,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
       _nightlyUpdatesEnabled = prefs.getBool('nightly_updates_enabled') ?? false;
+      _unstableUpdatesEnabled = prefs.getBool('unstable_updates_enabled') ?? false;
       _loading = false;
     });
   }
@@ -138,6 +140,19 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveNightlyUpdates(bool val) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('nightly_updates_enabled', val);
+    
+    // If nightly is turned off, unstable must also be considered off
+    if (!val && _unstableUpdatesEnabled) {
+      setState(() => _unstableUpdatesEnabled = false);
+      await prefs.setBool('unstable_updates_enabled', false);
+    }
+    
+    UpdateService().checkForUpdates();
+  }
+  
+  Future<void> _saveUnstableUpdates(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('unstable_updates_enabled', val);
     UpdateService().checkForUpdates();
   }
   
@@ -256,9 +271,14 @@ class _SettingsPageState extends State<SettingsPage> {
           // Nightly Updates (top of Advanced Settings for easy access)
           AppUpdatesSection(
             nightlyEnabled: _nightlyUpdatesEnabled,
+            unstableEnabled: _unstableUpdatesEnabled,
             onNightlyChanged: (val) {
               setState(() => _nightlyUpdatesEnabled = val);
               _saveNightlyUpdates(val);
+            },
+            onUnstableChanged: (val) {
+              setState(() => _unstableUpdatesEnabled = val);
+              _saveUnstableUpdates(val);
             },
           ),
           

@@ -1,8 +1,16 @@
 # Therapets (Sync Companion)
 
-[![Download Latest APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/StrawberryFrappe/SyncCompanion/releases/latest/download/app-release.apk)
-
 A Flutter-based virtual pet app that uses a custom BLE hardware companion (M5-IMU-Sensor) to bring your pet to life through motion controls and real-time telemetry.
+
+## Download Builds
+
+| Channel | Build Type | Download Link |
+| :--- | :--- | :--- |
+| **Stable** | `Production` | [![Download Stable](https://img.shields.io/badge/Download-Stable%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/StrawberryFrappe/Therapets/releases/latest/download/app-release.apk) |
+| **Nightly** | `Development` | [![Download Nightly](https://img.shields.io/badge/Download-Nightly%20APK-orange?style=for-the-badge&logo=android&logoColor=white)](https://github.com/StrawberryFrappe/Therapets/releases) |
+| **Unstable** | `Experimental` | [![Download Unstable](https://img.shields.io/badge/Download-Unstable%20APK-red?style=for-the-badge&logo=android&logoColor=white)](https://github.com/StrawberryFrappe/Therapets/releases) |
+
+---
 
 **Supports two hardware variants:**
 - **MAX30100**: Pulse Oximeter + IMU

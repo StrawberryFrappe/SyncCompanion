@@ -15,8 +15,10 @@
 
   "appVersion": "Versión de la App",
   "appUpdates": "ACTUALIZACIONES DE LA APLICACIÓN",
-  "nightlyUpdates": "Actualizaciones Nocturnas (Nightly)",
-  "nightlyUpdatesDesc": "Detectar y actualizar automáticamente a compilaciones preliminares (dev).",
+  "nightlyUpdates": "Actualizaciones Nightly",
+  "nightlyUpdatesDesc": "Detectar y actualizar automáticamente a versiones de desarrollo (nightly).",
+  "unstableUpdates": "Versiones Inestables",
+  "unstableUpdatesDesc": "Permitir también actualizaciones automáticas para versiones experimentales (inestables).",
 
   "dailyMissions": "Misiones Diarias",
   "missionCompleted": "¡Misión Completada!",

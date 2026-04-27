@@ -2,7 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "unstable" ]
   workflow_dispatch:
 
 permissions:
@@ -39,6 +39,12 @@ jobs:
             TAG_NAME="v$NEW_VERSION"
             BUMP_COMMIT="true"
             PRERELEASE="false"
+          elif [ "${{ github.ref }}" == "refs/heads/unstable" ]; then
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH-unstable.${{ github.run_number }}"
+            NEW_FULL_VERSION="$NEW_VERSION+${{ github.run_number }}"
+            TAG_NAME="v$NEW_VERSION"
+            BUMP_COMMIT="false"
+            PRERELEASE="true"
           else
             NEW_VERSION="$MAJOR.$MINOR.$PATCH-nightly.${{ github.run_number }}"
             NEW_FULL_VERSION="$NEW_VERSION+${{ github.run_number }}"

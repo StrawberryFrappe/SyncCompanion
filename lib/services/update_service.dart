@@ -31,9 +31,10 @@ class UpdateService {
 
       final prefs = await SharedPreferences.getInstance();
       final isNightlyEnabled = prefs.getBool('nightly_updates_enabled') ?? false;
+      final isUnstableEnabled = prefs.getBool('unstable_updates_enabled') ?? false;
 
-      // If the nightly preference changed since last check, allow re-checking
-      if (_hasChecked && isNightlyEnabled != _lastNightlyState) {
+      // If preferences changed since last check, allow re-checking
+      if (_hasChecked && (isNightlyEnabled != _lastNightlyState)) {
         _hasChecked = false;
         updateUrlNotifier.value = null;
       }
@@ -53,13 +54,18 @@ class UpdateService {
 
         if (isNightlyEnabled && rawData is List && rawData.isNotEmpty) {
           // GitHub's /releases endpoint sorts stable releases before
-          // prereleases. Find the latest prerelease entry.
-          final nightlyEntry = rawData.firstWhere(
-            (r) => r['prerelease'] == true,
+          // prereleases. Find the latest entry that matches user preference.
+          final Map<String, dynamic>? targetEntry = (rawData as List).firstWhere(
+            (r) {
+              final tagName = (r['tag_name'] as String).toLowerCase();
+              if (isUnstableEnabled && tagName.contains('unstable')) return true;
+              if (tagName.contains('nightly')) return true;
+              return false;
+            },
             orElse: () => null,
           );
-          if (nightlyEntry == null) return;
-          data = nightlyEntry;
+          if (targetEntry == null) return;
+          data = targetEntry;
         } else if (!isNightlyEnabled && rawData is Map<String, dynamic>) {
           data = rawData;
         } else {
@@ -140,7 +146,8 @@ class UpdateService {
   }
 
   bool _isNewerVersion(String current, String release, {bool isNightlyEnabled = false}) {
-    final regex = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:-nightly\.(\d+))?');
+    // Regex matches v1.2.3 or 1.2.3-nightly.4 or 1.2.3-unstable.5
+    final regex = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:-(nightly|unstable)\.(\d+))?');
     
     final currentMatch = regex.firstMatch(current);
     final releaseMatch = regex.firstMatch(release);
@@ -178,26 +185,35 @@ class UpdateService {
       if (r < c) return false;
     }
     
-    // Same base version. Check nightly numbers.
-    String? currentNightlyStr = currentMatch.group(4);
-    String? releaseNightlyStr = releaseMatch.group(4);
+    // Same base version. Check build numbers.
+    String? currentType = currentMatch.group(4); // nightly or unstable
+    String? currentBuildStr = currentMatch.group(5);
     
-    // If one is stable and the other is nightly, the stable is newer
-    if (currentNightlyStr != null && releaseNightlyStr == null) {
-      return true; // Release is stable, current is nightly → upgrade
+    String? releaseType = releaseMatch.group(4);
+    String? releaseBuildStr = releaseMatch.group(5);
+    
+    // If one is stable and the other is pre-release, the stable is newer
+    if (currentType != null && releaseType == null) {
+      return true; // Release is stable, current is pre-release → upgrade
     }
-    if (currentNightlyStr == null && releaseNightlyStr != null) {
-      // Current is stable, release is nightly → only upgrade if user opted in
+    if (currentType == null && releaseType != null) {
+      // Current is stable, release is pre-release → only upgrade if user opted in
       return isNightlyEnabled;
     }
     
-    // Both are nightly
-    if (currentNightlyStr != null && releaseNightlyStr != null) {
-      int cNightly = int.parse(currentNightlyStr);
-      int rNightly = int.parse(releaseNightlyStr);
-      return rNightly > cNightly; // True if release nightly number > current
+    // Both are pre-releases
+    if (currentBuildStr != null && releaseBuildStr != null) {
+      // If same type, compare build numbers
+      if (currentType == releaseType) {
+        int cBuild = int.parse(currentBuildStr);
+        int rBuild = int.parse(releaseBuildStr);
+        return rBuild > cBuild;
+      }
+      // If different types, unstable is always considered "newer" than nightly
+      // because it's more experimental/ahead in terms of features.
+      return releaseType == 'unstable';
     }
     
-    return false; // Identical
+    return false; // Identical or unknown
   }
 }
