@@ -100,6 +100,13 @@ class PetStats extends HiveObject {
         _lastUpdateTime = lastUpdateTime ?? DateTime.now();
 
   // ============ GETTERS ============
+
+  /// Mark this instance as ready for saves.
+  /// Must be called after Hive rehydration so that save() is not a no-op.
+  void markReady() {
+    _isInitialized = true;
+    _canSave = true;
+  }
   
   /// Current hunger value (0.0 to 1.0)
   double get hunger => _hunger;

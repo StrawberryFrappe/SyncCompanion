@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:Therapets/services/cloud/telemetry_tracker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
@@ -81,9 +83,13 @@ class AppBootstrapper {
     PetStats petStats;
     if (statsBox != null) {
       petStats = await _loadOrMigratePetStats(statsBox, deviceService);
+      // Hive objects don't run through loadFromPrefs — mark ready explicitly
+      // so that save() calls are not silently discarded.
+      petStats.markReady();
     } else {
       debugPrint('[Bootstrapper] Falling back to default PetStats (Hive unavailable)');
       petStats = PetStats();
+      petStats.markReady();
     }
 
     // 5. Initialize Services that depend on others
@@ -143,10 +149,8 @@ class AppBootstrapper {
     if (box.isNotEmpty) {
       final stats = box.getAt(0)!;
       
-      // Calculate background elapsed time immediately
-      final now = DateTime.now();
+      // Grab Hive timestamp for native comparison
       final lastUpdateMs = stats.lastUpdateTime.millisecondsSinceEpoch;
-      final elapsedSec = (now.millisecondsSinceEpoch - lastUpdateMs) / 1000.0;
 
       // Task 3: Check if background service has newer stats in SharedPreferences
       try {
