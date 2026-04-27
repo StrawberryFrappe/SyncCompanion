@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'mission.dart';
 import 'daily_missions.dart';
@@ -23,6 +24,9 @@ class MissionService {
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
+
+  // Fail-safe to prevent overwriting SharedPreferences if load fails
+  bool _canSave = false;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -111,6 +115,7 @@ class MissionService {
     _activeMissions = missions;
     _lastResetDate = DateTime.now();
     _isInitialized = true; // Mark as initialized before saving
+    _canSave = true; // Safe to save now
     await _saveProgress();
     _notifyListeners();
   }
@@ -151,11 +156,12 @@ class MissionService {
             if (_activeMissions.isNotEmpty) {
               debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in bundle');
               _isInitialized = true;
+              _canSave = true; // Safe to save loaded missions
               _notifyListeners();
               return;
             }
           }
-        } catch (e, st) {
+        } catch (e) {
           debugPrint('[MissionService] Bundle parse error — falling back to legacy keys: $e');
         }
       }
@@ -176,18 +182,20 @@ class MissionService {
           if (_activeMissions.isNotEmpty) {
             debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in legacy keys');
             _isInitialized = true;
+            _canSave = true; // Safe to save migrated missions
             _notifyListeners();
             // Migrate to bundle on next save
             await save();
             return;
           }
-        } catch (e, st) {
+        } catch (e) {
           debugPrint('[MissionService] Legacy parse error: $e');
         }
       }
 
       // Nothing usable found — generate fresh missions.
       await _generateDailyMissions();
+      _canSave = true; // Safe to save fresh missions
       debugPrint('[MissionService] LOAD COMPLETE - Fresh missions generated');
     } finally {
       _isLoading = false;
@@ -218,7 +226,7 @@ class MissionService {
   /// Enqueue a save. Concurrent callers are serialised — each waits for the
   /// previous save to finish before starting its own write.
   Future<void> _enqueueSave() {
-    if (!_isInitialized) return Future.value();
+    if (!_isInitialized || !_canSave) return Future.value();
     _saveLock = _saveLock.catchError((_) {}).then((_) => _doSave());
     return _saveLock;
   }

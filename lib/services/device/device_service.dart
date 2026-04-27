@@ -1,13 +1,11 @@
 import 'dart:async';
-import 'dart:collection';
-import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' hide BluetoothService;
 
 import 'bluetooth_service.dart';
 import 'bio_signal_processor.dart';
 import 'temperature_signal_processor.dart';
+import 'device_status_aggregator.dart';
 import '../../game/models/telemetry_data.dart';
 export 'bluetooth_service.dart' show BluetoothUserAction, BluetoothUserActionType;
 export 'bio_signal_processor.dart' show BioData;
@@ -90,7 +88,6 @@ class DeviceService {
   }
 
   int _activeMinigames = 0;
-  bool get _isMinigameRunning => _activeMinigames > 0;
 
   void registerMinigameStart() {
     _activeMinigames++;
@@ -189,8 +186,6 @@ class DeviceService {
            // Reset liveness and grace period state
            _lastTelemetryTime = null;
            _statusAggregator.reset();
-           _wasHumanDetected = false;
-           _syncGraceTimer?.cancel();
          }
        }
     });
@@ -249,9 +244,6 @@ class DeviceService {
     _emitDisplayStatus(currentDisplayStatus);
   }
   
-  void _handleHumanDetectionChange(bool humanDetected) {
-     _statusAggregator.handleHumanDetectionChange(humanDetected);
-  }
 
   void _updateState(DeviceConnectionState newState) {
     if (_currentState != newState) {
