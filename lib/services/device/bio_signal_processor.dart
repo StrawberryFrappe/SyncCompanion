@@ -195,6 +195,33 @@ class BioSignalProcessor {
   BioData _latestBioData = const BioData();
   BioData get latestBioData => _latestBioData;
   
+  /// Pre-seed the processor with values from native service to skip warm-up.
+  void preSeed(int bpm, int spo2) {
+    if (bpm == 0 || spo2 == 0) return;
+    
+    _initialized = true;
+    _fingerDetectedState = true;
+    _consecutiveValidSamples = 100; // Skip finger sustained check
+    _lastValidBpm = bpm;
+    _lastValidSpO2 = spo2;
+    _currentSpO2 = spo2;
+    
+    _bpmHistory.clear();
+    for (int i = 0; i < 5; i++) _bpmHistory.addLast(bpm);
+    
+    _spo2History.clear();
+    for (int i = 0; i < 5; i++) _spo2History.addLast(spo2);
+    
+    _latestBioData = BioData(
+      bpm: bpm,
+      spo2: spo2,
+      sensorConnected: true,
+      fingerDetected: true,
+      humanDetected: true,
+    );
+    _bioDataController.add(_latestBioData);
+  }
+  
   /// Process raw IR and RED values from the sensor.
   void process(int rawIr, int rawRed) {
     // Handle sensor error/disconnected state (65535 = 0xFFFF = sensor error)

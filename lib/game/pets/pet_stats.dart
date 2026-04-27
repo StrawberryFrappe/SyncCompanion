@@ -110,6 +110,9 @@ class PetStats extends HiveObject {
   /// Current happiness buffer (accumulated while linked in background)
   double get happinessBuffer => _happinessBuffer;
 
+  /// Timestamp of last update
+  DateTime get lastUpdateTime => _lastUpdateTime;
+
   /// Current gold coins (Clothing)
   int get goldCoins => _goldCoins;
 
@@ -418,11 +421,39 @@ class PetStats extends HiveObject {
       if (isInBox) {
         await super.save();
         debugPrint('[PetStats] SAVE SUCCESS (Hive) - Timestamp: $now');
+        
+        // Task 1: Mirror to SharedPreferences for native background service
+        await _mirrorToPrefs();
       } else {
         debugPrint('[PetStats] SAVE FAILED - Not in a Hive box!');
+        // Even if not in box (e.g. initial setup), we might want to mirror
+        await _mirrorToPrefs();
       }
     } catch (e) {
       debugPrint('[PetStats] SAVE ERROR: $e');
+    }
+  }
+
+  /// Mirror critical stats to SharedPreferences for the native background service.
+  /// This ensures the service has access to the latest Hive data.
+  Future<void> _mirrorToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Native Kotlin service expects these keys
+      await prefs.setDouble('pet_hunger', _hunger);
+      await prefs.setDouble('pet_happiness', _happiness);
+      await prefs.setInt('pet_last_update', _lastUpdateTime.millisecondsSinceEpoch);
+      await prefs.setDouble('pet_low_wellbeing_threshold', lowWellbeingThreshold);
+      
+      // Also mirror decay rates if they've changed
+      await prefs.setDouble('pet_hunger_decay_rate', hungerDecayRate);
+      await prefs.setDouble('pet_happiness_decay_rate', happinessDecayRate);
+      await prefs.setDouble('pet_happiness_gain_rate', happinessGainRate);
+      
+      debugPrint('[PetStats] Mirror to SharedPreferences SUCCESS');
+    } catch (e) {
+      debugPrint('[PetStats] Mirror to SharedPreferences FAILED: $e');
     }
   }
 

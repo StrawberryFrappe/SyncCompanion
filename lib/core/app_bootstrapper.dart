@@ -1,4 +1,5 @@
 import 'package:Therapets/services/cloud/telemetry_tracker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -96,6 +97,28 @@ class AppBootstrapper {
   ) async {
     if (box.isNotEmpty) {
       final stats = box.getAt(0)!;
+      
+      // Task 3: Check if background service has newer stats in SharedPreferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final lastUpdateMs = prefs.getInt('pet_last_update');
+        
+        if (lastUpdateMs != null) {
+          final hiveUpdateMs = stats.lastUpdateTime.millisecondsSinceEpoch;
+          
+          // If SharedPreferences is newer, the background service updated the stats while app was closed
+          if (lastUpdateMs > hiveUpdateMs) {
+            debugPrint('[Bootstrapper] Native service has NEWER stats. Rehydrating from SharedPreferences.');
+            stats.hunger = prefs.getDouble('pet_hunger') ?? stats.hunger;
+            stats.happiness = prefs.getDouble('pet_happiness') ?? stats.happiness;
+            // No need to manually update _lastUpdateTime as applyBackgroundUpdates will use DateTime.now()
+            // and we've already synced the hunger/happiness values to the native service's last state.
+          }
+        }
+      } catch (e) {
+        debugPrint('[Bootstrapper] Failed to check native rehydration: $e');
+      }
+
       // Apply background updates immediately on load
       final isSynced = deviceService.currentDisplayStatus == DeviceDisplayStatus.synced;
       stats.applyBackgroundUpdates(wasDeviceSynced: isSynced);

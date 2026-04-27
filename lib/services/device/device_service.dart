@@ -141,6 +141,9 @@ class DeviceService {
   StreamSubscription? _nativeConnectionSub;
   StreamSubscription? _bioSub;
   StreamSubscription? _tempSub;
+  StreamSubscription? _nativeHumanSub;
+  StreamSubscription? _nativeBpmSub;
+  StreamSubscription? _nativeSpo2Sub;
 
   // Device type detection (sticky - determined by first packet)
   DeviceType _deviceType = DeviceType.unknown;
@@ -164,8 +167,26 @@ class DeviceService {
   // --- Initialization ---
 
   Future<void> init() async {
-    // Ensure BluetoothService is initialized if not already
-    await _bluetooth.init();
+    // 1. Attach listeners BEFORE initializing BluetoothService to capture initial state emissions
+    
+    // Listen to native human detection and vitals to pre-seed bio processor
+    _nativeHumanSub = _bluetooth.nativeHumanDetected$.listen((isDetected) {
+      if (isDetected && _deviceType == DeviceType.max30100) {
+        // BioProcessor will be pre-seeded when BPM/SpO2 arrive
+      }
+    });
+
+    _nativeBpmSub = _bluetooth.nativeBpm$.listen((bpm) {
+      if (bpm > 0 && _deviceType == DeviceType.max30100) {
+        _bioProcessor.preSeed(bpm, _bioProcessor.latestBioData.spo2);
+      }
+    });
+
+    _nativeSpo2Sub = _bluetooth.nativeSpo2$.listen((spo2) {
+      if (spo2 > 0 && _deviceType == DeviceType.max30100) {
+        _bioProcessor.preSeed(_bioProcessor.latestBioData.bpm, spo2);
+      }
+    });
 
     // Listen to native connected status for robust state
     // We prioritize native status as it survives UI restarts
@@ -235,6 +256,19 @@ class DeviceService {
     _statusAggregator.status$.listen((status) {
       _emitDisplayStatus(status);
     });
+
+    // 2. Now initialize BluetoothService (triggers initial broadcasts)
+    await _bluetooth.init();
+    
+    // 3. Re-verify initial state if listeners were attached too late for some reason
+    // or to handle the synchronous state stored in BluetoothService
+    if (_bluetooth.isNativeConnected) {
+      _updateState(DeviceConnectionState.connected);
+    }
+    
+    if (_bluetooth.isNativeHumanDetected && _deviceType == DeviceType.max30100) {
+      _bioProcessor.preSeed(_bluetooth.nativeBpm, _bluetooth.nativeSpo2);
+    }
     
     // Initial emission
     _emitDisplayStatus(currentDisplayStatus);
@@ -324,6 +358,9 @@ class DeviceService {
     _rawSub?.cancel();
     _bleConnectionSub?.cancel();
     _nativeConnectionSub?.cancel();
+    _nativeHumanSub?.cancel();
+    _nativeBpmSub?.cancel();
+    _nativeSpo2Sub?.cancel();
     _bioSub?.cancel();
     _tempSub?.cancel();
     _statusAggregator.dispose();
