@@ -43,6 +43,9 @@ class PetStats {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
   /// Gold coins (for clothing)
   int _goldCoins = 0;
   
@@ -402,40 +405,79 @@ class PetStats {
   }
 
   Future<void> _doSave() async {
-    _lastUpdateTime = DateTime.now();
+    final now = DateTime.now();
+    _lastUpdateTime = now;
+    final bundle = _toJson();
+    final jsonString = jsonEncode(bundle);
+    
+    debugPrint('[PetStats] SAVE START - Size: ${jsonString.length} bytes');
+    
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_bundleKey, jsonEncode(_toJson()));
+    final success = await prefs.setString(_bundleKey, jsonString);
+    
+    if (success) {
+      debugPrint('[PetStats] SAVE SUCCESS - Timestamp: $now');
+    } else {
+      debugPrint('[PetStats] SAVE FAILED!');
+    }
   }
 
   /// Load state from SharedPreferences and apply background updates.
   /// Reads the atomic bundle key; falls back to legacy individual keys
   /// for users upgrading from an earlier version.
   Future<void> loadFromPrefs({required bool isDeviceSynced}) async {
-    final prefs = await SharedPreferences.getInstance();
-    bool hadSavedState = false;
-
-    final bundleJson = prefs.getString(_bundleKey);
-    if (bundleJson != null) {
-      try {
-        hadSavedState = _fromJson(
-            jsonDecode(bundleJson) as Map<String, dynamic>);
-      } catch (e, st) {
-        print('[PetStats] Bundle parse error — falling back to legacy keys: $e\n$st');
-        hadSavedState = _loadLegacyKeys(prefs);
-      }
-    } else {
-      // First launch after update: migrate from old individual keys.
-      hadSavedState = _loadLegacyKeys(prefs);
-    }
-
-    if (hadSavedState) {
-      applyBackgroundUpdates(wasDeviceSynced: isDeviceSynced);
-      if (isDeviceSynced) applyHappinessBuffer();
+    if (_isLoading) {
+      debugPrint('[PetStats] LOAD SKIPPED - Already loading');
+      return;
     }
     
-    _isInitialized = true;
-    // Commit to bundle (also persists migrated data on first run).
-    await saveToPrefs();
+    debugPrint('[PetStats] LOAD START - isDeviceSynced: $isDeviceSynced');
+    _isLoading = true;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      bool hadSavedState = false;
+      bool wasLegacy = false;
+
+      final bundleJson = prefs.getString(_bundleKey);
+      if (bundleJson != null) {
+        try {
+          hadSavedState = _fromJson(
+              jsonDecode(bundleJson) as Map<String, dynamic>);
+          debugPrint('[PetStats] LOAD - Found bundle data');
+        } catch (e, st) {
+          debugPrint('[PetStats] Bundle parse error — falling back to legacy keys: $e');
+          hadSavedState = _loadLegacyKeys(prefs);
+          wasLegacy = hadSavedState;
+        }
+      } else {
+        // First launch after update: migrate from old individual keys.
+        hadSavedState = _loadLegacyKeys(prefs);
+        wasLegacy = hadSavedState;
+        if (hadSavedState) debugPrint('[PetStats] LOAD - Found legacy data for migration');
+      }
+
+      if (hadSavedState) {
+        applyBackgroundUpdates(wasDeviceSynced: isDeviceSynced);
+        if (isDeviceSynced) applyHappinessBuffer();
+      } else {
+        debugPrint('[PetStats] LOAD - No saved state found, using defaults');
+      }
+      
+      _isInitialized = true;
+      
+      // ONLY commit to bundle if we actually migrated legacy data or changed something.
+      // If we just loaded defaults for a new user, we don't need to force a save immediately
+      // which might race with other initializations.
+      if (wasLegacy) {
+        debugPrint('[PetStats] LOAD - Committing migrated legacy data to bundle');
+        await saveToPrefs();
+      }
+      
+      debugPrint('[PetStats] LOAD COMPLETE - Hunger: ${_hunger.toStringAsFixed(2)}, Gold: $_goldCoins');
+    } finally {
+      _isLoading = false;
+    }
   }
 
   /// Create a copy with modified values

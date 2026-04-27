@@ -24,6 +24,9 @@ class MissionService {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
   // Stream for UI updates
   final _missionUpdateController = StreamController<List<Mission>>.broadcast();
   Stream<List<Mission>> get missionUpdates => _missionUpdateController.stream;
@@ -97,8 +100,8 @@ class MissionService {
   }
 
   Future<void> _generateDailyMissions() async {
+    debugPrint('[MissionService] Generating fresh daily missions');
     // Generate 3 random missions for the day
-    // In a real app, use a seed based on the date so it's deterministic
     final missions = <Mission>[
       SyncDurationMission(targetDuration: 120 * 60, rewardGold: 50), // 2 hours
       MinigamePlayMission(targetPlays: 3, rewardGold: 30),
@@ -107,6 +110,7 @@ class MissionService {
     
     _activeMissions = missions;
     _lastResetDate = DateTime.now();
+    _isInitialized = true; // Mark as initialized before saving
     await _saveProgress();
     _notifyListeners();
   }
@@ -117,61 +121,77 @@ class MissionService {
   }
 
   Future<void> _loadMissions() async {
-    final prefs = await SharedPreferences.getInstance();
+    if (_isLoading) {
+      debugPrint('[MissionService] LOAD SKIPPED - Already loading');
+      return;
+    }
+    
+    debugPrint('[MissionService] LOAD START');
+    _isLoading = true;
 
-    // Try reading the atomic bundle first.
-    final bundleJson = prefs.getString(_bundleKey);
-    if (bundleJson != null) {
-      try {
-        final bundle = jsonDecode(bundleJson) as Map<String, dynamic>;
-        final lastResetMs = bundle['lastResetMs'] as int?;
-        if (lastResetMs != null) {
-          _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Try reading the atomic bundle first.
+      final bundleJson = prefs.getString(_bundleKey);
+      if (bundleJson != null) {
+        try {
+          final bundle = jsonDecode(bundleJson) as Map<String, dynamic>;
+          final lastResetMs = bundle['lastResetMs'] as int?;
+          if (lastResetMs != null) {
+            _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+          }
+          final missionJson = bundle['missions'] as String?;
+          if (missionJson != null) {
+            final List<dynamic> missionList = jsonDecode(missionJson);
+            _activeMissions = missionList
+                .map((j) => _missionFromJson(j as Map<String, dynamic>))
+                .whereType<Mission>()
+                .toList();
+            if (_activeMissions.isNotEmpty) {
+              debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in bundle');
+              _isInitialized = true;
+              _notifyListeners();
+              return;
+            }
+          }
+        } catch (e, st) {
+          debugPrint('[MissionService] Bundle parse error — falling back to legacy keys: $e');
         }
-        final missionJson = bundle['missions'] as String?;
-        if (missionJson != null) {
+      }
+
+      // Legacy key fallback (users upgrading from earlier versions).
+      final lastResetMs = prefs.getInt(_lastResetKey);
+      if (lastResetMs != null) {
+        _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+      }
+      final missionJson = prefs.getString(_missionDataKey);
+      if (missionJson != null) {
+        try {
           final List<dynamic> missionList = jsonDecode(missionJson);
           _activeMissions = missionList
               .map((j) => _missionFromJson(j as Map<String, dynamic>))
               .whereType<Mission>()
               .toList();
           if (_activeMissions.isNotEmpty) {
+            debugPrint('[MissionService] LOAD - Found ${_activeMissions.length} missions in legacy keys');
             _isInitialized = true;
             _notifyListeners();
+            // Migrate to bundle on next save
+            await save();
             return;
           }
+        } catch (e, st) {
+          debugPrint('[MissionService] Legacy parse error: $e');
         }
-      } catch (e, st) {
-        print('[MissionService] Bundle parse error — falling back to legacy keys: $e\n$st');
       }
-    }
 
-    // Legacy key fallback (users upgrading from earlier versions).
-    final lastResetMs = prefs.getInt(_lastResetKey);
-    if (lastResetMs != null) {
-      _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+      // Nothing usable found — generate fresh missions.
+      await _generateDailyMissions();
+      debugPrint('[MissionService] LOAD COMPLETE - Fresh missions generated');
+    } finally {
+      _isLoading = false;
     }
-    final missionJson = prefs.getString(_missionDataKey);
-    if (missionJson != null) {
-      try {
-        final List<dynamic> missionList = jsonDecode(missionJson);
-        _activeMissions = missionList
-            .map((j) => _missionFromJson(j as Map<String, dynamic>))
-            .whereType<Mission>()
-            .toList();
-        if (_activeMissions.isNotEmpty) {
-          _isInitialized = true;
-          _notifyListeners();
-          return;
-        }
-      } catch (e, st) {
-        print('[MissionService] Legacy parse error: $e\n$st');
-      }
-    }
-
-    // Nothing usable found — generate fresh missions.
-    await _generateDailyMissions();
-    _isInitialized = true;
   }
 
   Mission? _missionFromJson(Map<String, dynamic> json) {
@@ -204,6 +224,7 @@ class MissionService {
   }
 
   Future<void> _doSave() async {
+    debugPrint('[MissionService] SAVE START');
     final prefs = await SharedPreferences.getInstance();
     // Single atomic key: both fields live or die together.
     final bundle = jsonEncode({
@@ -211,7 +232,12 @@ class MissionService {
       // Nest missions as a pre-encoded string so jsonEncode errors are isolated.
       'missions': jsonEncode(_activeMissions.map((m) => m.toJson()).toList()),
     });
-    await prefs.setString(_bundleKey, bundle);
+    final success = await prefs.setString(_bundleKey, bundle);
+    if (success) {
+      debugPrint('[MissionService] SAVE SUCCESS');
+    } else {
+      debugPrint('[MissionService] SAVE FAILED!');
+    }
   }
 
   void _notifyListeners() {
