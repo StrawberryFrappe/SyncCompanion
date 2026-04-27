@@ -127,7 +127,7 @@ class BluetoothService {
       // Detect native service and attach EventChannel early.
       bool nativeRunning = false;
       try {
-        nativeRunning = await _platform.invokeMethod('isNativeServiceRunning') == true;
+        nativeRunning = await _platform.invokeMethod('isNativeServiceRunning').timeout(const Duration(seconds: 1)) == true;
       } catch (_) {}
       try {
         _attachNativeEventStream();
@@ -154,7 +154,7 @@ class BluetoothService {
       }
       // Ask for native status and wait for its reply so UI doesn't flip.
       try {
-        final res = await _platform.invokeMethod('requestNativeStatus');
+        final res = await _platform.invokeMethod('requestNativeStatus').timeout(const Duration(seconds: 2));
         if (res is Map) {
           final m = Map<String, dynamic>.from(res);
           _handleNativeStatusMap(m);
@@ -613,7 +613,7 @@ class BluetoothService {
   /// (e.g., minigames that need telemetry input).
   Future<void> requestNativeStatus() async {
     try {
-      final res = await _platform.invokeMethod('requestNativeStatus');
+      final res = await _platform.invokeMethod('requestNativeStatus').timeout(const Duration(seconds: 2));
       if (res is Map) {
         final m = Map<String, dynamic>.from(res);
         _handleNativeStatusMap(m);

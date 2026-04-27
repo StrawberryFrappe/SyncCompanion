@@ -38,36 +38,74 @@ class AppBootstrapper {
   static Future<BootstrapResult> init() async {
     debugPrint('[Bootstrapper] STARTING');
 
-    // 1. Initialize Hive
-    await Hive.initFlutter();
-    _registerAdapters();
+    // 1. Initialize Hive with fail-safe
+    try {
+      await Hive.initFlutter().timeout(const Duration(seconds: 2));
+      _registerAdapters();
+    } catch (e) {
+      debugPrint('[Bootstrapper] Hive initialization failed: $e');
+    }
 
-    // 2. Open Boxes
-    final statsBox = await Hive.openBox<PetStats>('pet_stats_box');
-    final missionBox = await Hive.openBox('missions_box');
+    // 2. Open Boxes with timeouts
+    Box<PetStats>? statsBox;
+    Box? missionBox;
+    try {
+      statsBox = await Hive.openBox<PetStats>('pet_stats_box').timeout(const Duration(seconds: 3));
+      missionBox = await Hive.openBox('missions_box').timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('[Bootstrapper] Failed to open Hive boxes: $e');
+    }
 
     // 3. Initialize Services (Leaf dependencies first)
     final localeService = LocaleService();
-    await localeService.init();
+    try {
+      await localeService.init().timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('[Bootstrapper] LocaleService init failed: $e');
+    }
 
     final cloudService = CloudService();
-    await cloudService.init();
+    try {
+      await cloudService.init().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('[Bootstrapper] CloudService init failed: $e');
+    }
 
     final deviceService = DeviceService();
-    await deviceService.init();
+    try {
+      await deviceService.init().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('[Bootstrapper] DeviceService init failed: $e');
+    }
 
-    // 4. Load/Migrate PetStats
-    PetStats petStats = await _loadOrMigratePetStats(statsBox, deviceService);
+    // 4. Load/Migrate PetStats (Safe even if box is null)
+    PetStats petStats;
+    if (statsBox != null) {
+      petStats = await _loadOrMigratePetStats(statsBox, deviceService);
+    } else {
+      debugPrint('[Bootstrapper] Falling back to default PetStats (Hive unavailable)');
+      petStats = PetStats();
+    }
 
     // 5. Initialize Services that depend on others
     final missionService = MissionService(cloudService: cloudService);
-    await missionService.init(petStats, missionBox);
+    if (missionBox != null) {
+      try {
+        await missionService.init(petStats, missionBox).timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint('[Bootstrapper] MissionService init failed: $e');
+      }
+    }
 
     final telemetryTracker = TelemetryTracker(
       deviceService: deviceService,
       cloudService: cloudService,
     );
-    await telemetryTracker.init();
+    try {
+      await telemetryTracker.init().timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('[Bootstrapper] TelemetryTracker init failed: $e');
+    }
 
     final notificationService = PetNotificationService(localeService: localeService);
 

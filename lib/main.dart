@@ -11,16 +11,13 @@ import 'core/app_lifecycle_manager.dart';
 import 'screens/game_screen.dart';
 import 'services/locale_service.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 1. Bootstrap all services and persistence
-  final bootstrap = await AppBootstrapper.init();
-  
-  // 2. Initialize communication port between task isolate and main isolate.
+  // Initialize communication port between task isolate and main isolate.
   FlutterForegroundTask.initCommunicationPort();
 
-  // 3. Initialize the foreground task plugin with conservative options.
+  // Initialize the foreground task plugin with conservative options.
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
       channelId: 'therapets_fg',
@@ -41,25 +38,74 @@ Future<void> main() async {
     ),
   );
 
-  runApp(
-    MultiProvider(
-      providers: [
-        Provider.value(value: bootstrap.cloudService),
-        Provider.value(value: bootstrap.deviceService),
-        Provider.value(value: bootstrap.missionService),
-        Provider.value(value: bootstrap.telemetryTracker),
-        Provider.value(value: bootstrap.petStats),
-        Provider.value(value: bootstrap.notificationService),
-        ChangeNotifierProvider.value(value: bootstrap.localeService),
-      ],
-      child: AppLifecycleManager(
-        petStats: bootstrap.petStats,
-        missionService: bootstrap.missionService,
-        deviceService: bootstrap.deviceService,
-        child: const TherapetsApp(),
-      ),
-    ),
-  );
+  runApp(const BootstrapWrapper());
+}
+
+/// Wrapper that handles the AppBootstrapper Future and shows a loading state.
+class BootstrapWrapper extends StatefulWidget {
+  const BootstrapWrapper({super.key});
+
+  @override
+  State<BootstrapWrapper> createState() => _BootstrapWrapperState();
+}
+
+class _BootstrapWrapperState extends State<BootstrapWrapper> {
+  late Future<BootstrapResult> _bootstrapFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrapFuture = AppBootstrapper.init();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<BootstrapResult>(
+      future: _bootstrapFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            home: Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(
+                child: CircularProgressIndicator(color: Colors.black),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: Text('Initialization Error: ${snapshot.error}'),
+              ),
+            ),
+          );
+        }
+
+        final bootstrap = snapshot.data!;
+        
+        return MultiProvider(
+          providers: [
+            Provider.value(value: bootstrap.cloudService),
+            Provider.value(value: bootstrap.deviceService),
+            Provider.value(value: bootstrap.missionService),
+            Provider.value(value: bootstrap.telemetryTracker),
+            Provider.value(value: bootstrap.petStats),
+            Provider.value(value: bootstrap.notificationService),
+            ChangeNotifierProvider.value(value: bootstrap.localeService),
+          ],
+          child: AppLifecycleManager(
+            petStats: bootstrap.petStats,
+            missionService: bootstrap.missionService,
+            deviceService: bootstrap.deviceService,
+            child: const TherapetsApp(),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class TherapetsApp extends StatelessWidget {
