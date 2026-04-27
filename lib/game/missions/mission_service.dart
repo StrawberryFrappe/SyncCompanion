@@ -74,7 +74,7 @@ class MissionService {
     }
 
     if (stateChanged) {
-      _saveProgress();
+      await _saveProgress();
       _notifyListeners();
     }
   }
@@ -226,8 +226,57 @@ class MissionService {
       await _box.put('lastResetMs', _lastResetDate.millisecondsSinceEpoch);
       await _box.put('missions', _activeMissions);
       debugPrint('[MissionService] SAVE SUCCESS (Hive)');
+      
+      // Mirror to SharedPreferences for atomic rehydration on next startup
+      await _mirrorToPrefs();
     } catch (e) {
       debugPrint('[MissionService] SAVE FAILED (Hive): $e');
+    }
+  }
+
+  /// Mirror critical mission state to SharedPreferences for atomic rehydration.
+  Future<void> _mirrorToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bundle = {
+        'lastResetMs': _lastResetDate.millisecondsSinceEpoch,
+        'missions': jsonEncode(_activeMissions.map((m) => m.toJson()).toList()),
+      };
+      await prefs.setString(_bundleKey, jsonEncode(bundle));
+      debugPrint('[MissionService] Mirror to SharedPreferences SUCCESS');
+    } catch (e) {
+      debugPrint('[MissionService] Mirror to SharedPreferences FAILED: $e');
+    }
+  }
+
+  /// Rehydrate mission progress based on background sync time.
+  /// Called by the AppBootstrapper during startup.
+  Future<void> rehydrateBackgroundProgress(double elapsedSeconds, bool wasSynced) async {
+    if (!_isInitialized || elapsedSeconds <= 0) return;
+
+    debugPrint('[MissionService] Rehydrating background progress: ${elapsedSeconds.toStringAsFixed(1)}s (synced: $wasSynced)');
+    
+    bool stateChanged = false;
+    final ctx = MissionContext(
+      dt: elapsedSeconds,
+      isDeviceSynced: wasSynced,
+    );
+
+    for (final mission in _activeMissions) {
+      if (!mission.isCompleted) {
+        final justCompleted = mission.update(ctx);
+        if (justCompleted) {
+          await _handleMissionCompletion(mission);
+          stateChanged = true;
+        } else if (mission.progress > 0) {
+          stateChanged = true;
+        }
+      }
+    }
+
+    if (stateChanged) {
+      await _saveProgress();
+      _notifyListeners();
     }
   }
 

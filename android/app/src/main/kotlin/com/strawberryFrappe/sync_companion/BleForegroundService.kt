@@ -242,23 +242,42 @@ class BleForegroundService : Service() {
         val now = System.currentTimeMillis()
         val elapsedSec = (now - lastUpdateMs) / 1000.0
         
-        // Debug: log the decay calculation
         if (DATA_LOG) Log.d("BleForegroundService", "checkPetCare: elapsedSec=$elapsedSec")
         
         if (elapsedSec <= 0) return
 
-        // Read current stats
-        var hunger = p.getFloat("pet_hunger", 1.0f).toDouble()
-        var happiness = p.getFloat("pet_happiness", 1.0f).toDouble()
+        // Read current stats (Attempt bundle read first for atomic consistency)
+        var hunger = 1.0
+        var happiness = 1.0
+        var hungerDecayRate = 0.0000463
+        var happinessDecayRate = 0.0000463
+        var happinessGainRate = 0.0001389
+        var threshold = 0.25
 
-        // SharedPreferences stores doubles via putFloat for Dart's setDouble
-        // which actually uses putFloat under the hood on Android.
-        val hungerDecayRate = p.getFloat("pet_hunger_decay_rate", 0.0000463f).toDouble()
-        val happinessDecayRate = p.getFloat("pet_happiness_decay_rate", 0.0000463f).toDouble()
-        val happinessGainRate = p.getFloat("pet_happiness_gain_rate", 0.0001389f).toDouble()
-        val threshold = p.getFloat("pet_low_wellbeing_threshold", 0.25f).toDouble()
+        val bundleJson = p.getString("pet_stats_bundle", null)
+        if (bundleJson != null) {
+            try {
+                val org_json = org.json.JSONObject(bundleJson)
+                hunger = org_json.optDouble("hunger", 1.0)
+                happiness = org_json.optDouble("happiness", 1.0)
+                hungerDecayRate = org_json.optDouble("hungerDecayRate", 0.0000463)
+                happinessDecayRate = org_json.optDouble("happinessDecayRate", 0.0000463)
+                happinessGainRate = org_json.optDouble("happinessGainRate", 0.0001389)
+                threshold = org_json.optDouble("lowWellbeingThreshold", 0.25)
+            } catch (e: Exception) {
+                Log.w("BleForegroundService", "Bundle parse error, falling back to keys: $e")
+                // Fallback to individual keys already handled by defaults + p.getFloat below
+            }
+        }
 
-        // Determine if currently synced (native BLE connected)
+        // Always overlay with individual keys if present (legacy support / backup)
+        hunger = p.getFloat("pet_hunger", hunger.toFloat()).toDouble()
+        happiness = p.getFloat("pet_happiness", happiness.toFloat()).toDouble()
+        hungerDecayRate = p.getFloat("pet_hunger_decay_rate", hungerDecayRate.toFloat()).toDouble()
+        happinessDecayRate = p.getFloat("pet_happiness_decay_rate", happinessDecayRate.toFloat()).toDouble()
+        happinessGainRate = p.getFloat("pet_happiness_gain_rate", happinessGainRate.toFloat()).toDouble()
+        threshold = p.getFloat("pet_low_wellbeing_threshold", threshold.toFloat()).toDouble()
+
         // Determine if currently synced (native BLE connected AND human detected)
         val isSynced = p.getBoolean(PREF_CONNECTED, false) && bioProcessor.humanDetected
 
@@ -272,11 +291,23 @@ class BleForegroundService : Service() {
 
         // Write updated values back
         try {
-            p.edit()
+            val editor = p.edit()
                 .putFloat("pet_hunger", hunger.toFloat())
                 .putFloat("pet_happiness", happiness.toFloat())
                 .putLong("pet_last_update", now)
-                .apply()
+            
+            // Also update bundle if it existed to maintain atomic integrity
+            if (bundleJson != null) {
+                try {
+                    val org_json = org.json.JSONObject(bundleJson)
+                    org_json.put("hunger", hunger)
+                    org_json.put("happiness", happiness)
+                    org_json.put("lastUpdateMs", now)
+                    editor.putString("pet_stats_bundle", org_json.toString())
+                } catch (e: Exception) {}
+            }
+            
+            editor.apply()
         } catch (e: Exception) {
             Log.w("BleForegroundService", "failed to write pet stats: $e")
         }

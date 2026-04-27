@@ -38,9 +38,8 @@ class AppBootstrapper {
   static Future<BootstrapResult> init() async {
     debugPrint('[Bootstrapper] STARTING');
 
-    // 1. Initialize Hive with fail-safe
     try {
-      await Hive.initFlutter().timeout(const Duration(seconds: 2));
+      await Hive.initFlutter().timeout(const Duration(seconds: 5));
       _registerAdapters();
     } catch (e) {
       debugPrint('[Bootstrapper] Hive initialization failed: $e');
@@ -50,8 +49,8 @@ class AppBootstrapper {
     Box<PetStats>? statsBox;
     Box? missionBox;
     try {
-      statsBox = await Hive.openBox<PetStats>('pet_stats_box').timeout(const Duration(seconds: 3));
-      missionBox = await Hive.openBox('missions_box').timeout(const Duration(seconds: 2));
+      statsBox = await Hive.openBox<PetStats>('pet_stats_box').timeout(const Duration(seconds: 5));
+      missionBox = await Hive.openBox('missions_box').timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('[Bootstrapper] Failed to open Hive boxes: $e');
     }
@@ -91,7 +90,15 @@ class AppBootstrapper {
     final missionService = MissionService(cloudService: cloudService);
     if (missionBox != null) {
       try {
-        await missionService.init(petStats, missionBox).timeout(const Duration(seconds: 2));
+        await missionService.init(petStats, missionBox).timeout(const Duration(seconds: 5));
+        
+        // Rehydrate background progress for missions (e.g. sync duration)
+        final lastUpdateMs = petStats.lastUpdateTime.millisecondsSinceEpoch;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final elapsedSec = (now - lastUpdateMs) / 1000.0;
+        final isSynced = deviceService.currentDisplayStatus == DeviceDisplayStatus.synced;
+        
+        await missionService.rehydrateBackgroundProgress(elapsedSec, isSynced);
       } catch (e) {
         debugPrint('[Bootstrapper] MissionService init failed: $e');
       }
@@ -136,30 +143,42 @@ class AppBootstrapper {
     if (box.isNotEmpty) {
       final stats = box.getAt(0)!;
       
+      // Calculate background elapsed time immediately
+      final now = DateTime.now();
+      final lastUpdateMs = stats.lastUpdateTime.millisecondsSinceEpoch;
+      final elapsedSec = (now.millisecondsSinceEpoch - lastUpdateMs) / 1000.0;
+
       // Task 3: Check if background service has newer stats in SharedPreferences
       try {
         final prefs = await SharedPreferences.getInstance();
-        final lastUpdateMs = prefs.getInt('pet_last_update');
+        final nativeUpdateMs = prefs.getInt('pet_last_update');
         
-        if (lastUpdateMs != null) {
-          final hiveUpdateMs = stats.lastUpdateTime.millisecondsSinceEpoch;
+        if (nativeUpdateMs != null && nativeUpdateMs > lastUpdateMs) {
+          debugPrint('[Bootstrapper] Native service has NEWER stats. Rehydrating.');
           
-          // If SharedPreferences is newer, the background service updated the stats while app was closed
-          if (lastUpdateMs > hiveUpdateMs) {
-            debugPrint('[Bootstrapper] Native service has NEWER stats. Rehydrating from SharedPreferences.');
+          // Try bundle first (Atomic)
+          final bundleJson = prefs.getString('pet_stats_bundle');
+          if (bundleJson != null) {
+            try {
+              final Map<String, dynamic> bundle = jsonDecode(bundleJson);
+              stats.rehydrateFromMap(bundle);
+            } catch (e) {
+              debugPrint('[Bootstrapper] Bundle parse error: $e');
+            }
+          } else {
+            // Fallback to individual keys
             stats.hunger = prefs.getDouble('pet_hunger') ?? stats.hunger;
             stats.happiness = prefs.getDouble('pet_happiness') ?? stats.happiness;
-            // No need to manually update _lastUpdateTime as applyBackgroundUpdates will use DateTime.now()
-            // and we've already synced the hunger/happiness values to the native service's last state.
           }
         }
       } catch (e) {
         debugPrint('[Bootstrapper] Failed to check native rehydration: $e');
       }
 
-      // Apply background updates immediately on load
+      // Apply background updates (decay/gain) for the time since last update
       final isSynced = deviceService.currentDisplayStatus == DeviceDisplayStatus.synced;
       stats.applyBackgroundUpdates(wasDeviceSynced: isSynced);
+      
       return stats;
     }
 

@@ -440,7 +440,11 @@ class PetStats extends HiveObject {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Native Kotlin service expects these keys
+      // 1. Write Atomic Bundle (Preferred by new rehydration logic)
+      final bundle = toJson();
+      await prefs.setString(_bundleKey, jsonEncode(bundle));
+
+      // 2. Write Individual Keys (Required by native Kotlin service)
       await prefs.setDouble('pet_hunger', _hunger);
       await prefs.setDouble('pet_happiness', _happiness);
       await prefs.setInt('pet_last_update', _lastUpdateTime.millisecondsSinceEpoch);
@@ -451,10 +455,46 @@ class PetStats extends HiveObject {
       await prefs.setDouble('pet_happiness_decay_rate', happinessDecayRate);
       await prefs.setDouble('pet_happiness_gain_rate', happinessGainRate);
       
-      debugPrint('[PetStats] Mirror to SharedPreferences SUCCESS');
+      debugPrint('[PetStats] Mirror to SharedPreferences SUCCESS (Bundle + Keys)');
     } catch (e) {
       debugPrint('[PetStats] Mirror to SharedPreferences FAILED: $e');
     }
+  }
+
+  /// Convert to JSON map for bundle persistence.
+  Map<String, dynamic> toJson() {
+    return {
+      'hunger': _hunger,
+      'happiness': _happiness,
+      'happinessBuffer': _happinessBuffer,
+      'goldCoins': _goldCoins,
+      'silverCoins': _silverCoins,
+      'unlockedClothing': _unlockedClothingIds,
+      'equippedClothing': _equippedClothing,
+      'foodInventory': _foodInventory,
+      'hungerDecayRate': hungerDecayRate,
+      'happinessGainRate': happinessGainRate,
+      'happinessDecayRate': happinessDecayRate,
+      'lowWellbeingThreshold': lowWellbeingThreshold,
+      'lastUpdateMs': _lastUpdateTime.millisecondsSinceEpoch,
+    };
+  }
+
+  /// Rehydrate stats from a map (bundle).
+  /// Used by Bootstrapper for native-to-dart rehydration.
+  void rehydrateFromMap(Map<String, dynamic> json) {
+    _hunger = (json['hunger'] as num?)?.toDouble() ?? _hunger;
+    _happiness = (json['happiness'] as num?)?.toDouble() ?? _happiness;
+    _happinessBuffer = (json['happinessBuffer'] as num?)?.toDouble() ?? _happinessBuffer;
+    _goldCoins = (json['goldCoins'] as int?) ?? _goldCoins;
+    _silverCoins = (json['silverCoins'] as int?) ?? _silverCoins;
+    
+    final lastMs = json['lastUpdateMs'] as int?;
+    if (lastMs != null) {
+      _lastUpdateTime = DateTime.fromMillisecondsSinceEpoch(lastMs);
+    }
+    
+    debugPrint('[PetStats] Rehydrated from map - Hunger: ${_hunger.toStringAsFixed(2)}');
   }
 
   /// Load state from SharedPreferences and apply background updates.
