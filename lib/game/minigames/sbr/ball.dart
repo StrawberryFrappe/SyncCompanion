@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import '../../pets/pet_stats.dart';
-import '../../game/game_settings.dart';
+import '../../game_settings.dart';
 import '../flappy_bird/flappy_pet.dart' as flappy_pet; // Reusing sprite logic
 import '../flappy_bird/flappy_food.dart' as flappy_food; // Reusing sprite logic
 
