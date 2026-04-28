@@ -1,0 +1,47 @@
+--- BleForegroundService.kt
++++ BleForegroundService.kt
+@@ -213,6 +213,44 @@
+         handler.postDelayed(petCareRunnable cat android/app/src/main/kotlin/com/strawberryFrappe/sync_companion/BleForegroundService.kt | grep -C 10 'petCareRunnable', PET_CARE_INTERVAL_MS)
+     }
+ 
++    private fun startSyncStateTimer() {
++        syncStateRunnable?.let { handler.removeCallbacks(it) }
++        syncStateRunnable = object : Runnable {
++            private var secondsTick = 0
++            override fun run() {
++                try {
++                    val connected = gatt != null && prefs?.getBoolean(PREF_CONNECTED, false) == true
++                    if (connected) {
++                        isConnectedThisMinute = true
++                        if (bioProcessor.humanDetected) {
++                            syncedSecondsThisMinute++
++                            if (bioProcessor.lastValidBpm > 0) bpmReadings.add(bioProcessor.lastValidBpm)
++                            if (bioProcessor.lastValidSpO2 > 0) spo2Readings.add(bioProcessor.lastValidSpO2)
++                        }
++                    }
++                    secondsTick++
++                    if (secondsTick >= 60) {
++                        secondsTick = 0
++                        if (isConnectedThisMinute) {
++                            val synced = syncedSecondsThisMinute > 30
++                            val currentSyncedMinutes = prefs?.getInt("synced_minutes_today", 0) ?: 0
++                            if (synced) prefs?.edit()?.putInt("synced_minutes_today", currentSyncedMinutes + 1)?.apply()
++                            
++                            val avgBpm = if (bpmReadings.isNotEmpty()) bpmReadings.average().toInt() else null
++                            val avgSpo2 = if (spo2Readings.isNotEmpty()) spo2Readings.average().toInt() else null
++                            cloudManager.logSyncStatus(synced, avgBpm, avgSpo2, null)
++                        }
++                        isConnectedThisMinute = false
++                        syncedSecondsThisMinute = 0
++                        bpmReadings.clear()
++                        spo2Readings.clear()
++                    }
++                } catch (e: Exception) {}
++                handler.postDelayed(this, 1000)
++            }
++        }
++        handler.postDelayed(syncStateRunnable cat android/app/src/main/kotlin/com/strawberryFrappe/sync_companion/BleForegroundService.kt | grep -C 10 'petCareRunnable', 1000)
++    }
++
+     /**
+      * Compute pet stat decay using the same formula as Dart's PetStats.update().

@@ -18,6 +18,8 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.SharedPreferences
 import android.preference.PreferenceManager
 import android.util.Log
@@ -60,7 +62,15 @@ class BleForegroundService : Service() {
     private var ackClearRunnable: Runnable? = null
     // Pet care periodic checker
     private var petCareRunnable: Runnable? = null
+    private var syncStateRunnable: Runnable? = null
     private lateinit var bioProcessor: BioSignalProcessor
+    private lateinit var cloudManager: CloudManager
+
+    // Tallies
+    private var syncedSecondsThisMinute = 0
+    private var isConnectedThisMinute = false
+    private var bpmReadings = mutableListOf<Int>()
+    private var spo2Readings = mutableListOf<Int>()
 
     override fun onCreate() {
         super.onCreate()
@@ -73,6 +83,7 @@ class BleForegroundService : Service() {
         // native state so UI can display it immediately. The service will update
         // the persisted flag when a real connection/disconnection occurs.
         bioProcessor = BioSignalProcessor(this)
+        cloudManager = CloudManager(this)
         // If saved device id exists, attempt reconnect
         val did = prefs?.getString(PREF_SAVED_ID, null)
         if (did != null) {
@@ -80,6 +91,7 @@ class BleForegroundService : Service() {
         }
         // Start periodic pet care checker
         startPetCareTimer()
+        startSyncStateTimer()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -152,6 +164,8 @@ class BleForegroundService : Service() {
     override fun onDestroy() {
         petCareRunnable?.let { handler.removeCallbacks(it) }
         petCareRunnable = null
+        syncStateRunnable?.let { handler.removeCallbacks(it) }
+        syncStateRunnable = null
         disconnectGatt()
         super.onDestroy()
     }
@@ -216,6 +230,47 @@ class BleForegroundService : Service() {
             }
         }
         handler.postDelayed(petCareRunnable!!, PET_CARE_INTERVAL_MS)
+    }
+
+    private fun startSyncStateTimer() {
+        syncStateRunnable?.let { handler.removeCallbacks(it) }
+        syncStateRunnable = object : Runnable {
+            private var secondsTick = 0
+            override fun run() {
+                try {
+                    val connected = gatt != null && prefs?.getBoolean(PREF_CONNECTED, false) == true
+                    if (connected) {
+                        isConnectedThisMinute = true
+                        if (bioProcessor.humanDetected) {
+                            syncedSecondsThisMinute++
+                            if (bioProcessor.lastValidBpm > 0) bpmReadings.add(bioProcessor.lastValidBpm)
+                            if (bioProcessor.lastValidSpO2 > 0) spo2Readings.add(bioProcessor.lastValidSpO2)
+                        }
+                    }
+                    secondsTick++
+                    if (secondsTick >= 60) {
+                        if (isConnectedThisMinute) {
+                            val synced = syncedSecondsThisMinute > 30
+                            val currentSyncedMinutes = prefs?.getInt("synced_minutes_today", 0) ?: 0
+                            if (synced) prefs?.edit()?.putInt("synced_minutes_today", currentSyncedMinutes + 1)?.apply()
+                            
+                            val avgBpm = if (bpmReadings.isNotEmpty()) bpmReadings.average().toInt() else null
+                            val avgSpo2 = if (spo2Readings.isNotEmpty()) spo2Readings.average().toInt() else null
+                            cloudManager.logSyncStatus(synced, avgBpm, avgSpo2, null)
+                        }
+                        secondsTick = 0
+                        isConnectedThisMinute = false
+                        syncedSecondsThisMinute = 0
+                        bpmReadings.clear()
+                        spo2Readings.clear()
+                    }
+                } catch (e: Exception) {
+                    Log.w("BleForegroundService", "syncStateTimer error: $e")
+                }
+                handler.postDelayed(this, 1000)
+            }
+        }
+        handler.postDelayed(syncStateRunnable!!, 1000)
     }
 
     /**
@@ -409,13 +464,52 @@ class BleForegroundService : Service() {
         stopSelf()
     }
 
+
+    private var isScanning = false
+
+    private val scanCallback = object : ScanCallback() {
+        override fun onScanResult(callbackType: Int, result: ScanResult?) {
+            result?.device?.address?.let { address ->
+                val targetId = prefs?.getString(PREF_SAVED_ID, null)
+                if (targetId == address) {
+                    try { adapter?.bluetoothLeScanner?.stopScan(this) } catch (e: Exception) {}
+                    isScanning = false
+                    connectToDevice(targetId)
+                }
+            }
+        }
+        override fun onScanFailed(errorCode: Int) {
+            isScanning = false
+        }
+    }
+
     private fun scheduleReconnect() {
-        reconnectAttempts++
-        val delay = (Math.min(30, 1 shl reconnectAttempts) * 1000).toLong()
-        handler.postDelayed({
-            val did = prefs?.getString(PREF_SAVED_ID, null)
-            if (did != null) connectToDevice(did)
-        }, delay)
+        val targetId = prefs?.getString(PREF_SAVED_ID, null) ?: return
+        if (isScanning) return
+        
+        try {
+            val scanner = adapter?.bluetoothLeScanner
+            if (scanner != null) {
+                isScanning = true
+                scanner.startScan(scanCallback)
+            } else {
+                // Fallback if scanner unavailable
+                reconnectAttempts++
+                val delay = (Math.min(30, 1 shl reconnectAttempts) * 1000).toLong()
+                handler.postDelayed({
+                    val did = prefs?.getString(PREF_SAVED_ID, null)
+                    if (did != null) connectToDevice(did)
+                }, delay)
+            }
+        } catch (e: Exception) {
+            isScanning = false
+            reconnectAttempts++
+            val delay = (Math.min(30, 1 shl reconnectAttempts) * 1000).toLong()
+            handler.postDelayed({
+                val did = prefs?.getString(PREF_SAVED_ID, null)
+                if (did != null) connectToDevice(did)
+            }, delay)
+        }
     }
 
     private val gattCallback = object : BluetoothGattCallback() {

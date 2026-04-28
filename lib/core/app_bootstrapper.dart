@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:Therapets/services/cloud/telemetry_tracker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -19,7 +18,6 @@ class BootstrapResult {
   final CloudService cloudService;
   final DeviceService deviceService;
   final MissionService missionService;
-  final TelemetryTracker telemetryTracker;
   final PetStats petStats;
   final PetNotificationService notificationService;
 
@@ -28,7 +26,6 @@ class BootstrapResult {
     required this.cloudService,
     required this.deviceService,
     required this.missionService,
-    required this.telemetryTracker,
     required this.petStats,
     required this.notificationService,
   });
@@ -110,16 +107,6 @@ class AppBootstrapper {
       }
     }
 
-    final telemetryTracker = TelemetryTracker(
-      deviceService: deviceService,
-      cloudService: cloudService,
-    );
-    try {
-      await telemetryTracker.init().timeout(const Duration(seconds: 2));
-    } catch (e) {
-      debugPrint('[Bootstrapper] TelemetryTracker init failed: $e');
-    }
-
     final notificationService = PetNotificationService(localeService: localeService);
 
     debugPrint('[Bootstrapper] COMPLETE');
@@ -129,7 +116,6 @@ class AppBootstrapper {
       cloudService: cloudService,
       deviceService: deviceService,
       missionService: missionService,
-      telemetryTracker: telemetryTracker,
       petStats: petStats,
       notificationService: notificationService,
     );

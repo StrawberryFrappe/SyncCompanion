@@ -91,7 +91,6 @@ class _BootstrapWrapperState extends State<BootstrapWrapper> {
             Provider.value(value: bootstrap.cloudService),
             Provider.value(value: bootstrap.deviceService),
             Provider.value(value: bootstrap.missionService),
-            Provider.value(value: bootstrap.telemetryTracker),
             Provider.value(value: bootstrap.petStats),
             Provider.value(value: bootstrap.notificationService),
             ChangeNotifierProvider.value(value: bootstrap.localeService),
