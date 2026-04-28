@@ -241,6 +241,7 @@ class BleForegroundService : Service() {
                     val connected = gatt != null && prefs?.getBoolean(PREF_CONNECTED, false) == true
                     if (connected) {
                         isConnectedThisMinute = true
+                        bioProcessor.evaluateGracePeriod()
                         if (bioProcessor.humanDetected) {
                             syncedSecondsThisMinute++
                             if (bioProcessor.lastValidBpm > 0) bpmReadings.add(bioProcessor.lastValidBpm)
@@ -733,6 +734,8 @@ class BioSignalProcessor(private val context: Context) {
     var lastValidBpm = 0
     var lastValidSpO2 = 0
     var humanDetected = false
+    private var lastHumanDetectedTimeMs = 0L
+
 
     fun process(rawIr: Int, rawRed: Int) {
         if (rawIr < 1000) {
@@ -792,14 +795,19 @@ class BioSignalProcessor(private val context: Context) {
         val displaySpO2 = if (fingerDetectedState && currentSpO2 >= minSpo2ForHuman) currentSpO2 else (if (fingerDetectedState) lastValidSpO2 else 0)
         
         val hasValidVitals = displayBpm in minBpmForHuman..maxBpmForHuman && displaySpO2 >= minSpo2ForHuman
-        val fingerSustained = consecutiveValidSamples > 50
+        val fingerSustained = consecutiveValidSamples > 15
         val bpmStdDev = calculateBpmStdDev()
-        val isBpmStable = bpmHistory.size < 3 || bpmStdDev < 30.0
+        val isBpmStable = bpmHistory.size < 3 || bpmStdDev < 40.0
         
         val newHumanDetected = fingerDetectedState && hasValidVitals && fingerSustained && isBpmStable
         
-        if (newHumanDetected != humanDetected) {
-            humanDetected = newHumanDetected
+        if (newHumanDetected) {
+            lastHumanDetectedTimeMs = System.currentTimeMillis()
+        }
+        
+        val effectivelyDetected = newHumanDetected || (System.currentTimeMillis() - lastHumanDetectedTimeMs < 15000L)
+        if (effectivelyDetected != humanDetected) {
+            humanDetected = effectivelyDetected
             updatePersistedStats()
         }
     }
@@ -904,6 +912,15 @@ class BioSignalProcessor(private val context: Context) {
         if (amplitudeSampleCount >= amplitudeWindowSamples) amplitudeSampleCount = 0
     }
     
+
+    fun evaluateGracePeriod() {
+        val effectivelyDetected = (System.currentTimeMillis() - lastHumanDetectedTimeMs < 15000L)
+        if (humanDetected && !effectivelyDetected) {
+            humanDetected = false
+            updatePersistedStats()
+        }
+    }
+
     private fun resetOnNoFinger() {
         state = BeatState.INIT
         threshold = minThreshold
@@ -923,8 +940,9 @@ class BioSignalProcessor(private val context: Context) {
         amplitudeSampleCount = 0
         initialized = false
         fingerDetectedState = false
-        if (humanDetected) {
-            humanDetected = false
+        val effectivelyDetected = (System.currentTimeMillis() - lastHumanDetectedTimeMs < 15000L)
+        if (effectivelyDetected != humanDetected) {
+            humanDetected = effectivelyDetected
             updatePersistedStats()
         }
     }
