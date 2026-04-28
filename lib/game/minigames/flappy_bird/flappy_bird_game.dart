@@ -106,9 +106,11 @@ class FlappyBirdGame extends FlameGame with TapCallbacks, HasCollisionDetection 
   }
 
   void _onDeviceEvent(DeviceEvent event) {
-    if (isGameOver || !hasStarted) return;
-    
     if (event is ShakeEvent) {
+      if (isGameOver) return;
+      if (!hasStarted) {
+        startGame();
+      }
       _tryFlap();
     }
   }
