@@ -13,8 +13,8 @@ class DeviceStatusAggregator {
   final bool Function() _hasRecentTelemetryProvider;
 
   // Configuration
-  static const Duration _syncGracePeriod = Duration(seconds: 12);
-  static const int _noHumanDebounceThreshold = 20;
+  static const Duration _syncGracePeriod = Duration(seconds: 15);
+  static const int _noHumanDebounceThreshold = 15;
 
   // State
   Timer? _syncGraceTimer;
@@ -43,16 +43,28 @@ class DeviceStatusAggregator {
     _startHistoryTimer();
   }
 
+  int _staleSeconds = 0;
+  bool _lastRecordedState = false;
+
   void _startHistoryTimer() {
     _historyTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_hasRecentTelemetryProvider()) {
-        _humanDetectionHistory.addLast(_isHumanDetectedProvider());
+        _staleSeconds = 0;
+        bool currentState = _isHumanDetectedProvider();
+        // Update last recorded state for grace period
+        _lastRecordedState = currentState;
+        _humanDetectionHistory.addLast(currentState);
         if (_humanDetectionHistory.length > 60) {
           _humanDetectionHistory.removeFirst();
         }
         update();
       } else if (_humanDetectionHistory.isNotEmpty) {
-        _humanDetectionHistory.clear();
+        _staleSeconds++;
+        // Case 3: Device Disconnects (BLE drops) -> Freeze history for 30s
+        if (_staleSeconds > 30) {
+          _humanDetectionHistory.clear();
+        }
+        update();
       }
     });
   }

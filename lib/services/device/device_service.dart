@@ -356,13 +356,10 @@ class DeviceService {
   /// Re-attaches the severed EventChannel and resets stale Dart state
   /// so the monitoring pipeline recovers immediately.
   Future<void> onAppResumed() async {
-    // Reset liveness so we don't report stale "connected" until fresh packets arrive
-    _lastTelemetryTime = null;
-    _awaitingFreshTelemetry = true;
-    _statusAggregator.reset();
-    // Emit current display status (will be waiting/searching until data flows)
-    _emitDisplayStatus(currentDisplayStatus);
-    // Re-attach native event stream and request fresh status from native service
+    // DO NOT reset liveness. The native service holds the source of truth.
+    // If we nuke state here, we destroy the background barrage history.
+
+    // Re-attach native event stream and request fresh canonical status from native service
     await _bluetooth.reattachNativeEventStream();
   }
 
